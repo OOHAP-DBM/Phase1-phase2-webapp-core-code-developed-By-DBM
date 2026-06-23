@@ -1,0 +1,2385 @@
+<?php
+
+namespace Modules\POS\Controllers\Web;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
+use Modules\POS\Services\POSBookingService;
+use Modules\POS\Models\POSBookingHoarding;
+use Modules\POS\Models\PosCustomer;
+use App\Models\Hoarding;
+use App\Models\User;
+use Modules\Hoardings\Models\HoardingMedia;
+use Modules\Hoardings\Services\HoardingAvailabilityService;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use App\Services\Whatsapp\TwilioWhatsappService;
+use Modules\POS\Models\POSBooking;
+use Modules\POS\Events\PosCustomerCreated;
+use App\Notifications\PosBookingHoldExpiredNotification;
+use Illuminate\Support\Facades\Notification;
+
+class VendorPosController extends Controller
+{
+    protected POSBookingService $posBookingService;
+    protected HoardingAvailabilityService $availabilityService;
+
+    public function __construct(
+        POSBookingService $posBookingService,
+        HoardingAvailabilityService $availabilityService
+    ) {
+        $this->middleware(['auth', 'role:vendor|admin|superadmin']);
+        $this->posBookingService = $posBookingService;
+        $this->availabilityService = $availabilityService;
+    }
+
+    private function resolveEffectiveVendorId(?Request $request = null): int
+    {
+        $request = $request ?? request();
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        $isAdminContext = method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['admin', 'superadmin', 'super_admin']);
+
+        if (!$isAdminContext) {
+            return (int) $user->id;
+        }
+
+        $sessionKey = 'pos.selected_vendor_id';
+        $requestedVendorId = $request->input('vendor_id') ?? $request->query('vendor_id');
+
+        if (!empty($requestedVendorId)) {
+            $vendor = User::query()
+                ->whereKey((int) $requestedVendorId)
+                ->whereHas('roles', function ($query) {
+                    $query->where('name', 'vendor');
+                })
+                ->first();
+
+            if (!$vendor) {
+                abort(422, 'Invalid vendor selected for POS context.');
+            }
+
+            if ($request->hasSession()) {
+                $request->session()->put($sessionKey, (int) $vendor->id);
+            }
+
+            return (int) $vendor->id;
+        }
+
+        $sessionVendorId = $request->hasSession() ? $request->session()->get($sessionKey) : null;
+        if (!empty($sessionVendorId)) {
+            $exists = User::query()
+                ->whereKey((int) $sessionVendorId)
+                ->whereHas('roles', function ($query) {
+                    $query->where('name', 'vendor');
+                })
+                ->exists();
+
+            if ($exists) {
+                return (int) $sessionVendorId;
+            }
+        }
+
+        $fallbackVendorId = User::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('name', 'vendor');
+            })
+            ->orderBy('id')
+            ->value('id');
+
+        if (!$fallbackVendorId) {
+            abort(422, 'No vendor available for POS context.');
+        }
+
+        if ($request->hasSession()) {
+            $request->session()->put($sessionKey, (int) $fallbackVendorId);
+        }
+
+        return (int) $fallbackVendorId;
+    }
+
+    private function resolveAdminBookingScopeContext(?Request $request = null): array
+    {
+        $request = $request ?? request();
+        $user = Auth::user();
+
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
+
+        $isAdminContext = method_exists($user, 'hasAnyRole')
+            && $user->hasAnyRole(['admin', 'superadmin', 'super_admin']);
+
+        if (!$isAdminContext) {
+            return [
+                'scope' => 'mine',
+                'vendor_id' => (int) $user->id,
+                'is_admin' => false,
+            ];
+        }
+
+        $scope = strtolower((string) ($request->input('booking_scope')
+            ?? $request->query('booking_scope')
+            ?? ($request->hasSession() ? $request->session()->get('pos.admin_booking_scope', 'vendor') : 'vendor')));
+
+        if (!in_array($scope, ['overall', 'mine', 'vendor'], true)) {
+            $scope = 'vendor';
+        }
+
+        if ($scope === 'overall') {
+            return [
+                'scope' => 'overall',
+                'vendor_id' => null,
+                'is_admin' => true,
+            ];
+        }
+
+        if ($scope === 'mine') {
+            return [
+                'scope' => 'mine',
+                'vendor_id' => (int) $user->id,
+                'is_admin' => true,
+            ];
+        }
+
+        return [
+            'scope' => 'vendor',
+            'vendor_id' => $this->resolveEffectiveVendorId($request),
+            'is_admin' => true,
+        ];
+    }
+
+    /**
+     * Show POS bookings list page for vendor
+     */
+    public function index(Request $request)
+    {
+        // Blade view handles API fetch, so just render view
+        return view('vendor.pos.list');
+    }
+
+    /**
+     * Show create booking page
+     */
+    public function create(Request $request)
+    {
+        // Do not use or set any vendor context/session for create POS booking
+        return view('vendor.pos.create', [
+            'posGstRate' => $this->posBookingService->getGSTRate(),
+        ]);
+    }
+
+    /**
+     * Show POS dashboard
+     */
+    public function dashboard(Request $request)
+    {
+        return view('vendor.pos.dashboard');
+    }
+
+    /**
+     * Show POS customers list page for vendor
+     */
+    public function customers(Request $request)
+    {
+        $vendorId = $this->resolveEffectiveVendorId($request);
+
+        $bookingCustomers = POSBooking::where('vendor_id', $vendorId)
+            ->whereNotNull('customer_id')
+            ->pluck('customer_id')
+            ->unique()
+            ->toArray();
+
+        $posCustomerUserIds = PosCustomer::where('vendor_id', $vendorId)
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->unique()
+            ->toArray();
+
+        $allUserIds = collect($bookingCustomers)
+            ->merge($posCustomerUserIds)
+            ->unique()
+            ->filter()
+            ->values()
+            ->toArray();
+        $allUserIds = User::whereIn('id', $allUserIds)
+            ->where('active_role', 'customer')
+            ->pluck('id')
+            ->toArray();
+
+        $search = trim($request->input('search', ''));
+        $status = (array) $request->input('status', []);
+        $usersQuery = User::whereIn('id', $allUserIds)
+            ->with(['posProfile' => function ($query) use ($vendorId) {
+                $query->where('vendor_id', $vendorId);
+            }]);
+        if ($search !== '') {
+            $usersQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                    ->orWhere('email', 'like', "%$search%")
+                    ->orWhere('phone', 'like', "%$search%")
+                    ->orWhereHas('posProfile', function ($q2) use ($search) {
+                        $q2->where('business_name', 'like', "%$search%");
+                    });
+            });
+        }
+        if (in_array('active', $status) && in_array('inactive', $status)) {
+            // No filter, show all
+        } else if (in_array('active', $status)) {
+            $usersQuery->whereIn('id', function ($query) use ($vendorId) {
+                return $query->select('customer_id')
+                    ->from('pos_bookings')
+                    ->where('vendor_id', $vendorId)
+                    ->whereNotNull('customer_id');
+            });
+        } else if (in_array('inactive', $status)) {
+            $usersQuery->whereNotIn('id', function ($query) use ($vendorId) {
+                return $query->select('customer_id')
+                    ->from('pos_bookings')
+                    ->where('vendor_id', $vendorId)
+                    ->whereNotNull('customer_id');
+            });
+        }
+        $users = $usersQuery->get();
+
+        $customers = $users->map(function ($user) use ($vendorId) {
+            $bookings = POSBooking::where('vendor_id', $vendorId)
+                ->where('customer_id', $user->id)
+                ->get();
+
+            $totalBookings = $bookings->count();
+            $totalSpent = $bookings->sum('total_amount');
+            $lastBookingAt = $bookings->max('created_at');
+
+            $name = $user->name;
+            if ($user->posProfile && $user->posProfile->business_name) {
+                $name = $user->posProfile->business_name;
+            }
+
+            return [
+                'id' => $user->id,
+                'name' => $name,
+                'phone' => $user->phone,
+                'email' => $user->email,
+                'total_bookings' => $totalBookings,
+                'total_spent' => $totalSpent,
+                'last_booking_at' => $lastBookingAt,
+                'is_active' => $totalBookings > 0,
+                'profile_status' => $user->status === 'active' ? 'active' : 'inactive',
+            ];
+        });
+
+        return view('vendor.pos.customers', [
+            'customers' => $customers,
+            'totalCustomers' => $customers->count(),
+            'posBasePath' => '/vendor/pos',
+            'posRoutePrefix' => 'vendor.pos',
+            'posLayout' => 'layouts.vendor',
+            'posScope' => 'vendor',
+        ]);
+    }
+
+    /**
+     * Show POS booking details page for vendor
+     */
+    public function show($id)
+    {
+        \Log::info("Vendor POS show booking details", [
+            'booking_id' => $id,
+            'user_id' => Auth::id(),
+        ]);
+        $booking = POSBooking::findOrFail($id);
+        \Log::info("this is" . $booking);
+
+        // The view will fetch booking details via API
+        return view('vendor.pos.show', ['bookingId' => $id]);
+    }
+
+    /**
+     * View POS booking invoice PDF for vendor
+     */
+    public function viewInvoice(int $id)
+    {
+        $booking = POSBooking::forVendor(Auth::id())->findOrFail($id);
+
+        if (empty($booking->invoice_path)) {
+            abort(404, 'Invoice not available for this booking.');
+        }
+
+        if (!Storage::disk('public')->exists($booking->invoice_path)) {
+            abort(404, 'Invoice file not found.');
+        }
+
+        $absolutePath = Storage::disk('public')->path($booking->invoice_path);
+        return response()->file($absolutePath, [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
+    /**
+     * Get POS settings (GST rate, payment modes, etc.)
+     * Web endpoint: GET /vendor/pos/api/settings
+     */
+    public function getSettings(): JsonResponse
+    {
+        try {
+            $gstRate = $this->posBookingService->getGSTRate();
+            $allowCash = $this->posBookingService->isCashPaymentAllowed();
+            $allowCreditNote = $this->posBookingService->isCreditNoteAllowed();
+            $creditNoteDays = $this->posBookingService->getCreditNoteDays();
+            $autoApproval = $this->posBookingService->isAutoApprovalEnabled();
+            $autoInvoice = $this->posBookingService->isAutoInvoiceEnabled();
+
+            $cashLimit = DB::table('settings')->where('key', 'pos_cash_limit')->value('value');
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'gst_rate' => $gstRate,
+                    'allow_cash_payment' => $allowCash,
+                    'allow_credit_note' => $allowCreditNote,
+                    'credit_note_days' => $creditNoteDays,
+                    'auto_approval' => $autoApproval,
+                    'auto_invoice' => $autoInvoice,
+                    'pos_cash_limit' => $cashLimit, // <-- Add this line
+                    'payment_modes' => [
+                        'cash' => 'Cash',
+                        'credit_note' => 'Credit Note',
+                        'bank_transfer' => 'Bank Transfer',
+                        'cheque' => 'Cheque',
+                        'online' => 'Online Payment',
+                    ],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching POS settings', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch settings',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get vendor's available hoardings for POS booking
+     * Web endpoint: GET /vendor/pos/api/hoardings
+     */
+    // public function getHoardings(Request $request): JsonResponse
+    // {
+    //     try {
+    //         $vendorId = Auth::id();
+    //         $query = Hoarding::query()
+    //             ->where('vendor_id', $vendorId)
+    //             ->where('status', 'active');
+
+    //         // ...existing code for filters (unchanged)...
+    //         // 1. Type filter
+    //         if ($request->filled('type') && $request->type !== 'ALL') {
+    //             $query->where('hoarding_type', strtolower($request->type));
+    //         }
+    //         // 2. Text search
+    //         if ($request->filled('search')) {
+    //             $search = $request->get('search');
+    //             $query->where(function ($q) use ($search) {
+    //                 $q->where('title',   'like', "%{$search}%")
+    //                 ->orWhere('city',    'like', "%{$search}%")
+    //                 ->orWhere('address', 'like', "%{$search}%");
+    //             });
+    //         }
+    //         // 3. Category filter
+    //         if ($request->filled('category')) {
+    //             $categories = array_filter(explode(',', $request->get('category')));
+    //             if (!empty($categories)) {
+    //                 $query->whereIn('category', $categories);
+    //             }
+    //         }
+    //         // 4. Availability filter
+    //         if ($request->filled('availability')) {
+    //             $availabilityValues = array_filter(explode(',', $request->get('availability')));
+    //             if (count($availabilityValues) === 1) {
+    //                 $today = now()->toDateString();
+    //                 if (in_array('available', $availabilityValues)) {
+    //                     $query->whereDoesntHave('bookings', function ($q) use ($today) {
+    //                         $q->where('start_date', '<=', $today)
+    //                         ->where('end_date',   '>=', $today)
+    //                         ->whereIn('status', ['confirmed', 'active', 'payment_hold']);
+    //                     });
+    //                 } elseif (in_array('booked', $availabilityValues)) {
+    //                     $query->whereHas('bookings', function ($q) use ($today) {
+    //                         $q->where('start_date', '<=', $today)
+    //                         ->where('end_date',   '>=', $today)
+    //                         ->whereIn('status', ['confirmed', 'active', 'payment_hold']);
+    //                     });
+    //                 }
+    //             }
+    //         }
+    //         // 5. Surroundings filter
+    //         if ($request->filled('surroundings')) {
+    //             $surroundings = array_filter(explode(',', $request->get('surroundings')));
+    //             if (!empty($surroundings)) {
+    //                 $query->where(function ($q) use ($surroundings) {
+    //                     foreach ($surroundings as $surrounding) {
+    //                         $q->orWhereRaw('JSON_CONTAINS(located_at, ?)', [json_encode($surrounding)]);
+    //                     }
+    //                 });
+    //             }
+    //         }
+    //         // 6. Hoarding Size filter
+    //         $hoardingSizeMin = (int) $request->get('hoarding_size_min', 0);
+    //         $hoardingSizeMax = (int) $request->get('hoarding_size_max', 1000);
+    //         $hasHoardingSizeFilter = $hoardingSizeMin > 0 || $hoardingSizeMax < 1000;
+    //         if ($hasHoardingSizeFilter) {
+    //             $query->where(function ($q) use ($hoardingSizeMin, $hoardingSizeMax) {
+    //                 $q->whereHas('oohHoarding', function ($oohQ) use ($hoardingSizeMin, $hoardingSizeMax) {
+    //                     $oohQ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) >= ?', [$hoardingSizeMin])
+    //                         ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) <= ?', [$hoardingSizeMax]);
+    //                 })
+    //                 ->orWhereHas('doohScreen', function ($doohQ) use ($hoardingSizeMin, $hoardingSizeMax) {
+    //                     $doohQ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) >= ?', [$hoardingSizeMin])
+    //                         ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) <= ?', [$hoardingSizeMax]);
+    //                 });
+    //             });
+    //         }
+    //         // 7. Screen Size filter
+    //         $screenSizeMin = (int) $request->get('screen_size_min', 0);
+    //         $screenSizeMax = (int) $request->get('screen_size_max', 1000);
+    //         $hasScreenSizeFilter = $screenSizeMin > 0 || $screenSizeMax < 1000;
+    //         if ($hasScreenSizeFilter) {
+    //             $query->whereHas('doohScreen', function ($q) use ($screenSizeMin, $screenSizeMax) {
+    //                 $q->where('screen_size', '>=', $screenSizeMin)
+    //                 ->where('screen_size', '<=', $screenSizeMax);
+    //             });
+    //         }
+    //         // 8. Resolution filter
+    //         if ($request->filled('resolution')) {
+    //             $resolutions = array_filter(explode(',', $request->get('resolution')));
+    //             if (!empty($resolutions)) {
+    //                 $query->whereHas('doohScreen', function ($q) use ($resolutions) {
+    //                     $q->whereIn('resolution', $resolutions);
+    //                 });
+    //             }
+    //         }
+    //         // 9. Date availability filter
+    //         if ($request->filled('start_date') && $request->filled('end_date')) {
+    //             $startDate = $request->get('start_date');
+    //             $endDate   = $request->get('end_date');
+    //             $query->whereDoesntHave('bookings', function ($q) use ($startDate, $endDate) {
+    //                 $q->where(function ($inner) use ($startDate, $endDate) {
+    //                     $inner->whereBetween('start_date', [$startDate, $endDate])
+    //                         ->orWhereBetween('end_date', [$startDate, $endDate])
+    //                         ->orWhere(function ($overlap) use ($startDate, $endDate) {
+    //                             $overlap->where('start_date', '<=', $startDate)
+    //                                     ->where('end_date', '>=', $endDate);
+    //                         });
+    //                 })
+    //                 ->whereIn('status', ['confirmed', 'payment_hold', 'active']);
+    //             });
+    //         }
+
+    //         // ── Pagination ──
+    //         $perPage = (int) $request->get('per_page', 8);
+    //         $page = (int) $request->get('page', 1);
+    //         $paginator = $query
+    //             ->select([
+    //                 'id', 'title', 'address', 'city', 'state',
+    //                 'hoarding_type', 'category', 'located_at',
+    //                 'base_monthly_price', 'monthly_price',
+    //             ])
+    //             ->orderBy('title')
+    //             ->get()
+    //             ->map(function ($hoarding) {
+    //                 $imageUrl = $this->getHoardingImageUrl($hoarding);
+
+    //                 $pricePerMonth = isset($hoarding->monthly_price)
+    //                     ? (float) $hoarding->monthly_price
+    //                     : null;
+
+    //                 if (!$pricePerMonth || $pricePerMonth <= 0) {
+    //                     $pricePerMonth = $hoarding->base_monthly_price ?? 0;
+    //                 }
+
+    //                 return [
+    //                     'id'                  => $hoarding->id,
+    //                     'title'               => $hoarding->title,
+    //                     'location_address'    => $hoarding->address,
+    //                     'location_city'       => $hoarding->city,
+    //                     'location_state'      => $hoarding->state,
+    //                     'type'                => $hoarding->hoarding_type,
+    //                     'category'            => $hoarding->category,
+    //                     'price_per_month'     => $pricePerMonth,
+    //                     'image_url'           => $imageUrl,
+    //                     'total_slots_per_day' => $hoarding->doohScreen->total_slots_per_day ?? 300,
+    //                     'is_currently_booked' => $hoarding->bookings()
+    //                         ->where('start_date', '<=', now())
+    //                         ->where('end_date',   '>=', now())
+    //                         ->whereIn('status', ['confirmed', 'active'])
+    //                         ->exists(),
+    //                 ];
+    //             });
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'data'    => $hoardings,
+    //             'current_page' => $paginator->currentPage(),
+    //             'per_page' => $paginator->perPage(),
+    //             'total' => $paginator->total(),
+    //             'last_page' => $paginator->lastPage(),
+    //             'count'   => $hoardings->count(),
+    //             'filters_applied' => $request->only([
+    //                 'type', 'category', 'resolution', 'availability',
+    //                 'surroundings', 'hoarding_size_min', 'hoarding_size_max',
+    //                 'screen_size_min', 'screen_size_max',
+    //             ]),
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         Log::error('Error fetching hoardings', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Failed to fetch hoardings',
+    //             'error'   => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
+    public function getHoardings(Request $request): JsonResponse
+    {
+        try {
+            $vendorId = $this->resolveEffectiveVendorId($request);
+
+            // ── Base query ────────────────────────────────────────────────
+            $query = Hoarding::query()
+                ->where('vendor_id', $vendorId)
+                ->where('status', 'active');
+
+            // ── 1. Type filter (OOH / DOOH / ALL) ─────────────────────────
+            if ($request->filled('type') && $request->type !== 'ALL') {
+                $query->where('hoarding_type', strtolower($request->type));
+                // strtolower because DB stores 'ooh' / 'dooh' (lowercase)
+            }
+
+            // ── 2. Text search ─────────────────────────────────────────────
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('title',   'like', "%{$search}%")
+                        ->orWhere('city',    'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%");
+                });
+            }
+
+            // ── 3. Category filter (OOH only) ─────────────────────────────
+            // DB column: hoardings.category  (values: billboard, unipole, gantry, pole_kiosk)
+            if ($request->filled('category')) {
+                $categories = array_filter(explode(',', $request->get('category')));
+                if (!empty($categories)) {
+                    $query->whereIn('category', $categories);
+                }
+            }
+
+            // ── 4. Availability filter ─────────────────────────────────────
+            // "available"  → no active booking overlapping today
+            // "booked"     → has active booking overlapping today
+            if ($request->filled('availability')) {
+                $availabilityValues = array_filter(explode(',', $request->get('availability')));
+
+                // Only filter if exactly one option is chosen (both = no filter needed)
+                if (count($availabilityValues) === 1) {
+                    $today = now()->toDateString();
+
+                    if (in_array('available', $availabilityValues)) {
+                        // Hoardings with NO active booking today
+                        $query->whereDoesntHave('bookings', function ($q) use ($today) {
+                            $q->where('start_date', '<=', $today)
+                                ->where('end_date',   '>=', $today)
+                                ->whereIn('status', ['confirmed', 'active', 'payment_hold']);
+                        });
+                    } elseif (in_array('booked', $availabilityValues)) {
+                        // Hoardings WITH an active booking today
+                        $query->whereHas('bookings', function ($q) use ($today) {
+                            $q->where('start_date', '<=', $today)
+                                ->where('end_date',   '>=', $today)
+                                ->whereIn('status', ['confirmed', 'active', 'payment_hold']);
+                        });
+                    }
+                }
+            }
+
+            // ── 5. Surroundings filter ─────────────────────────────────────
+            // DB column: hoardings.located_at (JSON array)
+            // Values: crossroad, highway, market_area, commercial_complexes, main_road
+            if ($request->filled('surroundings')) {
+                $surroundings = array_filter(explode(',', $request->get('surroundings')));
+                if (!empty($surroundings)) {
+                    $query->where(function ($q) use ($surroundings) {
+                        foreach ($surroundings as $surrounding) {
+                            // JSON_CONTAINS for MySQL, or use LIKE for compatibility
+                            $q->orWhereRaw('JSON_CONTAINS(located_at, ?)', [json_encode($surrounding)]);
+                            // Fallback if not using JSON column:
+                            // $q->orWhere('located_at', 'like', "%{$surrounding}%");
+                        }
+                    });
+                }
+            }
+
+            // ── 6. Hoarding Size filter (OOH → ooh_hoardings.width * height) ─
+            // Join with ooh_hoardings to filter by size (width * height = sq.ft area)
+            $hoardingSizeMin = (int) $request->get('hoarding_size_min', 0);
+            $hoardingSizeMax = (int) $request->get('hoarding_size_max', 1000);
+
+            $hasHoardingSizeFilter = $hoardingSizeMin > 0 || $hoardingSizeMax < 1000;
+
+            if ($hasHoardingSizeFilter) {
+                $query->where(function ($q) use ($hoardingSizeMin, $hoardingSizeMax) {
+                    // OOH: join ooh_hoardings for width/height
+                    $q->whereHas('oohHoarding', function ($oohQ) use ($hoardingSizeMin, $hoardingSizeMax) {
+                        $oohQ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) >= ?', [$hoardingSizeMin])
+                            ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) <= ?', [$hoardingSizeMax]);
+                    })
+                        // OR DOOH: join dooh_screens for width/height
+                        ->orWhereHas('doohScreen', function ($doohQ) use ($hoardingSizeMin, $hoardingSizeMax) {
+                            $doohQ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) >= ?', [$hoardingSizeMin])
+                                ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) <= ?', [$hoardingSizeMax]);
+                        });
+                });
+            }
+
+            // ── 7. Screen Size filter (DOOH → dooh_screens.screen_size) ────
+            // Uses dooh_screens.screen_size column (in sq.ft or inches — adjust as needed)
+            $screenSizeMin = (int) $request->get('screen_size_min', 0);
+            $screenSizeMax = (int) $request->get('screen_size_max', 1000);
+
+            $hasScreenSizeFilter = $screenSizeMin > 0 || $screenSizeMax < 1000;
+
+            if ($hasScreenSizeFilter) {
+                $query->whereHas('doohScreen', function ($q) use ($screenSizeMin, $screenSizeMax) {
+                    // If you have a dedicated screen_size column:
+                    $q->where('screen_size', '>=', $screenSizeMin)
+                        ->where('screen_size', '<=', $screenSizeMax);
+
+                    // If you DON'T have screen_size column but have width/height:
+                    // $q->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) >= ?', [$screenSizeMin])
+                    //   ->whereRaw('(COALESCE(width, 0) * COALESCE(height, 0)) <= ?', [$screenSizeMax]);
+                });
+            }
+
+            // ── 8. Resolution filter (DOOH only) ──────────────────────────
+            // DB column: dooh_screens.resolution  (values: led, hd, ultra_hd)
+            if ($request->filled('resolution')) {
+                $resolutions = array_filter(explode(',', $request->get('resolution')));
+                if (!empty($resolutions)) {
+                    $query->whereHas('doohScreen', function ($q) use ($resolutions) {
+                        $q->whereIn('resolution', $resolutions);
+                    });
+                }
+            }
+
+            // ── 9. Date availability filter ────────────────────────────────
+            if ($request->filled('start_date') && $request->filled('end_date')) {
+                $startDate = $request->get('start_date');
+                $endDate   = $request->get('end_date');
+
+                $query->where('base_monthly_price', '>', 0)
+                    ->whereDoesntHave('bookings', function ($q) use ($startDate, $endDate) {
+                        $q->where(function ($inner) use ($startDate, $endDate) {
+                            $inner->whereBetween('start_date', [$startDate, $endDate])
+                                ->orWhereBetween('end_date', [$startDate, $endDate])
+                                ->orWhere(function ($overlap) use ($startDate, $endDate) {
+                                    $overlap->where('start_date', '<=', $startDate)
+                                        ->where('end_date', '>=', $endDate);
+                                });
+                        })
+                            ->whereIn('status', ['confirmed', 'payment_hold', 'active']);
+                    });
+            }
+
+            // ── Execute & map ──────────────────────────────────────────────
+            $hoardings = $query
+                ->select([
+                    'id',
+                    'title',
+                    'address',
+                    'city',
+                    'state',
+                    'hoarding_type',
+                    'category',
+                    'located_at',
+                    'base_monthly_price',
+                    'monthly_price',
+                ])
+                ->orderBy('title')
+                ->get()
+                ->map(function ($hoarding) {
+                    $imageUrl = $this->getHoardingImageUrl($hoarding);
+
+                    $pricePerMonth = isset($hoarding->monthly_price)
+                        ? (float) $hoarding->monthly_price
+                        : null;
+
+                    if (!$pricePerMonth || $pricePerMonth <= 0) {
+                        $pricePerMonth = $hoarding->base_monthly_price ?? 0;
+                    }
+
+                    return [
+                        'id'                  => $hoarding->id,
+                        'title'               => $hoarding->title,
+                        'location_address'    => $hoarding->address,
+                        'location_city'       => $hoarding->city,
+                        'location_state'      => $hoarding->state,
+                        'display_location'    => $hoarding->display_location,
+                        'type'                => $hoarding->hoarding_type,
+                        'category'            => $hoarding->category,
+                        'price_per_month'     => $pricePerMonth,
+                        'image_url'           => $imageUrl,
+                        'total_slots_per_day' => $hoarding->doohScreen->total_slots_per_day ?? 300,
+                        'is_currently_booked' => $hoarding->bookings()
+                            ->where('start_date', '<=', now())
+                            ->where('end_date',   '>=', now())
+                            ->whereIn('status', ['confirmed', 'active'])
+                            ->exists(),
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data'    => $hoardings,
+                'count'   => $hoardings->count(),
+                'filters_applied' => $request->only([
+                    'type',
+                    'category',
+                    'resolution',
+                    'availability',
+                    'surroundings',
+                    'hoarding_size_min',
+                    'hoarding_size_max',
+                    'screen_size_min',
+                    'screen_size_max',
+                ]),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching hoardings', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch hoardings',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper: Get hoarding image URL based on type
+     * 
+     * OOH: Uses hoarding_media table (file_path column)
+     * DOOH: Uses spatie media library on DOOHScreen child
+     */
+    private function getHoardingImageUrl(Hoarding $hoarding): ?string
+    {
+        try {
+            // For OOH: Check hoarding_media table
+            if ($hoarding->hoarding_type === 'ooh') {
+                $media = \Modules\Hoardings\Models\HoardingMedia::where('hoarding_id', $hoarding->id)
+                    ->where('is_primary', true)
+                    ->orderBy('sort_order')
+                    ->first();
+
+                if ($media && $media->file_path) {
+                    return asset('storage/' . ltrim($media->file_path, '/'));
+                }
+
+                // Fallback: Get first media
+                $media = \Modules\Hoardings\Models\HoardingMedia::where('hoarding_id', $hoarding->id)
+                    ->orderBy('sort_order')
+                    ->first();
+
+                return $media ? asset('storage/' . ltrim($media->file_path, '/')) : null;
+            }
+
+            // For DOOH: Try Spatie media library, fallback to dooh_screen_media table
+            if ($hoarding->hoarding_type === 'dooh' && $hoarding->doohScreen) {
+                // Try Spatie media library (if used)
+                if (method_exists($hoarding->doohScreen, 'getFirstMedia')) {
+                    $media = $hoarding->doohScreen->getFirstMedia('hero_image');
+                    if ($media) {
+                        return $media->getUrl();
+                    }
+                    $galleryMedia = $hoarding->doohScreen->getFirstMedia('gallery');
+                    if ($galleryMedia) {
+                        return $galleryMedia->getUrl();
+                    }
+                }
+                // Fallback: Use dooh_screen_media table (primary or first)
+                $media = $hoarding->doohScreen->media()
+                    ->orderByDesc('is_primary')
+                    ->orderBy('sort_order')
+                    ->first();
+                if ($media && $media->file_path) {
+                    return asset('storage/' . ltrim($media->file_path, '/'));
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::warning('Error getting hoarding image URL', [
+                'hoarding_id' => $hoarding->id,
+                'type' => $hoarding->hoarding_type,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get a customer by ID
+     * Web endpoint: GET /vendor/pos/api/customers/{id}
+     */
+    public function getCustomerById(Request $request, $id): JsonResponse
+    {
+        try {
+            $customer = User::query()
+                ->where('id', $id)
+                ->whereHas('roles', function ($q) {
+                    $q->where('name', 'customer');
+                })
+                ->select(['id', 'name', 'email', 'phone', 'gstin', 'address', 'billing_address', 'billing_city', 'billing_state', 'billing_pincode'])
+                ->first();
+
+            if (!$customer) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Customer not found',
+                    'data' => null,
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $customer,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching customer by ID', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch customer',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Search customers by name, phone, or email
+     * Web endpoint: GET /vendor/pos/api/customers?search=term
+     */
+    public function searchCustomers(Request $request): JsonResponse
+    {
+        try {
+            $search   = $request->get('search', '');
+            $vendorId = $this->resolveEffectiveVendorId($request);
+
+            if (strlen($search) < 2) {
+                return response()->json([
+                    'success' => true,
+                    'data'    => [],
+                    'message' => 'Search term must be at least 2 characters',
+                ]);
+            }
+
+            // pos_customers table mein jo is vendor ke liye registered hain
+            $posCustomerUserIds = PosCustomer::where('vendor_id', $vendorId)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->toArray();
+
+            $customers = User::query()
+                ->where(function ($q) use ($posCustomerUserIds) {
+                    // active_role = 'customer' ho
+                    $q->where('active_role', 'customer')
+                        // ya pos_customers mein ho is vendor ke liye
+                        ->orWhereIn('id', $posCustomerUserIds);
+                })
+                ->where(function ($q) use ($search) {
+                    $q->where('name',  'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                })
+                ->select(['id', 'name', 'email', 'phone', 'gstin', 'address', 'billing_address', 'billing_city', 'billing_state', 'billing_pincode'])
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data'    => $customers,
+                'count'   => $customers->count(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error searching customers', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to search customers',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate total price with GST
+     * Web endpoint: POST /vendor/pos/api/calculate-price
+     * Body: { base_amount, discount_amount? }
+     */
+    public function calculatePrice(Request $request): JsonResponse
+    {
+        try {
+            $validated = $request->validate([
+                'base_amount' => 'required|numeric|min:0',
+                'discount_amount' => 'nullable|numeric|min:0',
+            ]);
+
+            $gstRate = $this->posBookingService->getGSTRate();
+            $baseAmount = $validated['base_amount'];
+            $discountAmount = $validated['discount_amount'] ?? 0;
+
+            $amountAfterDiscount = max(0, $baseAmount - $discountAmount);
+            $taxAmount = ($amountAfterDiscount * $gstRate) / 100;
+            $totalAmount = $amountAfterDiscount + $taxAmount;
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'base_amount' => round($baseAmount, 2),
+                    'discount_amount' => round($discountAmount, 2),
+                    'amount_after_discount' => round($amountAfterDiscount, 2),
+                    'gst_rate' => $gstRate,
+                    'tax_amount' => round($taxAmount, 2),
+                    'total_amount' => round($totalAmount, 2),
+                ],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error calculating price', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to calculate price',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Create POS booking with multiple hoardings
+     * Web endpoint: POST /vendor/pos/api/bookings
+     */
+    // public function createBooking(Request $request): JsonResponse
+    // {
+    //     try {
+    //         Log::info('POS create booking request', [
+    //             'vendor_id' => Auth::id(),
+    //             'payload' => $request->only(['hoarding_ids','start_date','end_date','base_amount','payment_mode'])
+    //         ]);
+    //         // $validated = $request->validate([
+    //         //     'hoarding_ids' => 'required|string', // Comma-separated IDs
+    //         //     'customer_id' => 'nullable|exists:users,id',
+    //         //     'customer_name' => 'required|string|max:255',
+    //         //     'customer_phone' => 'required|string|max:20',
+    //         //     'customer_email' => 'nullable|email|max:255',
+    //         //     'customer_address' => 'nullable|string|max:500',
+    //         //     'customer_gstin' => 'nullable|string|max:15',
+    //         //     'booking_type' => 'required|in:ooh,dooh',
+    //         //     'start_date' => 'required|date|after_or_equal:today',
+    //         //     'end_date' => 'required|date|after_or_equal:start_date',
+    //         //     'base_amount' => 'required|numeric|min:0',
+    //         //     'discount_amount' => 'nullable|numeric|min:0',
+    //         //     'payment_mode' => 'required|in:cash,credit_note,bank_transfer,cheque,online',
+    //         //     'payment_reference' => 'nullable|string|max:255',
+    //         //     'payment_notes' => 'nullable|string|max:500',
+    //         //     'notes' => 'nullable|string|max:1000',
+    //         //     'hold_minutes'                          => 'nullable|integer|min:0',
+    //         //     'payment_details_type'                  => 'nullable|string|in:bank_transfer,online',
+    //         // ]);
+    //          $validated = $request->validate([
+    //             'hoarding_ids'               => 'nullable',
+    //             'hoarding_items'             => 'nullable|array',        // NEW: per-hoarding detail
+    //             'hoarding_items.*.hoarding_id'        => 'required_with:hoarding_items|integer',
+    //             'hoarding_items.*.start_date'         => 'required_with:hoarding_items|date',
+    //             'hoarding_items.*.end_date'           => 'required_with:hoarding_items|date|after_or_equal:hoarding_items.*.start_date',
+    //             'hoarding_items.*.price_per_month'    => 'nullable|numeric',
+    //             'hoarding_items.*.type'               => 'nullable|string',
+    //             'hoarding_items.*.total_slots_per_day'=> 'nullable|integer',
+    //             'customer_id'                => 'nullable|exists:users,id',
+    //             'customer_name'              => 'nullable|string|max:255',
+    //             'customer_phone'             => 'nullable|string|max:20',
+    //             'customer_email'             => 'nullable|email|max:255',
+    //             'customer_address'           => 'nullable|string|max:500',
+    //             'customer_gstin'             => 'nullable|string|max:15',
+    //             'booking_type'               => 'nullable|in:ooh,dooh',
+    //             'start_date'                 => 'required|date',          // global fallback
+    //             'end_date'                   => 'required|date|after_or_equal:start_date',
+    //             'base_amount'                => 'required|numeric|min:0',
+    //             'discount_amount'            => 'nullable|numeric|min:0',
+    //             'payment_mode'               => 'required|in:cash,credit_note,bank_transfer,cheque,online',
+    //             'payment_reference'          => 'nullable|string|max:255',
+    //             'payment_notes'              => 'nullable|string|max:500',
+    //             'notes'                      => 'nullable|string|max:1000',
+    //             'hold_minutes'                          => 'nullable|integer|min:0',
+    //             'payment_details_type'                  => 'nullable|string|in:bank_transfer,online',
+    //         ]);
+
+    //         $vendorId = Auth::id();
+    //         // $hoardingIds = array_filter(array_map('intval', explode(',', $validated['hoarding_ids'])));
+    //         // Check if it's already an array (from JSON), otherwise explode it
+    //         $hoardingIds = is_array($request->hoarding_ids) 
+    //             ? $request->hoarding_ids 
+    //             : explode(',', $request->hoarding_ids);
+
+    //         if (empty($hoardingIds)) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'At least one hoarding must be selected',
+    //             ], 422);
+    //         }
+
+    //         // Verify all hoardings belong to vendor
+    //         $hoardings = Hoarding::whereIn('id', $hoardingIds)
+    //             ->where('vendor_id', $vendorId)
+    //             ->get();
+
+    //         if ($hoardings->count() !== count($hoardingIds)) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'One or more hoardings not found or do not belong to you',
+    //             ], 403);
+    //         }
+
+    //         // Check availability for all selected hoardings
+    //         $startDate = Carbon::parse($validated['start_date']);
+    //         $endDate = Carbon::parse($validated['end_date']);
+    //         $unavailableHoardings = [];
+
+    //         foreach ($hoardings as $hoarding) {
+    //             // Get availability for this hoarding in the date range
+    //             $availability = $this->availabilityService->checkMultipleDates(
+    //                 $hoarding->id,
+    //                 [
+    //                     $startDate->format('Y-m-d'),
+    //                     $endDate->format('Y-m-d'),
+    //                 ]
+    //             );
+
+    //             // Verbose logging for debugging availability issues
+    //             Log::info('POS booking availability check', [
+    //                 'vendor_id' => $vendorId,
+    //                 'hoarding_id' => $hoarding->id,
+    //                 'hoarding_addr' => $hoarding->address ?? $hoarding->title ?? null,
+    //                 'start_date' => $startDate->format('Y-m-d'),
+    //                 'end_date' => $endDate->format('Y-m-d'),
+    //                 'availability_preview' => array_slice($availability, 0, 5),
+    //             ]);
+
+    //             // Check if all dates in range are available
+    //             if (!empty($availability)) {
+    //                 $allDatesAvailable = true;
+    //                 $unavailableReasons = [];
+
+    //                 foreach ($availability as $dateCheck) {
+    //                     if ($dateCheck['status'] !== 'available') {
+    //                         $allDatesAvailable = false;
+    //                         if (!in_array($dateCheck['status'], $unavailableReasons)) {
+    //                             $unavailableReasons[] = $dateCheck['status'];
+    //                         }
+    //                     }
+    //                 }
+
+    //                 if (!$allDatesAvailable) {
+    //                     $unavailableHoardings[] = [
+    //                         'hoarding_id' => $hoarding->id,
+    //                         'hoarding_name' => $hoarding->address,
+    //                         'reasons' => $unavailableReasons,
+    //                     ];
+    //                 }
+    //             }
+    //         }
+
+    //         // If any hoardings are unavailable, return error with details
+    //         if (!empty($unavailableHoardings)) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'One or more selected hoardings are not available for the specified dates',
+    //                 'unavailable_hoardings' => $unavailableHoardings,
+    //                 'details' => $this->formatUnavailabilityDetails($unavailableHoardings),
+    //             ], 422);
+    //         }
+
+    //         // Calculate pricing
+    //         $gstRate = $this->posBookingService->getGSTRate();
+    //         $baseAmount = (float) $validated['base_amount'];
+    //         $discountAmount = (float) ($validated['discount_amount'] ?? 0);
+    //         $amountAfterDiscount = max(0, $baseAmount - $discountAmount);
+    //         $taxAmount = ($amountAfterDiscount * $gstRate) / 100;
+    //         $totalAmount = $amountAfterDiscount + $taxAmount;
+
+    //         // Create booking via service
+    //         $bookingData = [
+    //             'vendor_id' => $vendorId,
+    //             'customer_id' => $validated['customer_id'] ?? null,
+    //             'customer_name' => $validated['customer_name'] ?? null,
+    //             'customer_email' => $validated['customer_email'] ?? null,
+    //             'customer_phone' => $validated['customer_phone'] ?? null,
+    //             'customer_address' => $validated['customer_address'] ?? null,
+    //             'customer_gstin' => $validated['customer_gstin']??null,
+    //             'booking_type' => $validated['booking_type'] ?? 'ooh',
+    //             'start_date' => $validated['start_date'],
+    //             'end_date' => $validated['end_date'],
+    //             'duration_days' => Carbon::parse($validated['end_date'])
+    //                 ->diffInDays(Carbon::parse($validated['start_date'])) + 1,
+    //             'base_amount' => $baseAmount,
+    //             'discount_amount' => $discountAmount,
+    //             'tax_amount' => $taxAmount,
+    //             'total_amount' => $totalAmount,
+    //             'payment_mode' => $validated['payment_mode'],
+    //             'payment_reference' => $validated['payment_reference'] ?? null,
+    //             'payment_notes' => $validated['payment_notes']     ?? null,
+    //             'notes' => $validated['notes']             ?? null,
+    //             'status' => 'draft',
+    //             'payment_status' => 'unpaid',
+    //         ];
+
+    //         // Ensure customer fields meet DB requirements
+    //         if (empty($bookingData['customer_name'])) {
+    //             $bookingData['customer_name'] = 'Walk-in Customer';
+    //         }
+    //         if (empty($bookingData['customer_phone'])) {
+    //             $bookingData['customer_phone'] = 'N/A';
+    //         }
+
+    //         // Log prepared booking payload for debugging
+    //         Log::info('POS booking data prepared', [
+    //             'vendor_id' => $vendorId,
+    //             'booking_data' => array_merge($bookingData, [
+    //                 'hoarding_ids' => $hoardingIds,
+    //                 'num_hoardings' => count($hoardingIds),
+    //             ])
+    //         ]);
+
+    //         $booking = $this->posBookingService->createBooking($bookingData);
+    //         Log::info('POS booking created', ['vendor_id' => $vendorId, 'booking_id' => $booking->id]);
+
+    //         // Create pos_booking_hoardings records
+    //         $durationDays = $endDate->diffInDays($startDate) + 1;
+    //         $pricePerHoarding = $baseAmount / count($hoardingIds); // Distribute price evenly
+    //         $discountPerHoarding = $discountAmount / count($hoardingIds);
+    //         $taxPerHoarding = $taxAmount / count($hoardingIds);
+    //         $totalPerHoarding = $totalAmount / count($hoardingIds);
+
+    //          $slotsPerDay = $item['total_slots_per_day'] ?? null;
+    //         // If not provided by frontend, fall back to hoarding's stored value
+    //         if (is_null($slotsPerDay) && $hoarding->doohScreen) {
+    //             $slotsPerDay = $hoarding->doohScreen->total_slots_per_day ?? null;
+    //         }
+    //         foreach ($hoardings as $hoarding) {
+    //             POSBookingHoarding::create([
+    //                 'pos_booking_id' => $booking->id,
+    //                 'hoarding_id' => $hoarding->id,
+    //                 'hoarding_price' => $pricePerHoarding,
+    //                 'hoarding_discount' => $discountPerHoarding,
+    //                 'hoarding_tax' => $taxPerHoarding,
+    //                 'hoarding_total' => $totalPerHoarding,
+    //                 'start_date' => $startDate,
+    //                 'end_date' => $endDate,
+    //                 'duration_days' => $durationDays,
+    //                 'status' => 'pending',
+    //             ]);
+    //         }
+
+    //         try {
+    //             if (!empty($booking->customer_id)) {
+    //                 $customer = \App\Models\User::find($booking->customer_id);
+                    
+    //                 // DB Notification
+    //                 if ($customer && method_exists($customer, 'notify')) {
+    //                     $customer->notify(new \App\Notifications\PosBookingCreatedNotification($booking));
+    //                 }
+                    
+    //                 // Email — sirf tab bhejo jab valid email ho
+    //                 if ($customer && !empty($customer->email) && filter_var($customer->email, FILTER_VALIDATE_EMAIL)) {
+    //                     \Mail::to($customer->email)->send(new \App\Mail\PosBookingCreatedMail($booking, $customer));
+    //                 } else {
+    //                     \Log::info('POS email skipped - no valid email', [
+    //                         'customer_id' => $booking->customer_id,
+    //                         'email' => $customer->email ?? 'NULL'
+    //                     ]);
+    //                 }
+    //             }
+    //         } catch (\Exception $e) {
+    //             \Log::warning('Failed to send POS booking notification/email', [
+    //                 'error' => $e->getMessage(),
+    //                 'booking_id' => $booking->id ?? null,
+    //             ]);
+    //         }
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Booking created successfully',
+    //             'data' => [
+    //                 'id' => $booking->id,
+    //                 'invoice_number' => $booking->invoice_number,
+    //                 'total_amount' => $booking->total_amount,
+    //                 'hoarding_count' => count($hoardingIds),
+    //             ],
+    //         ], 201);
+
+    //     } catch (\Illuminate\Validation\ValidationException $e) {
+    //         Log::warning('POS booking validation failed', [
+    //             'vendor_id' => Auth::id(),
+    //             'errors' => $e->errors(),
+    //             'payload' => $request->only(['hoarding_ids','start_date','end_date','base_amount'])
+    //         ]);
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Validation failed',
+    //             'errors' => $e->errors(),
+    //         ], 422);
+    //     } catch (\Exception $e) {
+    //         Log::error('Error creating POS booking', [
+    //             'vendor_id' => Auth::id(),
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Failed to create booking',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
+    /**
+     * Create POS booking with multiple hoardings
+     * Web endpoint: POST /vendor/pos/api/bookings
+     */
+    public function createBooking(Request $request): JsonResponse
+    {
+        try {
+            $vendorId = $this->resolveEffectiveVendorId($request);
+            Log::info('POS create booking request', [
+                'vendor_id' => $vendorId,
+                'payload_keys' => array_keys($request->all()),
+            ]);
+
+            $validated = $request->validate([
+                'hoarding_ids'                          => 'nullable',
+                'hoarding_items'                        => 'nullable|array',
+                'hoarding_items.*.hoarding_id'          => 'required_with:hoarding_items|integer',
+                'hoarding_items.*.start_date'           => 'required_with:hoarding_items|date',
+                'hoarding_items.*.end_date'             => 'required_with:hoarding_items|date|after_or_equal:hoarding_items.*.start_date',
+                'hoarding_items.*.price_per_month'      => 'nullable|numeric',
+                'hoarding_items.*.type'                 => 'nullable|string',
+                'hoarding_items.*.total_slots_per_day'  => 'nullable|integer',
+                'customer_id'                           => 'nullable|exists:users,id',
+                'customer_name'                         => 'nullable|string|max:255',
+                'customer_phone'                        => 'nullable|string|max:20',
+                'customer_email'                        => 'nullable|email|max:255',
+                'customer_address'                      => 'nullable|string|max:500',
+                'customer_gstin'                        => 'nullable|string|max:15',
+                'booking_type'                          => 'nullable|in:ooh,dooh',
+                'start_date'                            => 'required|date',
+                'end_date'                              => 'required|date|after_or_equal:start_date',
+                'base_amount'                           => 'required|numeric|min:0',
+                'discount_amount'                       => 'nullable|numeric|min:0',
+                'payment_mode'                          => 'required|in:cash,credit_note,bank_transfer,cheque,online',
+                'payment_reference'                     => 'nullable|string|max:255',
+                'payment_notes'                         => 'nullable|string|max:500',
+                'notes'                                 => 'nullable|string|max:1000',
+                'hold_minutes'                          => 'nullable|integer|min:0',
+                'payment_details_type'                  => 'nullable|string|in:bank_transfer,online,credit_note',
+                'is_milestone'   => 'nullable|boolean',
+                'milestone_data' => 'required_if:is_milestone,true|array|min:1',
+                'milestone_data.*.title'       => 'required_if:is_milestone,true|string|max:100',
+                'milestone_data.*.amount_type' => 'required_if:is_milestone,true|in:percentage,fixed',
+                'milestone_data.*.amount'      => 'required_if:is_milestone,true|numeric|min:0.01',
+                'milestone_data.*.due_date'    => 'nullable|date',
+                'milestone_data.*.vendor_notes' => 'nullable|string|max:500',
+                'po_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240'
+            ]);
+
+            // ── Resolve hoarding IDs ─────────────────────────────────────
+            $hoardingIds = is_array($request->hoarding_ids)
+                ? $request->hoarding_ids
+                : explode(',', $request->hoarding_ids ?? '');
+            $hoardingIds = array_values(array_filter(array_map('intval', $hoardingIds)));
+
+            if (empty($hoardingIds)) {
+                return response()->json(['success' => false, 'message' => 'At least one hoarding must be selected'], 422);
+            }
+
+            // ── Build per-hoarding metadata map ─────────────────────────
+            $hoardingItemsMap = [];
+            foreach ($validated['hoarding_items'] ?? [] as $item) {
+                $hoardingItemsMap[(int)$item['hoarding_id']] = $item;
+            }
+
+            // ── Verify hoardings belong to vendor ────────────────────────
+            $hoardings = \App\Models\Hoarding::whereIn('id', $hoardingIds)
+                ->where('vendor_id', $vendorId)
+                ->get();
+
+            if ($hoardings->count() !== count($hoardingIds)) {
+                return response()->json(['success' => false, 'message' => 'One or more hoardings not found or do not belong to you'], 403);
+            }
+
+            // ── Availability check per hoarding with its own date range ──
+            $unavailableHoardings = [];
+
+            foreach ($hoardings as $hoarding) {
+                $item      = $hoardingItemsMap[$hoarding->id] ?? null;
+                $itemStart = $item ? Carbon::parse($item['start_date']) : Carbon::parse($validated['start_date']);
+                $itemEnd   = $item ? Carbon::parse($item['end_date'])   : Carbon::parse($validated['end_date']);
+
+                $availability = $this->availabilityService->checkMultipleDates(
+                    $hoarding->id,
+                    [$itemStart->format('Y-m-d'), $itemEnd->format('Y-m-d')]
+                );
+
+                if (!empty($availability)) {
+                    $unavailableReasons = [];
+                    $skipStatuses = ['available', 'blocked']; // blocked is allowed to proceed
+                  foreach ($availability as $dateCheck) {
+                        if (
+                            !in_array($dateCheck['status'], $skipStatuses) &&
+                            !in_array($dateCheck['status'], $unavailableReasons)
+                        ) {
+                            $unavailableReasons[] = $dateCheck['status'];
+                        }
+                    }
+                    if (!empty($unavailableReasons)) {
+                        $unavailableHoardings[] = [
+                            'hoarding_id'   => $hoarding->id,
+                            'hoarding_name' => $hoarding->address ?? $hoarding->title,
+                            'reasons'       => $unavailableReasons,
+                        ];
+                    }
+                }
+            }
+
+            if (!empty($unavailableHoardings)) {
+                return response()->json([
+                    'success'               => false,
+                    'message'               => 'One or more selected hoardings are not available for the specified dates',
+                    'unavailable_hoardings' => $unavailableHoardings,
+                    'details'               => $this->formatUnavailabilityDetails($unavailableHoardings),
+                ], 422);
+            }
+
+            $isMilestone = (bool) ($validated['is_milestone'] ?? false);
+            $milestoneData = $isMilestone ? ($validated['milestone_data'] ?? []) : [];
+
+            // ── Pricing ──────────────────────────────────────────────────
+            $gstRate            = $this->posBookingService->getGSTRate();
+            $baseAmount         = (float) $validated['base_amount'];
+            $discountAmount     = (float) ($validated['discount_amount'] ?? 0);
+            $amountAfterDiscount = max(0, $baseAmount - $discountAmount);
+            $taxAmount          = ($amountAfterDiscount * $gstRate) / 100;
+            $totalAmount        = $amountAfterDiscount + $taxAmount;
+
+            // ── Hold expiry ──────────────────────────────────────────────
+            $holdMinutes = (int) ($validated['hold_minutes'] ?? 30);
+            $holdExpiryAt = $holdMinutes > 0 ? now()->addMinutes($holdMinutes) : null;
+
+            // ── Booking data ─────────────────────────────────────────────
+            $bookingData = [
+                'vendor_id'        => $vendorId,
+                'hoarding_ids'     => $hoardingIds,
+                'hoarding_items'   => $validated['hoarding_items'] ?? [],
+                'customer_id'      => $validated['customer_id'] ?? null,
+                'customer_name'    => $validated['customer_name']    ?? 'Walk-in Customer',
+                'customer_email'   => $validated['customer_email']   ?? null,
+                'customer_phone'   => $validated['customer_phone']   ?? 'N/A',
+                'customer_address' => $validated['customer_address'] ?? null,
+                'customer_gstin'   => $validated['customer_gstin']   ?? null,
+                'booking_type'     => $validated['booking_type']     ?? 'ooh',
+                'start_date'       => $validated['start_date'],
+                'end_date'         => $validated['end_date'],
+                'duration_days'    => Carbon::parse($validated['end_date'])
+                    ->diffInDays(Carbon::parse($validated['start_date'])) + 1,
+                'base_amount'      => $baseAmount,
+                'discount_amount'  => $discountAmount,
+                'tax_amount'       => round($taxAmount, 2),
+                'total_amount'     => round($totalAmount, 2),
+                'payment_mode'     => $validated['payment_mode'],
+                'payment_reference' => $validated['payment_reference'] ?? null,
+                'payment_notes'    => $validated['payment_notes']     ?? null,
+                'notes'            => $validated['notes']             ?? null,
+                'status'           => 'draft',
+                'payment_status'   => 'unpaid',
+                'hold_minutes'     => $holdMinutes,
+                'hold_expiry_at'   => $holdExpiryAt,
+                'is_milestone'     => $isMilestone,
+                'milestone_data'   => $milestoneData,
+            ];
+
+            $booking = $this->posBookingService->createBooking($bookingData);
+
+
+            // ── Reload with hoardings for invoice ─────────────────────────
+            $booking->load('bookingHoardings.hoarding');
+
+            // ── Notifications ─────────────────────────────────────────────
+            try {
+
+                // if ($this->posBookingService->isAutoInvoiceEnabled()) {
+                //     try {
+                //         /** @var \App\Services\InvoiceService $invoiceService */
+                //         $invoiceService = app(\App\Services\InvoiceService::class);
+
+                //         $invoice = $invoiceService->generateInvoiceForPOSBooking(
+                //             $booking->fresh(['bookingHoardings.hoarding']),
+                //             Auth::id()
+                //         );
+
+                //         $booking->update([
+                //             'invoice_number' => $invoice->invoice_number,
+                //             'invoice_date'   => $invoice->invoice_date,
+                //             'invoice_path'   => $invoice->pdf_path,
+                //         ]);
+
+                //         Log::info('POS invoice generated (controller)', [
+                //             'pos_booking_id' => $booking->id,
+                //             'invoice_number' => $invoice->invoice_number,
+                //             'grand_total'    => $invoice->grand_total,
+                //         ]);
+                //     } catch (\Exception $e) {
+                //         Log::error('Failed to generate POS invoice', [
+                //             'pos_booking_id' => $booking->id,
+                //             'error'          => $e->getMessage(),
+                //             'trace'          => $e->getTraceAsString(),
+                //         ]);
+                //         // Non-fatal — booking was created successfully
+                //     }
+                // }
+
+
+                $emailNotificationsEnabled = $this->posBookingService->isEmailNotificationEnabled();
+                $customer = null;
+
+                if (!empty($booking->customer_id)) {
+                    $customer = \App\Models\User::find($booking->customer_id);
+                    // if (
+                    //     $emailNotificationsEnabled
+                    //     && $customer
+                    //     && $customer->notification_email
+                    //     && filter_var($customer->email ?? '', FILTER_VALIDATE_EMAIL)
+                    // ) {
+                    //     \Mail::to($customer->email)->queue(new \App\Mail\PosBookingCreatedMail($booking, $customer, 'customer'));
+                    // }
+
+                    // Send push notification to customer if enabled
+                    if ($customer && $customer->notification_push) {
+                        try {
+                            send(
+                                $customer,
+                                'Booking Created Successfully',
+                                "Your POS booking #{$booking->invoice_number} for ₹" . number_format($booking->total_amount, 2) . " has been created",
+                                [
+                                    'type' => 'pos_booking_created',
+                                    'booking_id' => $booking->id,
+                                    'invoice_number' => $booking->invoice_number,
+                                    'total_amount' => $booking->total_amount,
+                                    'customer_name' => $booking->customer_name,
+                                    'source' => 'pos_system'
+                                ]
+                            );
+                            Log::info('Push notification sent to customer for booking creation', [
+                                'booking_id' => $booking->id,
+                                'customer_id' => $customer->id,
+                                'invoice_number' => $booking->invoice_number,
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::warning('Failed to send push notification to customer', [
+                                'booking_id' => $booking->id,
+                                'customer_id' => $customer->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+
+                if ($emailNotificationsEnabled) {
+                    $vendor = \App\Models\User::find($booking->vendor_id);
+
+                    // if ($vendor && $vendor->notification_email) {
+                    //     $vendorEmails = array_unique(array_filter($vendor->notification_emails ?? []));
+                    //     foreach ($vendorEmails as $vendorEmail) {
+                    //         if (!filter_var($vendorEmail, FILTER_VALIDATE_EMAIL)) {
+                    //             continue;
+                    //         }
+
+                    //         \Mail::to($vendorEmail)->queue(new \App\Mail\PosBookingCreatedMail($booking, $vendor, 'vendor'));
+                    //     }
+                    // }
+
+                    $admins = \App\Models\User::whereHas('roles', function ($query) {
+                        $query->whereIn('name', ['admin', 'super_admin']);
+                    })->get();
+
+                    // foreach ($admins as $admin) {
+                    //     if (!$admin->notification_email || !filter_var($admin->email ?? '', FILTER_VALIDATE_EMAIL)) {
+                    //         continue;
+                    //     }
+
+                    //     \Mail::to($admin->email)->queue(new \App\Mail\PosBookingCreatedMail($booking, $admin, 'admin'));
+                    // }
+                }
+            } catch (\Exception $e) {
+                Log::warning('POS notification/email failed', ['booking_id' => $booking->id, 'error' => $e->getMessage()]);
+            }
+
+            // ── WhatsApp notification ──────────────────────────────────────
+            try {
+                // $phone = $booking->customer_phone ?? ($booking->customer_id ? optional(\App\Models\User::find($booking->customer_id))->phone : null);
+                // if ($phone && $phone !== 'N/A') {
+                //     $this->sendWhatsAppNotification($booking, $phone);
+                // }
+                $phone = $booking->customer_phone
+                    ?? ($booking->customer_id
+                        ? optional(\App\Models\User::find($booking->customer_id))->phone
+                        : null
+                    );
+
+                // 👇 ADD THIS LOG HERE
+                Log::info('Booking WhatsApp Debug', [
+                    'booking_id' => $booking->id,
+                    'customer_phone' => $booking->customer_phone,
+                    'resolved_phone' => $phone,
+                ]);
+
+                if ($phone && $phone !== 'N/A') {
+                    $this->sendWhatsAppNotification($booking, $phone);
+                } else {
+                    Log::warning('WhatsApp skipped - invalid phone', [
+                        'booking_id' => $booking->id,
+                        'phone' => $phone,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('POS WhatsApp notification failed', ['booking_id' => $booking->id, 'error' => $e->getMessage()]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking created successfully',
+                'data'    => [
+                    'id'             => $booking->id,
+                    'invoice_number' => $booking->invoice_number,
+                    'total_amount'   => round($totalAmount, 2),
+                    'hoarding_count' => count($hoardingIds),
+                    'hold_expiry_at' => $holdExpiryAt?->toISOString(),
+                    'hold_minutes'   => $holdMinutes,
+                ],
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('POS booking validation failed', ['vendor_id' => Auth::id(), 'errors' => $e->errors()]);
+            return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error('Error creating POS booking', ['vendor_id' => Auth::id(), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json(['success' => false, 'message' => 'Failed to create booking', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Send WhatsApp notification to customer with payment details + hold countdown
+     * Uses a WhatsApp API service (adapt to your provider: Twilio / Wati / 2Factor / etc.)
+     */
+    protected function sendWhatsAppNotification(\Modules\POS\Models\POSBooking $booking, string $phone): void
+    {
+        // Ensure bookingHoardings relationship is loaded
+        if (!$booking->relationLoaded('bookingHoardings')) {
+            $booking->load('bookingHoardings.hoarding');
+        }
+
+        $vendor       = \App\Models\User::find($booking->vendor_id);
+        $totalAmount  = number_format((float) $booking->total_amount, 2);
+        $holdMins     = $booking->hold_minutes ?? 0;
+        $holdText     = $holdMins > 0
+            ? "⏳ *Payment Due Within:* " . ($holdMins >= 1440 ? round($holdMins / 1440) . ' day(s)' : ($holdMins >= 60 ? round($holdMins / 60) . ' hour(s)' : "{$holdMins} minutes"))
+            : "ℹ️ No payment time limit.";
+
+        $milestones = \App\Models\QuotationMilestone::where('pos_booking_id', $booking->id)
+            ->orderBy('sequence_no')
+            ->get();
+
+        $milestoneBlock = '';
+        if ($milestones->isNotEmpty()) {
+            $milestoneLines = $milestones->values()->map(function ($ms, $idx) {
+                $seq = $ms->sequence_no ?? ($idx + 1);
+                $title = $ms->title ?? ('Milestone ' . $seq);
+                $amount = number_format((float) ($ms->calculated_amount ?? $ms->amount ?? 0), 2);
+                $dueDate = $ms->due_date ? \Carbon\Carbon::parse($ms->due_date)->format('d M Y') : 'N/A';
+
+                return "{$seq}. {$title} - ₹{$amount} (Due: {$dueDate})";
+            })->implode("\n");
+
+            $milestoneBlock = "\n🧩 *Milestones:*\n{$milestoneLines}\n";
+        }
+
+        $paymentBlock = '';
+        $paymentDetail = null;
+        if (in_array($booking->payment_mode, ['bank_transfer', 'cheque', 'online', 'upi'], true)) {
+            $detailType = in_array($booking->payment_mode, ['bank_transfer', 'cheque'], true) ? 'bank' : 'upi';
+            $paymentDetail = \Modules\POS\Models\VendorPaymentDetail::where('vendor_id', $booking->vendor_id)
+                ->where('type', $detailType)
+                ->first();
+        }
+
+        // Build hoarding list with clickable links
+        $hoardingLines = $booking->bookingHoardings->map(function ($bh) {
+            $h = $bh->hoarding;
+            $hoardingTitle = $h->title ?? 'Hoarding';
+            $hoardingId = $h->id ?? null;
+
+            // Create a short clickable link to the hoarding details page
+            $hoardingUrl = $hoardingId
+                ? config('app.url') . '/h/' . $hoardingId
+                : null;
+
+            $hoardingLink = $hoardingUrl
+                ? "🔗 {$hoardingTitle}\n   {$hoardingUrl}"
+                : "• {$hoardingTitle}";
+
+            return $hoardingLink . " ({$bh->start_date} → {$bh->end_date})";
+        })->implode("\n\n");
+
+        if (in_array($booking->payment_mode, ['bank_transfer', 'cheque'], true) && $paymentDetail) {
+            $paymentBlock = "\n🏦 *Bank Transfer Details:*\n"
+                . "Bank: {$paymentDetail->bank_name}\n"
+                . "A/C No: {$paymentDetail->account_number}\n"
+                . "Holder: {$paymentDetail->account_holder}\n"
+                . "IFSC: {$paymentDetail->ifsc_code}\n"
+                . "Reference: {$booking->invoice_number}";
+        } elseif (in_array($booking->payment_mode, ['online', 'upi']) && $paymentDetail) {
+            $paymentBlock = "\n📱 *UPI Payment:*\n"
+                . "UPI ID: {$paymentDetail->upi_id}\n"
+                . ($paymentDetail->qr_image_path ? "QR: " . \Illuminate\Support\Facades\Storage::disk('public')->url($paymentDetail->qr_image_path) : "");
+        } elseif ($booking->payment_mode === 'cash') {
+            $paymentBlock = "\n💵 *Payment Mode:* Cash (collect at office)";
+        }
+
+        $vendorName = $vendor?->name ?? 'Vendor';
+        $message = "🎯 *POS Booking created!*\n\n"
+            . "Hello *{$booking->customer_name}*,\n\n"
+            . "Your booking has been created by *{$vendorName}*.\n\n"
+            . "📋 *Booking Details:*\n"
+            . "Invoice: #{$booking->invoice_number}\n"
+            . "Total Amount: ₹{$totalAmount}\n\n"
+            . "🏛️ *Hoardings Booked:*\n{$hoardingLines}\n\n"
+            . $milestoneBlock
+            . "{$holdText}\n"
+            . $paymentBlock
+            . "\n\nThank you for your business!";
+
+        // Normalize phone number - remove all non-digits
+        $normalizedPhone = preg_replace('/\D+/', '', $phone);
+
+        // Validate phone has minimum length BEFORE adding prefix
+        if (empty($normalizedPhone) || strlen($normalizedPhone) < 10) {
+            Log::warning('POS WhatsApp skipped - invalid phone number', [
+                'booking_id' => $booking->id,
+                'original_phone' => $phone,
+                'normalized_phone' => $normalizedPhone,
+                'reason' => 'Phone number too short or empty',
+            ]);
+            return;
+        }
+
+        // Add country code if not present
+        if (!str_starts_with($normalizedPhone, '91')) {
+            $normalizedPhone = '91' . ltrim($normalizedPhone, '0');
+        }
+
+        // Add + prefix for WhatsApp format
+        $normalizedPhone = '+' . $normalizedPhone;
+
+        Log::info('POS WhatsApp attempting to send', [
+            'booking_id' => $booking->id,
+            'original_phone' => $phone,
+            'normalized_phone' => $normalizedPhone,
+            'customer_name' => $booking->customer_name,
+        ]);
+
+        try {
+            $whatsapp = app(TwilioWhatsappService::class);
+            $sent = $whatsapp->send($normalizedPhone, $message);
+
+            Log::info('POS WhatsApp notification dispatched', [
+                'booking_id' => $booking->id,
+                'phone'      => $normalizedPhone,
+                'sent'       => $sent,
+                'message_preview' => substr($message, 0, 100),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('POS WhatsApp notification failed', [
+                'booking_id' => $booking->id,
+                'phone' => $normalizedPhone,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+    }
+
+    /**
+     * Get POS dashboard statistics
+     * Web endpoint: GET /vendor/pos/api/dashboard
+     */
+    public function getDashboardStats(): JsonResponse
+    {
+        try {
+            $context = $this->resolveAdminBookingScopeContext(request());
+
+            // Get statistics
+            $baseQuery = \Modules\POS\Models\POSBooking::query();
+            if ($context['scope'] !== 'overall') {
+                $baseQuery->where('vendor_id', $context['vendor_id']);
+            }
+
+            $totalBookings = (clone $baseQuery)->count();
+            $totalRevenue = (clone $baseQuery)
+                ->where('payment_status', 'paid')
+                ->sum('total_amount') ?? 0;
+            $pendingPayments = (clone $baseQuery)
+                ->whereIn('payment_status', ['unpaid', 'partial'])
+                ->where('status', '!=', 'cancelled')
+                ->sum('total_amount') ?? 0;
+            $activeCreditNotes = (clone $baseQuery)
+                ->where('credit_note_status', 'active')
+                ->count();
+
+            // 1. Registered Customers (Unique by ID)
+            $regCount = (clone $baseQuery)
+                ->whereNotNull('customer_id')
+                ->distinct('customer_id')
+                ->count('customer_id');
+
+            // 2. Guest Walk-ins (Unique by Phone, excluding 'N/A')
+            $guestCount = (clone $baseQuery)
+                ->whereNull('customer_id')
+                ->whereNotNull('customer_phone')
+                ->where('customer_phone', '!=', 'N/A')
+                ->distinct('customer_phone')
+                ->count('customer_phone');
+
+            // 3. True Anonymous (Every 'N/A' or empty phone is a new person)
+            $naCount = (clone $baseQuery)
+                ->whereNull('customer_id')
+                ->where(function ($q) {
+                    $q->where('customer_phone', 'N/A')->orWhereNull('customer_phone');
+                })
+                ->count();
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total_bookings' => $totalBookings,
+                    'total_revenue' => (float) $totalRevenue,
+                    'pending_payments' => (float) $pendingPayments,
+                    'active_credit_notes' => $activeCreditNotes,
+                    'total_customers'  => ($regCount + $guestCount + $naCount), // The combined total
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching dashboard stats', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch dashboard stats',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get vendor's recent bookings
+     * Web endpoint: GET /vendor/pos/api/bookings
+     */
+    public function getBookingsList(Request $request): JsonResponse
+    {
+        try {
+            $context = $this->resolveAdminBookingScopeContext($request);
+            $perPage = max(1, min((int) ($request->get('per_page') ?? 10), 100));
+
+            $query = \Modules\POS\Models\POSBooking::with('bookingHoardings')
+                ->orderBy('created_at', 'desc');
+
+            if ($context['scope'] !== 'overall') {
+                $query->where('vendor_id', $context['vendor_id']);
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->get('status'));
+            }
+
+            $allowedPaymentStatuses = ['paid', 'unpaid', 'partial', 'credit'];
+            $paymentStatuses = [];
+
+            if ($request->filled('payment_statuses')) {
+                $rawPaymentStatuses = explode(',', (string) $request->get('payment_statuses'));
+                $paymentStatuses = array_values(array_unique(array_filter(array_map(function ($status) use ($allowedPaymentStatuses) {
+                    $status = trim((string) $status);
+                    return in_array($status, $allowedPaymentStatuses, true) ? $status : null;
+                }, $rawPaymentStatuses))));
+            } elseif ($request->filled('payment_status')) {
+                $singlePaymentStatus = trim((string) $request->get('payment_status'));
+                if (in_array($singlePaymentStatus, $allowedPaymentStatuses, true)) {
+                    $paymentStatuses = [$singlePaymentStatus];
+                }
+            }
+
+            if (!empty($paymentStatuses)) {
+                $query->whereIn('payment_status', $paymentStatuses);
+            }
+
+            if ($request->filled('search')) {
+                $search = trim((string) $request->get('search'));
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('invoice_number', 'like', "%{$search}%")
+                        ->orWhere('customer_name', 'like', "%{$search}%")
+                        ->orWhere('customer_phone', 'like', "%{$search}%")
+                        ->orWhere('customer_email', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('period')) {
+                $period = strtolower(trim((string) $request->get('period')));
+                $from = match ($period) {
+                    'today'              => now()->startOfDay(),
+                    'week', 'this_week'  => now()->startOfWeek(),
+                    'month', 'this_month' => now()->startOfMonth(),
+                    '1m'                 => now()->subMonth()->startOfDay(),
+                    '6m'                 => now()->subMonths(6)->startOfDay(),
+                    '1y', 'year'         => now()->subYear()->startOfDay(),
+                    default              => null,
+                };
+                if ($from) {
+                    $query->where('created_at', '>=', $from);
+                }
+            }
+
+            $bookings = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'data' => $bookings->items(),
+                    'current_page' => $bookings->currentPage(),
+                    'per_page' => $bookings->perPage(),
+                    'total' => $bookings->total(),
+                    'last_page' => $bookings->lastPage(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching bookings list', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch bookings',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get bookings with active payment holds
+     * Web endpoint: GET /vendor/pos/api/pending-payments
+     */
+    public function getPendingPayments(Request $request): JsonResponse
+    {
+        try {
+            $context = $this->resolveAdminBookingScopeContext($request);
+            $this->releaseExpiredPosHoldsForContext($context);
+
+            $query = \Modules\POS\Models\POSBooking::whereIn('payment_status', ['unpaid', 'partial'])
+                ->where('status', '!=', 'cancelled')
+                ->with('bookingHoardings.hoarding')
+                ->orderBy('created_at', 'asc');
+
+            if ($context['scope'] !== 'overall') {
+                $query->where('vendor_id', $context['vendor_id']);
+            }
+
+            $search = trim((string) $request->get('search', ''));
+            if ($search !== '') {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('invoice_number', 'like', "%{$search}%")
+                        ->orWhere('customer_name', 'like', "%{$search}%")
+                        ->orWhere('customer_phone', 'like', "%{$search}%")
+                        ->orWhere('customer_email', 'like', "%{$search}%");
+                });
+            }
+
+            $shouldPaginate = $request->has('page') || $request->has('per_page') || $search !== '';
+
+            if (!$shouldPaginate) {
+                $pendingPayments = $query->get();
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $pendingPayments,
+                ]);
+            }
+
+            $perPage = max(1, min((int) $request->get('per_page', 10), 100));
+            $pendingPayments = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $pendingPayments->items(),
+                'pagination' => [
+                    'current_page' => $pendingPayments->currentPage(),
+                    'per_page' => $pendingPayments->perPage(),
+                    'total' => $pendingPayments->total(),
+                    'last_page' => $pendingPayments->lastPage(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching pending payments', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch pending payments',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    protected function releaseExpiredPosHoldsForContext(array $context): void
+    {
+        $now = now();
+
+        $query = POSBooking::where('payment_status', 'unpaid')
+            ->whereIn('status', ['draft', 'pending_payment'])
+            ->whereNotNull('hold_expiry_at')
+            ->where('hold_expiry_at', '<=', $now)
+            ->with('bookingHoardings.hoarding');
+
+        if (($context['scope'] ?? 'mine') !== 'overall' && !empty($context['vendor_id'])) {
+            $query->where('vendor_id', (int) $context['vendor_id']);
+        }
+
+        $expiredBookings = $query->get();
+
+        foreach ($expiredBookings as $booking) {
+            $updated = POSBooking::whereKey($booking->id)
+                ->where('payment_status', 'unpaid')
+                ->whereIn('status', ['draft', 'pending_payment'])
+                ->whereNotNull('hold_expiry_at')
+                ->where('hold_expiry_at', '<=', $now)
+                ->update([
+                    'status' => 'cancelled',
+                    'cancelled_at' => $now,
+                    'cancellation_reason' => 'Payment hold expired - auto-released',
+                ]);
+
+            if ($updated === 0) {
+                continue;
+            }
+
+            foreach ($booking->bookingHoardings as $bookingHoarding) {
+                $hoarding = $bookingHoarding->hoarding;
+                if ($hoarding && (int) $hoarding->held_by_booking_id === (int) $booking->id) {
+                    $hoarding->update([
+                        'is_on_hold' => false,
+                        'hold_till' => null,
+                        'held_by_booking_id' => null,
+                    ]);
+                }
+            }
+
+            $booking->refresh();
+
+            try {
+                $this->dispatchHoldExpiredNotifications($booking);
+            } catch (\Throwable $e) {
+                Log::warning('POS hold-expiry fallback notification failed', [
+                    'booking_id' => $booking->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    protected function dispatchHoldExpiredNotifications(POSBooking $booking): void
+    {
+        $notification = new PosBookingHoldExpiredNotification($booking);
+
+        if ($booking->customer_id) {
+            $customer = User::find($booking->customer_id);
+            if ($customer && method_exists($customer, 'notifyNow')) {
+                $customer->notifyNow($notification);
+            }
+        } elseif (filter_var((string) $booking->customer_email, FILTER_VALIDATE_EMAIL)) {
+            Notification::route('mail', $booking->customer_email)->notifyNow($notification);
+        }
+
+        if ($booking->vendor_id) {
+            $vendor = User::find($booking->vendor_id);
+            if ($vendor && method_exists($vendor, 'notifyNow')) {
+                $vendor->notifyNow($notification);
+            }
+        }
+
+        $admins = User::whereHas('roles', function ($query) {
+            $query->whereIn('name', ['admin', 'superadmin', 'super_admin']);
+        })->get();
+
+        foreach ($admins as $admin) {
+            if (method_exists($admin, 'notifyNow')) {
+                $admin->notifyNow($notification);
+            }
+        }
+    }
+
+    /**
+     * Format unavailability details for human-readable error messages
+     * Maps availability statuses to friendly descriptions
+     */
+    protected function formatUnavailabilityDetails(array $unavailableHoardings): string
+    {
+        $messages = [];
+
+        foreach ($unavailableHoardings as $item) {
+            $hoardingName = $item['hoarding_name'] ?? "Hoarding #{$item['hoarding_id']}";
+            $reasons = [];
+
+            foreach ($item['reasons'] as $reason) {
+                switch ($reason) {
+                    case 'booked':
+                        $reasons[] = 'already booked for some dates';
+                        break;
+                    case 'blocked':
+                        $reasons[] = 'under maintenance/blocked for some dates';
+                        break;
+                    case 'hold':
+                        $reasons[] = 'on payment hold for some dates';
+                        break;
+                    case 'partial':
+                        $reasons[] = 'partially unavailable';
+                        break;
+                    default:
+                        $reasons[] = $reason;
+                }
+            }
+
+            $messages[] = "{$hoardingName}: " . implode(', ', $reasons);
+        }
+
+        return implode('. ', $messages) . '.';
+    }
+
+
+
+    // public function createCustomer(Request $request)
+    // {
+    //     \Log::info('Create POS customer request', [
+    //         'vendor_id' => Auth::id(),
+    //         'payload' => $request->all()
+    //     ]);
+    //     // 1. Expanded Validation
+    //     $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         // 'business_name' => 'nullable|string|max:100',
+    //         'email' => 'required|email|unique:users,email',
+    //         'phone' => 'required|string|max:20',
+    //         'password' => 'required|confirmed|min:6',
+    //         'gstin' => 'nullable|string|max:15',
+    //         'pincode' => 'nullable|string|max:10',
+    //         'city' => 'nullable|string|max:100',
+    //         'state' => 'nullable|string|max:100',
+    //         'country' => 'nullable|string|max:100',
+    //     ]);
+
+    //     try {
+    //         // 2. Start Transaction
+    //         return DB::transaction(function () use ($request) {
+    //             \Log::info('getting to create pos customer');
+    //             // 3. Create the Base User
+    //             $fullAddress = trim("{$request->city}, {$request->state} - {$request->pincode}, {$request->country}", ", -");
+
+    //             $user = User::create([
+    //                 'name' => $request->name,
+    //                 'email' => $request->email,
+    //                 'phone' => $request->phone,
+    //                 'password' => Hash::make($request->password),
+    //                 'active_role' => 'customer',
+    //                 'pincode' => $request->pincode,
+    //                 'gstin' => $request->gstin,
+    //                 'city' => $request->city,
+    //                 'state' => $request->state,
+    //                 'address'       =>$fullAddress,
+    //             ]);
+    //             $user->assignRole('customer');
+
+    //             // 4. Create the POS Customer Profile
+    //             // We combine City, State, and Pincode into the 'address' field 
+    //             // as per your migration schema
+
+    //             $user->posProfile()->create([
+    //                 'vendor_id'     => Auth::id(),
+    //                 'created_by'    => Auth::id(),
+    //                 'gstin'         => $request->gstin,
+    //                 'business_name' => $request->business_name,
+    //                 'address'       =>$fullAddress,
+    //             ]);
+
+    //             // 5. Return success response
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'message' => 'Customer created successfully',
+    //                 'data' => $user
+    //             ]);
+    //         });
+
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Something went wrong: ' . $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    public function createCustomer(Request $request)
+    {
+
+        try {
+
+            $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'phone' => 'required|string|max:20|unique:users,phone',
+                'password' => 'required|confirmed|min:6',
+                'gstin' => 'nullable|string|max:15|unique:users,gstin',
+            ]);
+
+            $user = DB::transaction(function () use ($request) {
+                $fullAddress = trim(
+                    "{$request->city}, {$request->state} - {$request->pincode}, {$request->country}",
+                    ", -"
+                );
+
+                $user = User::create([
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                    'password' => Hash::make($request->password),
+                    'active_role' => 'customer',
+                    'gstin' => $request->gstin,
+                    'billing_address' => $fullAddress,
+                    'billing_pincode' => $request->pincode,
+                    'billing_state' => $request->state,
+                    'billing_city' => $request->city,
+                    'country' => $request->country,
+                    'status' => 'active',
+                ]);
+
+                $user->assignRole('customer');
+
+                $user->posProfile()->create([
+                    'vendor_id' => Auth::id(),
+                    'created_by' => Auth::id(),
+                    'gstin' => $request->gstin,
+                    'business_name' => $request->business_name,
+                    'address' => $fullAddress,
+                ]);
+
+                return $user;
+            });
+
+            if (!$user || !$user->id) {
+                throw new \RuntimeException('Customer record could not be created.');
+            }
+
+            try {
+                // Log customer creation
+                Log::info('POS customer created', [
+                    'vendor_id' => Auth::id(),
+                    'customer_id' => $user->id,
+                    'customer_email' => $user->email,
+                ]);
+                DB::afterCommit(function () use ($user) {
+                    event(new PosCustomerCreated($user, Auth::user()));
+
+                    // Send in-app notification (Laravel Notification)
+                    if (method_exists($user, 'notify')) {
+                        try {
+                            $user->notify(new \App\Notifications\PosCustomerCreatedNotification($user));
+                        } catch (\Exception $e) {
+                            Log::warning('Failed to send in-app notification to customer', [
+                                'customer_id' => $user->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+
+                    // Send email to customer
+                    try {
+                        \Mail::to($user->email)->send(new \App\Mail\PosCustomerWelcome($user));
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to send welcome email to customer', [
+                            'customer_id' => $user->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+
+                    // Send push notification to customer
+                    try {
+                        send(
+                            $user,
+                            'Account Created Successfully',
+                            "Welcome to OOHApp! Your customer account has been created.",
+                            [
+                                'type' => 'pos_customer_account_created',
+                                'customer_id' => $user->id,
+                                'customer_name' => $user->name,
+                                'source' => 'pos_system'
+                            ]
+                        );
+                        Log::info('Push notification sent to customer for account creation', [
+                            'customer_id' => $user->id,
+                            'customer_name' => $user->name,
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to send push notification to customer', [
+                            'customer_id' => $user->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+
+                    // Send push notification to vendor
+                    try {
+                        $vendor = Auth::user();
+                        send(
+                            $vendor,
+                            'New POS Customer Created',
+                            "Customer {$user->name} has been successfully created",
+                            [
+                                'type' => 'pos_customer_created',
+                                'customer_id' => $user->id,
+                                'customer_name' => $user->name,
+                                'customer_email' => $user->email,
+                                'customer_phone' => $user->phone,
+                                'source' => 'pos_system'
+                            ]
+                        );
+                        Log::info('Push notification sent to vendor for customer creation', [
+                            'vendor_id' => Auth::id(),
+                            'customer_id' => $user->id,
+                            'customer_name' => $user->name,
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to send push notification to vendor', [
+                            'vendor_id' => Auth::id(),
+                            'customer_id' => $user->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                });
+            } catch (\Exception $e) {
+                Log::warning('Failed to log POS customer creation', [
+                    'vendor_id' => Auth::id(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+
+
+            // // Send notification and email to Vendor
+            // try {
+            //     $vendor = Auth::user();
+            //     // Notification (if using Laravel Notifications)
+            //     if (method_exists($vendor, 'notify')) {
+            //         $vendor->notify(new \App\Notifications\PosCustomerCreatedNotification($user));
+            //     }
+            //     // Email
+            //     \Mail::to($vendor->email)->send(new \App\Mail\PosCustomerCreatedForVendor($user));
+            // } catch (\Exception $e) {
+            //     \Log::warning('Failed to notify vendor on POS customer create', ['error' => $e->getMessage()]);
+            // }
+
+            // // Send email and SMS to Customer
+            // try {
+            //     // Email
+            //     \Mail::to($user->email)->send(new \App\Mail\PosCustomerWelcome($user));
+            //     // SMS (if you have an SMS service)
+            //     if (function_exists('send_sms')) {
+            //         send_sms($user->phone, "Welcome to OOHApp! Your customer profile has been created.");
+            //     }
+            // } catch (\Exception $e) {
+            //     \Log::warning('Failed to notify customer on POS customer create', ['error' => $e->getMessage()]);
+            // }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer created successfully',
+                'data' => $user
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Create POS customer failed', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create customer. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function showCustomer($id)
+    {
+        $vendorId = $this->resolveEffectiveVendorId(request());
+
+        // Find user by ID
+        $user = User::findOrFail($id);
+
+        // Get POS profile for this vendor (if exists)
+        $posProfile = $user->posProfile()->where('vendor_id', $vendorId)->first();
+
+        // Get all bookings for this user and vendor
+        $bookings = POSBooking::where('vendor_id', $vendorId)
+            ->where('customer_id', $user->id)
+            ->get();
+
+        $totalBookings = $bookings->count();
+        $totalSpent = $bookings->sum('total_amount');
+        $lastBookingAt = $bookings->max('created_at');
+
+        // Prefer posProfile business name if exists
+        $name = $user->name;
+        if ($posProfile && $posProfile->business_name) {
+            $name = $posProfile->business_name;
+        }
+
+        $customer = [
+            'id' => $user->id,
+            'name' => $name,
+            'phone' => $user->phone,
+            'email' => $user->email,
+            'total_bookings' => $totalBookings,
+            'total_spent' => $totalSpent,
+            'last_booking_at' => $lastBookingAt,
+            'is_active' => $totalBookings > 0,
+            'pos_profile' => $posProfile,
+            'bookings' => $bookings,
+        ];
+
+        return view('vendor.pos.customers.show', compact('customer'));
+    }
+}

@@ -1,0 +1,1057 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\HasSnapshots;
+use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use \Modules\DOOH\Models\DOOHScreen;
+use \Modules\Hoardings\Models\OOHHoarding;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Hoardings\Models\HoardingPackage;
+use Modules\Hoardings\Models\HoardingMedia;
+use Modules\Hoardings\Models\HoardingBrandLogo;
+use Modules\Enquiries\Models\Enquiry;
+use Modules\Hoardings\Models\HoardingAttribute;
+use Illuminate\Support\Str;
+use Modules\Hoardings\Http\Resources\HoardingResource;
+
+class Hoarding extends Model implements HasMedia
+
+{
+    use HasFactory, SoftDeletes, HasSnapshots, Auditable, InteractsWithMedia;
+
+    protected $table = 'hoardings';
+
+    protected $snapshotType = 'price_update';
+    protected $snapshotOnCreate = false;
+    protected $snapshotOnUpdate = true;
+
+    protected $auditModule = 'hoarding';
+
+    /**
+     * ONLY parent-level price fields
+     */
+    protected $priceFields = [
+        'base_monthly_price',
+        'monthly_price',
+        'weekly_price_1',
+        'weekly_price_2',
+        'weekly_price_3',
+        'commission_percent',
+        'graphics_charge',
+        'survey_charge',
+    ];
+
+    /* ===================== FILLABLE ===================== */
+
+    protected $fillable = [
+
+        /* Ownership */
+        'vendor_id',
+
+        /* Identity */
+        'title',
+        'slug',
+        'name',
+        'description',
+        'hoarding_type',
+        'category',
+
+        /* Location (shared by OOH & DOOH) */
+        'address',
+        'city',
+        'state',
+        'locality',
+        'pincode',
+        'country',
+        'latitude',
+        'longitude',
+        'geolocation_verified',
+        'geolocation_source',
+        'landmark',
+        'road_name',  
+        /* Visibility & Traffic */
+        'visibility_start',
+        'visibility_end',
+        'facing_direction',
+        'road_type',
+        'traffic_type',
+        'hoarding_visibility',
+        'visibility_details',
+
+        /* Audience */
+        'expected_footfall',
+        'expected_eyeball',
+        'audience_types',
+
+        /* Pricing (base only) */
+        'base_monthly_price',
+        'monthly_price',
+        'weekly_price_1',
+        'weekly_price_2',
+        'weekly_price_3',
+        'enable_weekly_booking',
+        'commission_percent',
+        'currency',
+        'survey_charge ',
+        'graphics_charge ',
+        'graphics_included',
+
+
+        /* Booking rules */
+        'grace_period_days',
+        'min_booking_duration',
+        'max_booking_months',
+        'available_from',
+        'available_to',
+        'block_dates',
+
+        /* Legal */
+        'nagar_nigam_approved',
+        'permit_number',
+        'permit_valid_till',
+
+        /* Workflow */
+        'status',
+        'current_step',
+        'is_featured',
+        'is_recommended',
+        'located_at',
+
+        /* Analytics */
+        'view_count',
+        'bookings_count',
+        'last_booked_at',
+        'discount_type',
+        'discount_value',
+        'slot_duration_seconds'
+    ];
+
+    /* ===================== CASTS ===================== */
+
+    protected $casts = [
+        'latitude' => 'decimal:7',
+        'longitude' => 'decimal:7',
+        'geolocation_verified' => 'boolean',
+        'landmarks' => 'array',
+        // 'visibility_start' => 'datetime:H:i',
+        // 'visibility_end' => 'datetime:H:i',
+        'visibility_details' => 'array',
+
+        'audience_types' => 'array',
+        'located_at' => 'array',
+
+        'base_monthly_price' => 'decimal:2',
+        'monthly_price' => 'decimal:2',
+        'weekly_price' => 'decimal:2',
+        'commission_percent' => 'decimal:2',
+        'enable_weekly_booking' => 'boolean',
+        'survey_charge' => 'decimal:2',
+        'graphics_charge' => 'decimal:2',
+        'graphics_included' => 'boolean',
+
+        'grace_period_days' => 'integer',
+        'block_dates' => 'array',
+        'available_from' => 'date',
+        'available_to' => 'date',
+
+        'nagar_nigam_approved' => 'boolean',
+        'permit_valid_till' => 'date',
+
+        'is_featured' => 'boolean',
+        'is_recommended' => 'boolean',
+        'view_count' => 'integer',
+        'bookings_count' => 'integer',
+        'last_booked_at' => 'datetime',
+    ];
+
+    /* ===================== CONSTANTS ===================== */
+
+    const TYPE_OOH  = 'ooh';
+    const TYPE_DOOH = 'dooh';
+
+    const STATUS_DRAFT            = 'draft';
+    const STATUS_PENDING_APPROVAL = 'pending_approval';
+    const STATUS_ACTIVE           = 'active';
+    const STATUS_INACTIVE         = 'inactive';
+    const STATUS_SUSPENDED        = 'suspended';
+
+    /* ===================== RELATIONSHIPS ===================== */
+    public function hoardingMedia()
+    {
+        return $this->hasMany(
+            HoardingMedia::class,
+            'hoarding_id',
+            'id'
+        )->orderBy('is_primary', 'desc')
+            ->orderBy('sort_order');
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'vendor_id');
+    }
+
+    public function ooh(): HasOne
+    {
+        return $this->hasOne(OOHHoarding::class, 'hoarding_id');
+    }
+    public function oohHoarding(): HasOne
+    {
+        return $this->hasOne(OOHHoarding::class, 'hoarding_id');
+    }
+
+    public function doohScreen(): HasOne
+    {
+        return $this->hasOne(DOOHScreen::class, 'hoarding_id');
+    }
+
+    public function packages()
+    {
+        if ($this->hoarding_type === 'dooh') {
+            return $this->doohScreen?->packages() ?? collect();
+        }
+
+        return $this->oohPackages();
+    }
+    /* ===================== SCOPES ===================== */
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
+    }
+
+    public function scopeByType($query, string $type)
+    {
+        return $query->where('hoarding_type', $type);
+    }
+
+    /* ===================== HELPERS ===================== */
+
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
+    public function doohScreens()
+    {
+        return $this->hasMany(\Modules\DOOH\Models\DOOHScreen::class);
+    }
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'hoarding_id');
+    }
+    public function posBookings()
+    {
+        return $this->hasMany(\Modules\POS\Models\POSBooking::class, 'hoarding_id');
+    }
+    // public function oohPackages()
+    // {
+    //     return $this->hasMany(HoardingPackage::class);
+    // }
+    /* =======================
+       OOH PACKAGES
+    ======================= */
+    public function oohPackages(): HasMany
+    {
+        return $this->hasMany(
+            HoardingPackage::class,
+            'hoarding_id',
+            'id'
+        );
+    }
+
+
+    const TYPE_BILLBOARD = 'billboard';
+    const TYPE_DIGITAL = 'digital';
+    const TYPE_TRANSIT = 'transit';
+    const TYPE_STREET_FURNITURE = 'street_furniture';
+    const TYPE_WALLSCAPE = 'wallscape';
+    const TYPE_MOBILE = 'mobile';
+
+    /**
+     * Get the geo fence for this hoarding.
+     */
+    public function geo(): HasOne
+    {
+        return $this->hasOne(HoardingGeo::class);
+    }
+
+    /**
+     * Get all enquiries for this hoarding.
+     */
+    public function enquiries()
+    {
+        return $this->hasMany(Enquiry::class);
+    }
+
+    /**
+     * Get all maintenance blocks for this hoarding (PROMPT 102)
+     */
+    public function maintenanceBlocks()
+    {
+        return $this->hasMany(MaintenanceBlock::class);
+    }
+
+    // /**
+    //  * Scope a query to filter by vendor.
+    //  */
+    public function scopeByVendor($query, $vendorId)
+    {
+        return $query->where('vendor_id', $vendorId);
+    }
+
+
+
+    /**
+     * Scope a query to filter by status.
+     */
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope to filter hoardings near a location using Haversine formula.
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param float $latitude
+     * @param float $longitude
+     * @param float $radiusKm
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeNearLocation($query, $latitude, $longitude, $radiusKm = 10)
+    {
+        // Haversine formula to calculate distance
+        // Distance in kilometers
+        $haversine = "(6371 * acos(cos(radians(?)) 
+                     * cos(radians(latitude)) 
+                     * cos(radians(longitude) - radians(?)) 
+                     + sin(radians(?)) 
+                     * sin(radians(latitude))))";
+
+        return $query
+            ->selectRaw("{$haversine} AS distance", [$latitude, $longitude, $latitude])
+            ->whereRaw("{$haversine} <= ?", [$latitude, $longitude, $latitude, $radiusKm])
+            ->orderBy('distance');
+    }
+
+    /**
+     * Check if hoarding supports weekly booking.
+     */
+    public function supportsWeeklyBooking(): bool
+    {
+        return $this->enable_weekly_booking && $this->weekly_price !== null;
+    }
+
+    public function getMediaAttributes()
+    {
+        if ($this->hoarding_type === self::TYPE_OOH) {
+            return $this->hoardingMedia;
+        }
+        if ($this->hoarding_type === self::TYPE_DOOH && $this->doohScreen) {
+            return $this->doohScreen->media;
+        }
+        return collect();
+    }
+
+    /**
+     * Register media collections for hoarding images.
+     */
+    public function registerMediaCollections(): void
+    {
+        // Hero/Primary Image - Single file, auto-compress
+        $this->addMediaCollection('hero_image')
+            ->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
+            ->maxFilesize(10 * 1024 * 1024) // 10MB
+            ->registerMediaConversions(function () {
+                $this->addMediaConversion('thumb')
+                    ->width(300)
+                    ->height(200)
+                    ->sharpen(10)
+                    ->nonQueued();
+
+                $this->addMediaConversion('preview')
+                    ->width(800)
+                    ->height(600)
+                    ->sharpen(10)
+                    ->nonQueued();
+
+                $this->addMediaConversion('large')
+                    ->width(1920)
+                    ->height(1080)
+                    ->sharpen(10)
+                    ->nonQueued();
+            });
+
+        // Night View Image - Single file
+        $this->addMediaCollection('night_image')
+            ->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
+            ->maxFilesize(10 * 1024 * 1024)
+            ->registerMediaConversions(function () {
+                $this->addMediaConversion('thumb')
+                    ->width(300)
+                    ->height(200)
+                    ->sharpen(10)
+                    ->nonQueued();
+
+                $this->addMediaConversion('preview')
+                    ->width(800)
+                    ->height(600)
+                    ->sharpen(10)
+                    ->nonQueued();
+            });
+
+        // Gallery/Angle Photos - Multiple files
+        $this->addMediaCollection('gallery')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
+            ->maxFilesize(10 * 1024 * 1024)
+            ->registerMediaConversions(function () {
+                $this->addMediaConversion('thumb')
+                    ->width(300)
+                    ->height(200)
+                    ->sharpen(10)
+                    ->nonQueued();
+
+                $this->addMediaConversion('preview')
+                    ->width(800)
+                    ->height(600)
+                    ->sharpen(10)
+                    ->nonQueued();
+            });
+
+        // Size/Dimension Overlay Image - Single file
+        $this->addMediaCollection('size_overlay')
+            ->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/svg+xml'])
+            ->maxFilesize(5 * 1024 * 1024)
+            ->registerMediaConversions(function () {
+                $this->addMediaConversion('thumb')
+                    ->width(300)
+                    ->height(200)
+                    ->nonQueued();
+            });
+    }
+
+
+    public function oohMedia(): HasMany
+    {
+        return $this->hasMany(HoardingMedia::class, 'hoarding_id');
+    }
+
+    public function brandLogos()
+    {
+        if ($this->hoarding_type === self::TYPE_DOOH && $this->doohScreen) {
+            // For DOOH, get brand logos from the child screen
+            return $this->doohScreen->brandLogos()->orderBy('sort_order');
+        }
+        return $this->hasMany(HoardingBrandLogo::class)
+            ->orderBy('sort_order');
+    }
+    /**
+     * Get hero image URL (with fallback to primary_image column if exists).
+     */
+    public function getHeroImageUrlAttribute(): ?string
+    {
+        $media = $this->getFirstMedia('hero_image');
+        return $media ? $media->getUrl() : null;
+    }
+
+    /**
+     * Get hero image thumbnail URL.
+     */
+    public function getHeroImageThumbAttribute(): ?string
+    {
+        $media = $this->getFirstMedia('hero_image');
+        return $media ? $media->getUrl('thumb') : null;
+    }
+
+    /**
+     * Get night image URL.
+     */
+    public function getNightImageUrlAttribute(): ?string
+    {
+        $media = $this->getFirstMedia('night_image');
+        return $media ? $media->getUrl() : null;
+    }
+
+    /**
+     * Get all gallery images.
+     */
+    public function getGalleryImagesAttribute()
+    {
+        return $this->getMedia('gallery');
+    }
+
+    /**
+     * Get size overlay image URL.
+     */
+    public function getSizeOverlayUrlAttribute(): ?string
+    {
+        $media = $this->getFirstMedia('size_overlay');
+        return $media ? $media->getUrl() : null;
+    }
+
+    /**
+     * Calculate Haversine distance to a point (in kilometers)
+     */
+    public function haversineDistance(float $lat, float $lng): float
+    {
+        $earthRadius = 6371; // Earth's radius in kilometers
+
+        $latFrom = deg2rad($this->lat);
+        $lngFrom = deg2rad($this->lng);
+        $latTo = deg2rad($lat);
+        $lngTo = deg2rad($lng);
+
+        $latDelta = $latTo - $latFrom;
+        $lngDelta = $lngTo - $lngFrom;
+
+        $angle = 2 * asin(sqrt(
+            pow(sin($latDelta / 2), 2) +
+                cos($latFrom) * cos($latTo) * pow(sin($lngDelta / 2), 2)
+        ));
+
+        return $angle * $earthRadius;
+    }
+
+    /**
+     * Get the grace period days for this hoarding
+     * Returns vendor-specific grace period or admin default
+     */
+    public function getGracePeriodDays(): int
+    {
+        return $this->grace_period_days ?? (int) config('booking.grace_period_days', env('BOOKING_GRACE_PERIOD_DAYS', 2));
+    }
+
+    /**
+     * Get the earliest allowed start date for campaigns
+     * This enforces the grace period to prevent last-minute bookings
+     */
+    public function getEarliestAllowedStartDate(): \Carbon\Carbon
+    {
+        return \Carbon\Carbon::today()->addDays($this->getGracePeriodDays());
+    }
+
+    /**
+     * Validate if a start date is within the allowed grace period
+     */
+    public function isStartDateAllowed(\Carbon\Carbon $startDate): bool
+    {
+        return $startDate->greaterThanOrEqualTo($this->getEarliestAllowedStartDate());
+    }
+
+    /**
+     * Get validation message for invalid start dates
+     */
+    public function getGracePeriodValidationMessage(): string
+    {
+        $days = $this->getGracePeriodDays();
+        $earliestDate = $this->getEarliestAllowedStartDate()->format('d M Y');
+
+        return "Campaign start date must be at least {$days} day(s) from today. Earliest allowed date: {$earliestDate}";
+    }
+
+    /**
+     * Attribute relationships
+     */
+    public function categoryAttribute()
+    {
+        return $this->belongsTo(HoardingAttribute::class, 'category_id');
+    }
+
+    public function materialAttribute()
+    {
+        return $this->belongsTo(HoardingAttribute::class, 'material_id');
+    }
+
+    public function lightingAttribute()
+    {
+        return $this->belongsTo(HoardingAttribute::class, 'lighting_id');
+    }
+
+    /**
+     * Generate an SEO-friendly title for this hoarding (OOH or DOOH).
+     * Uses location, type, size, and features.
+     *
+     * @return string
+     */
+    public function generateTitle(): string
+    {
+        // Determine type and child
+        $type = $this->hoarding_type ?? ($this->ooh ? 'ooh' : ($this->doohScreen ? 'dooh' : ''));
+        $child = $type === 'ooh' ? $this->ooh : ($type === 'dooh' ? $this->doohScreen : null);
+
+        // Type label
+        $typeLabel = '';
+        if ($type === 'ooh' && $child) {
+            $typeLabel = ucfirst($this->category ?? 'Hoarding');
+        } elseif ($type === 'dooh' && $child) {
+            $typeLabel = $child->screen_type ? ucfirst($child->screen_type) : 'LED Screen';
+        }
+        if (!$typeLabel) {
+            $typeLabel = 'Hoarding';
+        }
+
+        // Location
+        $parts = [];
+        if (!empty($this->locality)) $parts[] = $this->locality;
+        if (!empty($this->city)) $parts[] = $this->city;
+        if (empty($parts) && !empty($this->address)) $parts[] = $this->address;
+        if ($child && !empty($child->landmark)) $parts[] = $child->landmark;
+        $location = implode(', ', $parts);
+
+        // Size
+        $size = '';
+        if ($child && !empty($child->width) && !empty($child->height)) {
+            $unit = $child->measurement_unit ?? 'ft';
+            $width = (int) $child->width;
+            $height = (int) $child->height;
+            $size = $width . ' x ' . $height . ' ' . $unit;
+        }
+
+        // Features
+        $features = [];
+        if ($child && !empty($child->hoarding_visibility)) {
+            $features[] = ucfirst($child->hoarding_visibility);
+        }
+        if ($child && !empty($child->audience_types)) {
+            $aud = is_array($child->audience_types) ? implode('/', $child->audience_types) : $child->audience_types;
+            $features[] = $aud;
+        }
+        if ($child && !empty($child->main_features)) {
+            $features[] = $child->main_features;
+        }
+
+        // Compose title
+        $title = $typeLabel;
+        if ($location) $title .= ' in ' . $location;
+        if ($size) $title .= ' - ' . $size;
+        if ($features) $title .= ', ' . implode(', ', $features);
+
+        // Add main keywords for SEO
+        if ($type === 'ooh') {
+            $title .= ' | OOH Advertising';
+        } elseif ($type === 'dooh') {
+            $title .= ' | Digital Screen';
+        }
+        if (!empty($this->city)) {
+            $title .= ' | ' . $this->city;
+        }
+
+        // Ensure uniqueness (append id if needed)
+        // $existing = self::where('title', $title)->where('id', '!=', $this->id)->exists();
+        // if ($existing) {
+        //     $title .= ' #' . ($this->id ?? uniqid());
+        // }
+
+        return $title;
+    }
+
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        // On creation
+        static::created(function ($hoarding) {
+            $hoarding->loadMissing(['oohHoarding', 'doohScreen']); // load size data
+
+            $hoarding->updateQuietly([
+                'slug'  => $hoarding->generateSlugWithId(),
+                'title' => $hoarding->generateTitle(),
+            ]);
+        });
+
+        // On update
+        static::updating(function ($hoarding) {
+            $hoarding->title = $hoarding->generateTitle();
+
+            // Update slug if any key field changes
+            if ($hoarding->isDirty(['city', 'locality', 'category', 'landmark', 'hoarding_type'])) {
+                $hoarding->loadMissing(['oohHoarding', 'doohScreen']);
+                $hoarding->slug = $hoarding->generateSlugWithId();
+            }
+        });
+    }
+
+    public function generateSlugWithId(): string
+    {
+        $parts = [
+            Str::slug($this->city ?? ''),
+            Str::slug($this->locality ?? ''),
+            Str::slug($this->category ?? 'hoarding'),
+        ];
+
+
+        // Add landmark **only if available**
+        if (!empty($this->landmark)) {
+            $parts[] = Str::slug($this->landmark);
+        }
+
+        // Always append id for uniqueness
+        $parts[] = "h{$this->id}";
+
+        // Join non-empty parts with hyphen
+        return implode('-', array_filter($parts));
+    }
+
+
+
+    /**
+     * Scope a query to search by title, address, city, or description.
+     */
+    public function scopeSearch($query, $search)
+    {
+        return $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', "%{$search}%")
+                ->orWhere('address', 'like', "%{$search}%")
+                ->orWhere('city', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%");
+        });
+    }
+    public function getAudienceTypesAttribute($value)
+    {
+        if (empty($value)) {
+            return [];
+        }
+
+        // Already array
+        if (is_array($value)) {
+            return $value;
+        }
+
+        // JSON string
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Fallback: comma-separated
+        return array_filter(array_map('trim', explode(',', (string) $value)));
+    }
+
+    public function getDisplayLocationAttribute(): string
+    {
+        $parts = array_filter([
+            $this->locality,
+            $this->landmark ? 'Near ' . $this->landmark : null,
+            $this->city,
+            $this->state,
+            // $this->country,
+        ]);
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * Get formatted size for OOH / DOOH hoarding
+     */
+    public function getDisplaySizeAttribute(): string
+    {
+        // OOH size
+        if ($this->hoarding_type === self::TYPE_OOH && $this->ooh) {
+            if ($this->ooh->width && $this->ooh->height) {
+                $unit = $this->ooh->measurement_unit ?? 'ft';
+                return "{$this->ooh->width} x {$this->ooh->height} {$unit}";
+            }
+        }
+
+        // DOOH size
+        if ($this->hoarding_type === self::TYPE_DOOH && $this->doohScreen) {
+            if ($this->doohScreen->width && $this->doohScreen->height) {
+                $unit = $this->doohScreen->measurement_unit ?? 'px';
+                return "{$this->doohScreen->width} x {$this->doohScreen->height} {$unit}";
+            }
+
+            // Fallback for DOOH (screen type)
+            if ($this->doohScreen->screen_type) {
+                return strtoupper($this->doohScreen->screen_type);
+            }
+        }
+
+        return '-';
+    }
+
+    public function selectedEnquiryPackage(?int $packageId)
+    {
+        if (!$packageId) {
+            return null;
+        }
+
+        if ($this->hoarding_type === self::TYPE_DOOH) {
+            if (!$this->doohScreen) {
+                throw new \Exception('DOOH hoarding has no screen.');
+            }
+
+            return $this->doohScreen
+                ->packages()
+                ->where('id', $packageId)
+                ->first();
+        }
+
+        return $this->oohPackages()
+            ->where('id', $packageId)
+            ->first();
+    }
+    public function resolveMedia(): array
+    {
+        // ---------- OOH ----------
+        if ($this->hoarding_type === self::TYPE_OOH) {
+            return $this->hoardingMedia
+                ->sortByDesc('is_primary')
+                ->map(fn($media) => [
+                    'id'         => $media->id,
+                    'url'        => asset('storage/' . ltrim($media->file_path, '/')),
+                    'type'       => $media->media_type,
+                    'is_primary' => (bool) $media->is_primary,
+                ])
+                ->values()
+                ->toArray();
+        }
+
+        // ---------- DOOH ----------
+        if ($this->hoarding_type === self::TYPE_DOOH && $this->doohScreen) {
+            return $this->doohScreen->media
+                ->sortByDesc('is_primary')
+                ->map(fn($media) => [
+                    'id'         => $media->id,
+                    'url'        => asset('storage/' . ltrim($media->file_path, '/')),
+                    'type'       => $media->media_type,
+                    'is_primary' => (bool) $media->is_primary,
+                ])
+                ->values()
+                ->toArray();
+        }
+
+        return [];
+    }
+    public function heroImage(): ?string
+    {
+        $media = collect($this->resolveMedia())
+            ->firstWhere('is_primary', true)
+            ?? collect($this->resolveMedia())->first();
+
+        return $media['url'] ?? null;
+    }
+
+
+    /**
+     * Check if hoarding is currently available
+     */
+    public function getIsAvailableAttribute(): bool
+    {
+        if ($this->status !== 'active') {
+            return false;
+        }
+
+        if ($this->is_on_hold && $this->hold_till && $this->hold_till->isFuture()) {
+            return false;
+        }
+
+        if ($this->available_from && $this->available_from->isFuture()) {
+            return false;
+        }
+
+        if ($this->available_to && $this->available_to->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Get formatted price with currency
+     */
+    public function getFormattedPriceAttribute(): string
+    {
+        $symbol = $this->currency === 'INR' ? '₹' : '$';
+        return $symbol . number_format($this->monthly_price, 2);
+    }
+
+
+
+    /**
+     * Scope: Available hoardings (active and not on hold)
+     */
+    public function scopeAvailable($query)
+    {
+        return $query->where('status', 'active')
+            ->where(function ($q) {
+                $q->where('is_on_hold', false)
+                    ->orWhere(function ($q2) {
+                        $q2->where('is_on_hold', true)
+                            ->where('hold_till', '<', now());
+                    });
+            })
+            ->where(function ($q) {
+                $q->whereNull('available_from')
+                    ->orWhere('available_from', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('available_to')
+                    ->orWhere('available_to', '>=', now());
+            });
+    }
+
+    /**
+     * Scope: Filter by city
+     */
+    public function scopeInCity($query, string $city)
+    {
+        return $query->where('city', 'like', "%{$city}%");
+    }
+
+    /**
+     * Scope: Filter by locality
+     */
+    public function scopeInLocality($query, string $locality)
+    {
+        return $query->where(function ($q) use ($locality) {
+            $q->where('locality', 'like', "%{$locality}%")
+                ->orWhere('address', 'like', "%{$locality}%");
+        });
+    }
+
+    /**
+     * Scope: Filter by hoarding type
+     */
+    public function scopeOfType($query, string $type)
+    {
+        return $query->where('hoarding_type', 'like', "%{$type}%");
+    }
+
+    /**
+     * Scope: Featured hoardings
+     */
+    public function scopeFeatured($query)
+    {
+        return $query->where('is_featured', true);
+    }
+
+
+    /**
+     * Increment view count
+     */
+    public function incrementViewCount(): void
+    {
+        $this->increment('view_count');
+        $this->update(['last_viewed_at' => now()]);
+    }
+
+    /**
+     * Check if hoarding matches enquiry criteria
+     */
+    public function matchesEnquiry(string $city, array $localities, array $hoardingTypes): bool
+    {
+        // Check city match
+        if (stripos($this->city, $city) === false && stripos($city, $this->city) === false) {
+            return false;
+        }
+
+        // Check hoarding type match
+        $typeMatch = false;
+        foreach ($hoardingTypes as $type) {
+            if (stripos($this->hoarding_type, $type) !== false) {
+                $typeMatch = true;
+                break;
+            }
+        }
+
+        if (!$typeMatch) {
+            return false;
+        }
+
+        // Check locality match (if specified)
+        if (!empty($localities) && $localities[0] !== 'To be discussed') {
+            $localityMatch = false;
+            foreach ($localities as $locality) {
+                if (
+                    stripos($this->locality, $locality) !== false ||
+                    stripos($this->address, $locality) !== false ||
+                    stripos($this->landmark, $locality) !== false
+                ) {
+                    $localityMatch = true;
+                    break;
+                }
+            }
+
+            if (!$localityMatch) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+
+    /**
+     * Get the first media item for display (OOH or DOOH)
+     */
+    public function primaryMediaItem()
+    {
+        if ($this->hoarding_type === self::TYPE_OOH) {
+            return $this->hoardingMedia->first();
+        }
+
+        if ($this->hoarding_type === self::TYPE_DOOH && $this->doohScreen) {
+            return $this->doohScreen->media->sortBy('sort_order')->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * Get all media items for display (OOH or DOOH)
+     */
+    public function allMediaItems()
+    {
+        if ($this->hoarding_type === self::TYPE_OOH) {
+            return $this->hoardingMedia;
+        }
+
+        if ($this->hoarding_type === self::TYPE_DOOH && $this->doohScreen) {
+            return $this->doohScreen->media->sortBy('sort_order');
+        }
+
+        return collect();
+    }
+
+    // Proper Eloquent relationship (used if you ever need ->with())
+    public function commissionSettings(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\CommissionSetting::class, 'vendor_id', 'vendor_id')
+            ->where(function ($q) {
+                $q->where('hoarding_type', $this->hoarding_type)
+                    ->orWhere('hoarding_type', 'all');
+            });
+    }
+
+    // Accessor — resolves the single highest-priority rule
+    public function getEffectiveCommissionAttribute(): ?\App\Models\CommissionSetting
+    {
+        return \App\Models\CommissionSetting::resolveFor($this);
+    }
+    public function ratings()
+    {
+        return $this->hasMany(\App\Models\Rating::class);
+    }
+    public function averageRating()
+    {
+        return round($this->ratings()->avg('rating'),1);
+    }
+    public function reviewsCount()
+    {
+        return $this->ratings()->count();
+    }
+}

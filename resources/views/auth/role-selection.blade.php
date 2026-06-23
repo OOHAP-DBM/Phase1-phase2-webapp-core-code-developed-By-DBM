@@ -1,0 +1,223 @@
+@extends('layouts.guest')
+
+@section('title', 'Role Selection - OOHAPP')
+
+@push('styles')
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: #ffffff;
+}
+
+/* WRAPPER */
+.auth-wrapper {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* LEFT IMAGE */
+.auth-left {
+    background: #000;
+    padding: 0;
+}
+
+.auth-left img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* RIGHT FORM */
+.auth-right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+}
+
+/* FORM BOX */
+.login-box {
+    width: 100%;
+    max-width: 380px;
+}
+
+/* ROLE SELECTION */
+.role-card {
+    cursor: pointer;
+    text-align: center;
+}
+
+.role-card span {
+    display: block;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+.icon-circle {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    color: #0aa84f !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 75px;
+    color: #ffffff;
+    transition: 0.3s ease;
+}
+
+.role-card input:checked + .icon-circle,
+.role-card:hover .icon-circle {
+    background: #078d42;
+    color:white !important;
+    padding: 2px;0px !important;
+    transform: scale(1.05);
+}
+
+.role-divider {
+    width: 1px;
+    height: 80px;
+    background: #e5e7eb;
+}
+
+/* FOOTER */
+.auth-footer {
+    margin-top: 80px; /* 👈 thoda niche kiya */
+}
+
+.auth-footer p a {
+    text-decoration: none;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+    .auth-left {
+        display: none;
+    }
+
+    .auth-right {
+        width: 100%;
+    }
+}
+</style>
+@endpush
+
+@section('content')
+<div class="container-fluid auth-wrapper">
+    <div class="row h-100">
+
+        <!-- LEFT IMAGE -->
+        <div class="col-md-5 d-none d-md-block auth-left">
+              <a href="{{route('home')}}">
+                  <x-optimized-image
+                      src="assets/images/login/login_image.jpeg"
+                      :webp-srcset="asset('assets/images/login/login_image-390.webp') . ' 390w, ' . asset('assets/images/login/login_image-780.webp') . ' 780w, ' . asset('assets/images/login/login_image.webp') . ' 1250w'"
+                      :srcset="asset('assets/images/login/login_image-390.jpeg') . ' 390w, ' . asset('assets/images/login/login_image-780.jpeg') . ' 780w, ' . asset('assets/images/login/login_image.jpeg') . ' 1250w'"
+                      sizes="(min-width: 768px) 42vw, 100vw"
+                      alt="OOHAPP"
+                      width="1250"
+                      height="1600"
+                      loading="eager"
+                      fetchpriority="high"
+                  />
+              </a>
+        </div>
+
+        <!-- RIGHT FORM -->
+        <div class="col-md-7 col-12 auth-right">
+            <div class=" login-box text-center">
+                     <div class=" block md:hidden text-center mb-4 w-100">
+                        <a href="{{ route('home') }}" class="d-inline-block">
+                            <x-optimized-image
+                                :src="route('brand.oohapp-logo')"
+                                alt="OOHApp company logo"
+                                width="150"
+                                height="48"
+                                style="display:block; margin:0 auto; max-height:48px; object-fit:contain;"
+                            />
+                        </a>
+                    </div>
+                <h3 class="fw-semibold mb-4">Select your role</h3>
+                <form action="{{ route('register.store-role') }}" method="POST" id="roleForm">
+                    @csrf
+                    <input type="hidden" name="role" id="selectedRole">
+
+                    <div class="role-wrapper d-flex justify-content-center align-items-center gap-5 text-dark">
+
+                        <!-- CUSTOMER -->
+                        <label class="role-card" onclick="selectRole('customer', this)">
+                            <div class="icon-circle">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            <span>Customer</span>
+                        </label>
+
+                        <div class="role-divider"></div>
+
+                        <!-- VENDOR -->
+                        <label class="role-card" onclick="selectRole('vendor', this)">
+                            <div class="icon-circle">
+                                <i class="bi bi-person-fill"></i>
+                            </div>
+                            <span>Vendor</span>
+                        </label>
+
+                    </div>
+
+                    <!-- optional: auto submit OR button -->
+                    <button type="submit" id="continueBtn" hidden></button>
+                </form>
+                <!-- FOOTER -->
+             <div class="auth-footer mt-3 mt-md-5 pt-3 pt-md-5">
+    <p class="mb-1 mt-2 mt-md-5 pt-0 pt-md-5">
+                        Already Have an Account?
+                        <a href="{{ route('login') }}" class="text-success fw-semibold">Login</a>
+                    </p>
+
+                    <small class="text-muted">
+                        By clicking continue button, you agree with the
+                        <a href="{{ route('terms') }}" class="text-dark font-semibold">Terms & Conditions</a> and
+                        <a href="{{ route('privacy') }}" class="text-dark font-semibold">Privacy Policy</a>
+                        of OOHAPP App.
+                    </small>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+@endsection
+<script>
+function selectRole(role, element) {
+    // remove active from all
+    document.querySelectorAll('.role-card').forEach(card => {
+        card.classList.remove('active');
+    });
+
+    // add active to selected
+    element.classList.add('active');
+
+    // set role
+    document.getElementById('selectedRole').value = role;
+
+    // auto submit form
+    document.getElementById('roleForm').submit();
+}
+</script>

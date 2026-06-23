@@ -1,0 +1,298 @@
+@import 'tailwindcss';
+@import './theme.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* =================================
+   Admin Sidebar & Header Base
+================================= */
+
+.admin-sidebar {
+    min-width: 16rem;
+    max-width: 16rem;
+    background: #ffffff;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.04);
+}
+
+.admin-header {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+/* =================================
+   Sidebar Links (BASE)
+================================= */
+
+.admin-sidebar .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0.75rem;
+    border-radius: 0.75rem;
+    font-size: 0.80rem;
+    font-weight: 500;
+    color: #374151;
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* =================================
+   Sidebar Hover (NON-ACTIVE ONLY)
+================================= */
+
+/* .admin-sidebar .sidebar-link:hover:not(.active) {
+    background-color: rgba(34, 197, 94, 0.12);
+    color: var(--btn-color);
+} */
+
+/* =================================
+   Sidebar Active (FIGMA STYLE)
+================================= */
+
+/* .admin-sidebar .sidebar-link.active {
+    background-color: var(--btn-color-dark) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-radius: 0.75rem !important;
+} */
+
+/* Active Collapsible Buttons */
+/* .admin-sidebar button.active {
+    background-color: var(--btn-color-dark) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-radius: 0.75rem !important;
+} */
+
+/* Parent Button Green When Any Submenu Item is Active */
+/* .admin-sidebar li:has(.sidebar-submenu-item.active) > button {
+    background-color: var(--btn-color-dark) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    border-radius: 0.75rem !important;
+} */
+
+/* Parent Button SVG White When Any Submenu Item is Active */
+/* .admin-sidebar li:has(.sidebar-submenu-item.active) > button svg,
+.admin-sidebar li:has(.sidebar-submenu-item.active) > button svg path,
+.admin-sidebar li:has(.sidebar-submenu-item.active) > button svg * {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+} */
+
+/* Hover State for Dropdown Buttons */
+/* .admin-sidebar button:hover:not(.active) {
+    background-color: rgba(34, 197, 94, 0.12);
+    color: var(--btn-color);
+} */
+
+/* Active Submenu Links */
+/* .admin-sidebar .sidebar-submenu-item.active {
+    background-color: var(--btn-color-dark) !important;
+    color: #ffffff !important;
+} */
+
+/* Hover State for Submenu Items */
+/* .admin-sidebar .sidebar-submenu-item:hover:not(.active) {
+    background-color: rgba(34, 197, 94, 0.12);
+    color: var(--btn-color);
+} */
+
+/* Active SVG Icons */
+/* .admin-sidebar .sidebar-link.active svg,
+.admin-sidebar .sidebar-link.active svg path,
+.admin-sidebar .sidebar-link.active svg rect,
+.admin-sidebar .sidebar-link.active svg g path,
+.admin-sidebar .sidebar-link.active svg * {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+} */
+
+/* .admin-sidebar button.active svg,
+.admin-sidebar button.active svg path,
+.admin-sidebar button.active svg rect,
+.admin-sidebar button.active svg g path,
+.admin-sidebar button.active svg * {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+} */
+
+/* .admin-sidebar button.active svg,
+.admin-sidebar button.active svg path,
+.admin-sidebar button.active svg rect,
+.admin-sidebar button.active svg g path,
+.admin-sidebar button.active svg * {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+} */
+
+/* .admin-sidebar .sidebar-submenu-item.active svg,
+.admin-sidebar .sidebar-submenu-item.active svg * {
+    fill: #ffffff !important;
+} */
+
+/* .admin-sidebar .sidebar-link.active i,
+.admin-sidebar button.active i,
+.admin-sidebar .sidebar-submenu-item.active i {
+    color: #ffffff !important;
+} */
+
+/* =================================
+   Sidebar Section Titles
+================================= */
+
+/* .admin-sidebar .sidebar-submenu-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin: 0.5rem 0 0.25rem 0.5rem;
+}
+
+.submenu-item-indent {
+    margin-left: 25px;
+} */
+
+.logout-btn {
+    color: #ffffff !important;
+    background-color: var(--logout-btn) !important;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.logout-btn:hover {
+    background-color: #c73f3f !important;
+    transform: scale(1.02);
+}
+/* ADMIN LOGOUT FIX */
+.sidebar-logout {
+    color: #374151; /* gray-700 */
+}
+
+.sidebar-logout:hover {
+    background-color: #fee2e2 !important; /* red-100 */
+    color: #b91c1c !important;           /* red-700 */
+}
+
+
+/* =================================
+   Responsive
+================================= */
+
+@media (max-width: 1024px) {
+    .admin-sidebar {
+        position: fixed;
+        left: -100%;
+        z-index: 50;
+        transition: left 0.2s ease;
+    }
+
+    .admin-sidebar.open {
+        left: 0;
+    }
+
+    .main-panel {
+        margin-left: 0 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .admin-header {
+        padding: 0.75rem 0.5rem !important;
+        height: auto !important;
+        gap: 0.5rem;
+    }
+
+    .admin-header > div:first-child {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .admin-header > div:first-child span {
+        font-size: 0.75rem !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .admin-header > div:last-child {
+        gap: 0.5rem !important;
+    }
+
+    .admin-header h2 {
+        display: none !important;
+    }
+
+    .admin-header button[type="button"]:first-of-type {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0.25rem !important;
+    }
+
+    .admin-header button[type="button"]:first-of-type svg {
+        width: 18px !important;
+        height: 18px !important;
+    }
+
+    .admin-header .flex {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+.cart-btn.add {
+    @apply border border-gray-300 text-gray-700 hover:bg-gray-50;
+}
+
+.cart-btn.remove {
+    @apply border border-gray-300   text-red-400 hover:text-red-500;
+}
+
+.btn-color {
+    background-color: var(--btn-color) !important;
+    color: var(--white) !important;
+    transition: background 0.2s;
+}
+.btn-color:hover {
+    background-color: var(--btn-color-dark) !important;
+}
+.text-btn-color {
+    color: var(--btn-color) !important;
+    transition: color 0.2s;
+}
+.text-btn-color:hover {
+    color: var(--btn-color-dark) !important;
+}
+.theme-gradient {
+    background: linear-gradient(135deg, var(--btn-color), var(--btn-color-dark));
+}
+.theme-gradient-text {
+    background: linear-gradient(90deg, var(--btn-color), var(--btn-color-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+}
+/* Default (not wishlisted) */
+.shortlist-btn .wishlist-icon path {
+    fill: none;
+    stroke: white;
+    transition: fill 0.25s ease, stroke 0.25s ease, transform 0.2s ease;
+}
+
+/* Wishlisted state */
+.shortlist-btn.is-wishlisted .wishlist-icon path {
+    fill: #14c871;
+    stroke: #14c871;
+}
+
+/* Optional hover animation */
+.shortlist-btn:hover .wishlist-icon {
+    transform: scale(1.05);
+}

@@ -1,0 +1,791 @@
+@extends('layouts.guest')
+
+@section('title', 'Signup - OOHAPP')
+
+@push('styles')
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+<style>
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+.auth-wrapper {
+    width: 100vw;
+    height: 100vh;
+}
+.auth-left {
+    background: #000;
+    padding: 0;
+}
+.auth-left img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.auth-right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+}
+.signup-box {
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+}
+.signup-box h3 {
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+.form-control {
+    height: 46px;
+    border-radius: 6px;
+}
+.btn-continue {
+    height: 46px;
+    border-radius: 8px;
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+.btn-continue.active {
+    background: #2bb57c;
+    color: #fff;
+    cursor: pointer;
+}
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 25px 0;
+    color: #9ca3af;
+    font-size: 13px;
+}
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+.divider span {
+    margin: 0 10px;
+}
+.social-btn {
+    height: 46px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    width: 100%;
+    margin-bottom: 12px;
+}
+.social-btn.google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.footer-text {
+    margin-top: 40px;
+    font-size: 13px;
+    color: #6b7280;
+}
+.otp-box {
+    width: 44px;
+    height: 46px;
+    text-align: center;
+    font-size: 18px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+}
+@media (max-width: 768px) {
+    .auth-left { display: none; }
+}
+.otp-wrapper {
+    margin-top: -250px !important; 
+}
+@media (max-width: 768px) {
+    .otp-wrapper {
+        margin-left: 70px !important;
+    }
+}
+
+.otp-text {
+    text-align: left;
+}
+
+.otp-icon {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #d1fae5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* default: mobile + tablet */
+.d-done-box {
+    margin-left: 0 !important;
+}
+
+/* ONLY lg and above */
+@media (min-width: 1400px) {
+    .d-done-box {
+        margin-left: -200px !important;
+    }
+}
+.toggle-password {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #6b7280;
+    z-index: 5;
+}
+
+.toggle-password:hover {
+    color: #111827;
+}
+.signup-box {
+    position: relative;
+}
+
+/* OTP error floating only */
+#ajaxError.otp-error {
+    position: absolute;
+    top: 50px;          /* 👈 OTP heading ke niche */
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: 100%;
+    z-index: 50;
+}
+.otp-box.error{
+    border:1px solid #dc3545 !important;
+    background:#fff5f5 !important;
+}
+#otpInlineErrorEmail{
+    font-size:12px;
+    color:#dc3545;
+    margin-top:6px;
+    display:none;
+}
+@keyframes otpShake{
+    0%{transform:translateX(0)}
+    25%{transform:translateX(-4px)}
+    50%{transform:translateX(4px)}
+    75%{transform:translateX(-4px)}
+    100%{transform:translateX(0)}
+}
+.otp-shake{
+    animation:otpShake .25s ease;
+}
+
+</style>
+@endpush
+
+@section('content')
+<div class="container-fluid auth-wrapper">
+<div class="row h-100">
+
+    <!-- LEFT IMAGE -->
+    <div class="col-md-5 d-none d-md-block auth-left">
+        <a href="{{route('home')}}">
+            <x-optimized-image
+                src="assets/images/login/login_image.jpeg"
+                :webp-srcset="asset('assets/images/login/login_image-390.webp') . ' 390w, ' . asset('assets/images/login/login_image-780.webp') . ' 780w, ' . asset('assets/images/login/login_image.webp') . ' 1250w'"
+                :srcset="asset('assets/images/login/login_image-390.jpeg') . ' 390w, ' . asset('assets/images/login/login_image-780.jpeg') . ' 780w, ' . asset('assets/images/login/login_image.jpeg') . ' 1250w'"
+                sizes="(min-width: 768px) 42vw, 100vw"
+                alt="OOHAPP"
+                width="1250"
+                height="1600"
+                loading="eager"
+                fetchpriority="high"
+            />
+        </a>
+    </div>
+
+    <!-- RIGHT FORM -->
+    <div class="col-md-7 col-12 auth-right">
+    <div class="signup-box">
+
+        <div id="ajaxError" class="alert alert-danger text-start d-none"></div>
+
+        <!-- ================= OTP SECTION ================= -->
+        <div id="otp-section">
+            {{-- Logo — centered at top --}}
+            <div id="logoBox" class=" block md:hidden text-center mb-4 w-100">
+                <a href="{{ route('home') }}" class="d-inline-block">
+                    <x-optimized-image
+                        :src="route('brand.oohapp-logo')"
+                        alt="OOHApp company logo"
+                        width="150"
+                        height="48"
+                        style="display:block; margin:0 auto; max-height:48px; object-fit:contain;"
+                    />
+                </a>
+            </div>
+
+            <!-- EMAIL FORM -->
+            <form id="signupForm">
+                <h3>Signup</h3>
+                  @if ($errors->any())
+                    <div class="alert alert-danger text-start mb-3">
+                        <ul class="mb-0">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+                @csrf
+                <div class="mb-2 text-start">
+                    <input type="email" id="emailInput" class="form-control" placeholder="Email" required>
+                    <small class="text-muted">We will send you a 4-digit OTP to confirm your email</small>
+                </div>
+
+                <button type="submit" class="btn btn-continue w-100 mt-3" id="continueBtn" disabled>
+                    <span id="continueBtnText">Continue</span>
+                    <span id="continueBtnLoader" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </form>
+
+            <div class="divider"><span>OR</span></div>
+
+            <a href="{{ route('register.mobile-form')}}"
+                class="social-btn btn border border-1">
+                <i class="fa-solid fa-mobile-screen me-2"></i>
+                Continue with Mobile
+            </a>
+
+
+            <!-- <button class="social-btn google-btn">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18">
+                <span>Continue with Google</span>
+            </button> -->
+
+            <div class="footer-text fs-6">
+                Already Have an Account?
+                <a href="{{ route('login') }}" class="text-success fw-bold fs-6">Login</a>
+                <br>
+                <small>
+                    By clicking continue button, you agree with the
+                    <a href="{{ route('terms') }}" class="text-dark font-semibold">Terms & Conditions</a> and
+                    <a href="{{ route('privacy') }}" class="text-dark font-semibold">Privacy policy</a> of OOHAPP.
+                </small>
+            </div>
+
+            <!-- OTP VERIFY UI (FIGMA STYLE) -->
+
+           <div id="otp-ui" class="d-none mt-4 otp-wrapper">
+            <div id="otpErrorInline" class="alert alert-danger d-none mb-2"></div>
+            <!-- ICON -->
+            <div class="mb-3 otp-text">
+                <div class="otp-icon">
+                    <i class="fa-solid fa-envelope text-success fs-3"></i>
+                </div>
+            </div>
+            <!-- TEXT -->
+            <div class="otp-text">
+                <h6 class="fw-semibold mb-1 fs-4">Verify with OTP</h6>
+                <p class="text-muted small mb-3">
+                    Enter the 4-digit code sent to you at <br>
+                    <strong id="otp-email-text"></strong>
+                </p>
+            </div>
+            <!-- OTP BOXES -->
+            <div class="d-flex gap-2 my-3 otp-text">
+                <input class="otp-box" maxlength="1" inputmode="numeric">
+                <input class="otp-box" maxlength="1" inputmode="numeric">
+                <input class="otp-box" maxlength="1" inputmode="numeric">
+                <input class="otp-box" maxlength="1" inputmode="numeric">
+            </div>
+            <div id="otpInlineErrorEmail" class="text-left">Invalid OTP. Please try again.</div>
+            <!-- RESEND -->
+            <div class="otp-text">
+                <small class="text-muted">
+                    <span id="resendText">
+                        Resend OTP in <span class="text-success fw-bold" id="otpTimer">00:30</span>
+                    </span>
+                    <a href="javascript:void(0)"
+                    id="resendBtn"
+                    class="text-success fw-bold d-none">
+                        Resend OTP
+                    </a>
+                </small>
+            </div>
+            </div>
+
+
+           </div>
+        <!-- ================= FINAL REGISTER ================= -->
+        <div id="d-done" class="d-done-box" style="display:none; margin-top:-250px !important;">
+
+            <!-- Heading & Info -->
+            <h3 class="text-start mb-2">Create a Password</h3>
+            <p class="text-start mb-1 small">
+                Password should be minimum 4 character
+            </p>
+            <form action="{{ route('register.submit') }}"
+                method="POST"
+                autocomplete="off">
+                @csrf
+
+                <!-- REQUIRED HIDDEN FIELDS -->
+                <input type="hidden" name="email" id="finalEmail">
+                <input type="hidden" name="email_verified" value="1">
+                <input type="hidden" name="role" value="{{ $role ?? 'customer' }}">
+
+                <!-- FULL NAME -->
+                <p class="text-start mb-1">
+                    Name <span class="text-danger">*</span>
+                </p>
+                <div class="mb-2 text-start">
+                    <input type="text"
+                        name="name"
+                        class="form-control"
+                        placeholder="Full Name"
+                        autocomplete="new-name"
+                        autocorrect="off"
+                        spellcheck="false"
+                        required
+                        >
+                </div>
+                    <!-- PASSWORD -->
+                <p class="text-start mb-1">
+                    Password <span class="text-danger">*</span>
+                </p>
+                <div class="mb-2 text-start position-relative">
+                    <input type="password"
+                        id="password"
+                        name="password"
+                        class="form-control pe-5"
+                        placeholder="Password"
+                        autocomplete="new-password"
+                        required>
+
+                    <span class="toggle-password"
+                        data-target="password">
+                        <i class="fa-solid fa-eye"></i>
+                    </span>
+                </div>
+                <!-- CONFIRM PASSWORD -->
+              <p class="text-start mb-1">
+                Confirm Password <span class="text-danger">*</span>
+            </p>
+
+            <div class="mb-2 text-start position-relative">
+                <input type="password"
+                    id="password_confirmation"
+                    name="password_confirmation"
+                    class="form-control pe-5"
+                    placeholder="Confirm Password"
+                    autocomplete="new-password"
+                    required>
+
+                <span class="toggle-password"
+                    data-target="password_confirmation">
+                    <i class="fa-solid fa-eye"></i>
+                </span>
+            </div>
+
+                <div class="form-check text-start mb-3">
+                    <input class="form-check-input" type="checkbox" id="termsAgree" name="termsAgree" required>
+                    <label class="form-check-label" for="termsAgree">
+                        I agree to the <a href="{{ route('terms') }}" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a> and <a href="{{ route('privacy') }}" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+                    </label>
+                </div>
+
+                <!-- SUBMIT -->
+                <button type="submit" class="btn btn-continue active w-100">
+                    Create Account
+                </button>
+
+            </form>
+        </div>
+
+
+    </div>
+    </div>
+</div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        /* ===================== HELPERS ===================== */
+
+        function showFieldError(input, msg) {
+            clearFieldError(input);
+            const err = document.createElement('small');
+            err.className = 'text-danger d-block mt-1';
+            err.innerText = msg;
+            input.parentNode.appendChild(err);
+        }
+
+        function clearFieldError(input) {
+            const err = input.parentNode.querySelector('.text-danger');
+            if (err) err.remove();
+
+            // show helper text again if exists
+            const helper = input.parentNode.querySelector('.text-muted');
+            if (helper) helper.style.display = 'block';
+        }
+
+        function validateEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+        }
+
+        function validateName(name) {
+            return /^[A-Za-z ]{2,100}$/.test(name.trim());
+        }
+
+        function validatePassword(pwd) {
+            return pwd.length >= 4;
+        }
+
+        /* ===================== EMAIL + OTP ===================== */
+
+        const emailInput   = document.getElementById('emailInput');
+        const signupForm   = document.getElementById('signupForm');
+        const continueBtn  = document.getElementById('continueBtn');
+        const errorBox     = document.getElementById('ajaxError');
+        const helperText   = emailInput.parentNode.querySelector('.text-muted');
+
+        const otpUI        = document.getElementById('otp-ui');
+        const otpBoxes     = document.querySelectorAll('.otp-box');
+        const otpEmailText = document.getElementById('otp-email-text');
+
+        const divider      = document.querySelector('.divider');
+        const socialBtns   = document.querySelectorAll('.social-btn');
+        const footerText   = document.querySelector('.footer-text');
+
+        let enteredEmail = '';
+
+        emailInput.addEventListener('input', () => {
+            errorBox.classList.add('d-none');
+            errorBox.innerText = '';
+            clearFieldError(emailInput);
+
+            if (!validateEmail(emailInput.value)) {
+                continueBtn.disabled = true;
+                continueBtn.classList.remove('active');
+                if (helperText) helperText.style.display = 'none';
+                showFieldError(emailInput, 'Enter a valid email address');
+            } else {
+                continueBtn.disabled = false;
+                continueBtn.classList.add('active');
+                if (helperText) helperText.style.display = 'block';
+            }
+        });
+
+        signupForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (!validateEmail(emailInput.value)) {
+                showFieldError(emailInput, 'Invalid email format');
+                return;
+            }
+
+            enteredEmail = emailInput.value;
+
+            // Show loader
+            const btn = document.getElementById('continueBtn');
+            const btnText = document.getElementById('continueBtnText');
+            const btnLoader = document.getElementById('continueBtnLoader');
+            btn.disabled = true;
+            btnText.classList.add('d-none');
+            btnLoader.classList.remove('d-none');
+
+            fetch("{{ route('register.sendEmailOtp') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": "{{ csrf_token() }}"
+                },
+                body: JSON.stringify({ email: enteredEmail })
+            })
+            .then(r => r.json())
+            .then(res => {
+                // Hide loader
+                btn.disabled = false;
+                btnText.classList.remove('d-none');
+                btnLoader.classList.add('d-none');
+
+                if (!res.success) return showGlobalError(res.message);
+
+                signupForm.style.display = 'none';
+                divider.style.display = 'none';
+                socialBtns.forEach(b => b.style.display = 'none');
+                footerText.style.display = 'none';
+                document.getElementById('logoBox').style.display = 'none';
+                otpEmailText.innerText = enteredEmail;
+                otpUI.classList.remove('d-none');
+                otpBoxes[0].focus();
+                startResendTimer();
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btnText.classList.remove('d-none');
+                btnLoader.classList.add('d-none');
+                showGlobalError('Something went wrong. Please try again.');
+            });
+        });
+
+        /* ===================== OTP ===================== */
+
+        function showOtpInlineError(msg) {
+            const otpError = document.getElementById('otpErrorInline');
+            if (!otpError) return;
+            otpError.innerText = msg || 'Something went wrong';
+            otpError.classList.remove('d-none');
+        }
+        function clearOtpInlineError() {
+            const otpError = document.getElementById('otpErrorInline');
+            if (!otpError) return;
+            otpError.innerText = '';
+            otpError.classList.add('d-none');
+        }
+        const otpInlineErrorEmail = document.getElementById('otpInlineErrorEmail');
+        function markEmailOtpInvalid(msg='Invalid OTP. Please try again.'){
+            otpBoxes.forEach(box=>{
+                box.classList.add('error','otp-shake');
+            });
+
+            otpInlineErrorEmail.innerText = msg;
+            otpInlineErrorEmail.style.display = 'block';
+
+            setTimeout(()=>{
+                otpBoxes.forEach(box=>box.classList.remove('otp-shake'));
+            },300);
+        }
+
+        function clearEmailOtpHighlight(){
+            otpBoxes.forEach(box=>box.classList.remove('error'));
+            otpInlineErrorEmail.style.display = 'none';
+        }
+        otpBoxes.forEach((box, index) => {
+            box.addEventListener('input', () => {
+                box.value = box.value.replace(/\D/g, '');
+                clearOtpInlineError();
+                clearEmailOtpHighlight();
+                if (box.value && otpBoxes[index + 1]) {
+                    otpBoxes[index + 1].focus();
+                }
+                const otp = Array.from(otpBoxes).map(b => b.value).join('');
+                if (otp.length === 4) verifyOtp(otp);
+            });
+            box.addEventListener('keydown', e => {
+                if (e.key === 'Backspace' && !box.value && otpBoxes[index - 1]) {
+                    otpBoxes[index - 1].focus();
+                }
+            });
+        });
+
+        function verifyOtp(otp) {
+            clearOtpInlineError();
+            if (!/^\d{4}$/.test(otp)) {
+                showOtpInlineError('OTP must be 4 digits');
+                return;
+            }
+            fetch("{{ route('register.verifyEmailOtp') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": "{{ csrf_token() }}"
+                },
+                body: JSON.stringify({ email: enteredEmail, otp })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) {
+                    clearOtpInlineError();    
+                    markEmailOtpInvalid(res.message || 'Invalid OTP');
+                    otpBoxes.forEach(b=>b.value='');
+                    otpBoxes[0].focus();
+                    return;
+                }
+                clearOtpInlineError();
+                errorBox.classList.add('d-none');
+                errorBox.classList.remove('otp-error');
+                errorBox.innerText = '';
+                document.getElementById('otp-section').style.display = 'none';
+                document.getElementById('d-done').style.display = 'block';
+                document.getElementById('finalEmail').value = enteredEmail;
+            });
+        }
+
+        function showGlobalError(msg) {
+            // If OTP UI is visible, show inline error instead
+            if (!otpUI.classList.contains('d-none')) {
+                showOtpInlineError(msg);
+                return;
+            }
+            errorBox.innerText = msg || 'Something went wrong';
+            errorBox.classList.remove('d-none');
+            errorBox.classList.remove('otp-error');
+        }
+
+
+
+        /* ===================== FINAL FORM ===================== */
+
+        const finalForm = document.querySelector('#d-done form');
+        if (!finalForm) return;
+
+        const nameInput   = finalForm.querySelector('input[name="name"]');
+        const password   = document.getElementById('password');
+        const confirmPwd = document.getElementById('password_confirmation');
+
+        nameInput.addEventListener('input', () => {
+            clearFieldError(nameInput);
+            if (!validateName(nameInput.value)) {
+                showFieldError(nameInput, 'Name must contain only letters and spaces');
+            }
+        });
+
+        password.addEventListener('input', () => {
+            clearFieldError(password);
+            if (!validatePassword(password.value)) {
+                showFieldError(password, 'Password must be strong');
+            }
+        });
+
+        confirmPwd.addEventListener('input', () => {
+            clearFieldError(confirmPwd);
+            if (confirmPwd.value !== password.value) {
+                showFieldError(confirmPwd, 'Passwords do not match');
+            }
+        });
+
+        finalForm.addEventListener('submit', function (e) {
+            let valid = true;
+
+            clearFieldError(nameInput);
+            clearFieldError(password);
+            clearFieldError(confirmPwd);
+
+            if (!validateName(nameInput.value)) {
+                showFieldError(nameInput, 'Enter a valid full name');
+                valid = false;
+            }
+
+            // if (!validatePassword(password.value)) {
+            //     showFieldError(password, 'Weak password');
+            //     valid = false;
+            // }
+
+            if (password.value !== confirmPwd.value) {
+                showFieldError(confirmPwd, 'Password confirmation mismatch');
+                valid = false;
+            }
+
+            if (!valid) e.preventDefault();
+        });
+        /* ===================== RESEND OTP TIMER ===================== */
+
+let resendInterval = null;
+let resendSeconds = 30;
+
+const resendBtn   = document.getElementById('resendBtn');
+const resendText  = document.getElementById('resendText');
+const otpTimerEl  = document.getElementById('otpTimer');
+
+function startResendTimer() {
+
+    if (resendInterval) {
+        clearInterval(resendInterval);
+        resendInterval = null;
+    }
+
+    resendSeconds = 30;
+
+    resendBtn.classList.add('d-none');
+    resendText.classList.remove('d-none');
+
+    updateTimerText();
+
+    resendInterval = setInterval(() => {
+        resendSeconds--;
+
+        updateTimerText();
+
+        if (resendSeconds <= 0) {
+            clearInterval(resendInterval);
+            resendInterval = null;
+            resendText.classList.add('d-none');
+            resendBtn.classList.remove('d-none');
+        }
+    }, 1000);
+}
+
+function updateTimerText() {
+    const sec = resendSeconds < 10 ? '0' + resendSeconds : resendSeconds;
+    otpTimerEl.innerText = `00:${sec}`;
+}
+
+/* ===================== RESEND OTP CLICK ===================== */
+
+resendBtn.addEventListener('click', function () {
+    clearEmailOtpHighlight();
+    resendBtn.classList.add('d-none');
+    resendText.classList.remove('d-none');
+
+    fetch("{{ route('register.sendEmailOtp') }}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+        },
+        body: JSON.stringify({ email: enteredEmail })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (!res.success) {
+            showGlobalError(res.message || 'Failed to resend OTP');
+            return;
+        }
+
+        otpBoxes.forEach(b => b.value = '');
+        otpBoxes[0].focus();
+
+        startResendTimer();
+    });
+});
+
+
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        document.querySelectorAll('.toggle-password').forEach(toggle => {
+            toggle.addEventListener('click', function () {
+
+                const inputId = this.getAttribute('data-target');
+                const input   = document.getElementById(inputId);
+                const icon    = this.querySelector('i');
+
+                if (!input) return;
+
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        });
+
+    });
+</script>
+
+@endpush

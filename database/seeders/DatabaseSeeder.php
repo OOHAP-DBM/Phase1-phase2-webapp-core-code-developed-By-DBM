@@ -1,0 +1,44 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\User;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
+{
+    use WithoutModelEvents;
+
+    /**
+     * Seed the application's database.
+     */
+    public function run(): void
+    {
+        // User::factory(10)->create();
+
+        // User::factory()->create([
+        //     'name' => 'Test User',
+        //     'email' => 'test@example.com',
+        // ]);
+
+        // Seed tax rules
+        $this->call([
+            RolesAndPermissionsSeeder::class,
+            AdminUserSeeder::class,
+            TaxRulesSeeder::class,
+           
+            SettingsSeeder::class,
+            HoardingAttributesSeeder::class,
+            TermsAndConditionsSeeder::class,
+            FAQSeeder::class,
+            DisclaimerSeeder::class,
+            PrivacyPolicySeeder::class,
+            CancellationRefundPolicySeeder::class,
+            AboutPageSeeder::class,
+            AboutLeaderSeeder::class,
+            ImportPermissionSeeder::class,
+            InvoiceSettingsSeeder::class,
+        ]);
+    }
+}

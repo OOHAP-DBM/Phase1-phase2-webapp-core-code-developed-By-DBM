@@ -1,0 +1,879 @@
+<!-- Step 2: Settings & Attributes -->
+{{-- <div class="bg-white rounded-3xl shadow-sm border border-gray-100 mb-6"> --}}
+
+  <!-- Body -->
+  <div class="md:px-8 space-y-8">
+    <div class="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-1.5 h-6 bg-[#009A5C] rounded-full"></div>
+            <h3 class="text-xl font-bold text-gray-800">Additional Settings</h3>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Nagar Nigam Approval -->
+            @php
+                $nagarNigamApproved = old('nagar_nigam_approved', $parentHoarding->nagar_nigam_approved ?? 0);
+                $permitNumber = old('permit_number', $parentHoarding->permit_number ?? '');
+                $permitValidTill = old('permit_valid_till', $parentHoarding->permit_valid_till ?? '');
+            @endphp
+            <div class="flex items-center justify-between p-4 bg-green-50/30 rounded-2xl border border-green-100/50">
+                <label class="text-sm font-bold text-gray-700">Nagar Nigam Approved? </label>
+                <div class="flex items-center gap-6">
+                    <label class="flex items-center cursor-pointer group">
+                      <input type="radio" name="nagar_nigam_approved" value="1" 
+                             class="hidden peer" id="nagar-yes"
+                             {{ $nagarNigamApproved == 1 ? 'checked' : '' }}>
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">Yes</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer group">
+                      <input type="radio" name="nagar_nigam_approved" value="0" 
+                             class="hidden peer" id="nagar-no"
+                             {{ $nagarNigamApproved == 0 ? 'checked' : '' }}>
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">No</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Nagar Nigam Modal -->
+            <div id="nagarModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 hidden">
+              <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xs">
+                <h2 class="text-lg font-bold mb-4 text-gray-800">Enter Permit Details</h2>
+                <input type="text" id="permitNumberInput" 
+                       value="{{ $permitNumber }}"
+                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mb-4 outline-none focus:border-[#009A5C]" 
+                       placeholder="Permit Number">
+                <h6 class="text-xs font-semibold text-gray-700 mb-2">Permit valid till :</h6>
+                <input type="date" id="permitValidTillInput" 
+                       value="{{ $permitValidTill }}"
+                       class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mb-4 outline-none focus:border-[#009A5C]" 
+                       placeholder="Permit Valid Till">
+                <div class="flex justify-end gap-2">
+                  <button type="button" id="nagarCancelBtn" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold">Cancel</button>
+                  <button type="button" id="nagarSaveBtn" class="px-4 py-2 rounded-lg bg-[#009A5C] text-white font-semibold">Save</button>
+                </div>
+              </div>
+            </div>
+            <input type="hidden" name="permit_number" id="permitNumberHidden" value="{{ $permitNumber }}">
+            <input type="hidden" name="permit_valid_till" id="permitValidTillHidden" value="{{ $permitValidTill }}">
+
+            <!-- Block Dates -->
+            @php
+                $hasBlockDates = old('block_dates', !empty($parentHoarding->block_dates ?? null) ? 1 : 0);
+                $existingBlockDates = old('blocked_dates_json', !empty($parentHoarding->block_dates ?? null) ? json_encode($parentHoarding->block_dates) : '[]');
+            @endphp
+            <div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100">
+                <label class="text-sm font-bold text-gray-700">Do you want to block any certain dates?</label>
+                <div class="flex items-center gap-6">
+                  <label class="flex items-center cursor-pointer group">
+                    <input type="radio" name="block_dates" value="1" class="hidden peer" id="block-yes"
+                           {{ $hasBlockDates == 1 ? 'checked' : '' }}>
+                    <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                      <div class="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
+                    <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">Yes</span>
+                  </label>
+                  <label class="flex items-center cursor-pointer group">
+                    <input type="radio" name="block_dates" value="0" class="hidden peer" id="block-no"
+                           {{ $hasBlockDates == 0 ? 'checked' : '' }}>
+                    <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                      <div class="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
+                    <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">No</span>
+                  </label>
+                </div>
+            </div>
+
+            <!-- Block Dates Modal -->
+            <div id="blockDatesModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 hidden">
+              <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
+                <h2 class="text-lg font-bold mb-2 text-gray-800">Select Blocked Dates</h2>
+                <input type="text" id="blockDatesCalendar" hidden class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mb-4 outline-none focus:border-[#009A5C]" placeholder="Pick dates to block...">
+                <div class="flex justify-end gap-2 mt-2">
+                  <button type="button" id="blockDatesCancelBtn" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold">Cancel</button>
+                  <button type="button" id="blockDatesSaveBtn" class="px-4 py-2 rounded-lg bg-[#009A5C] text-white font-semibold">Save</button>
+                </div>
+              </div>
+            </div>
+            <input type="hidden" name="blocked_dates_json" id="blockedDatesHidden" value="{{ $existingBlockDates }}">
+
+            <!-- Grace Period -->
+            @php
+                $hasGracePeriod = old('needs_grace_period', !empty($parentHoarding->grace_period_days ?? null) ? 1 : 0);
+                $gracePeriodValue = old('grace_period_days', $parentHoarding->grace_period_days ?? '');
+            @endphp
+            <div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100">
+                <label class="text-sm font-bold text-gray-700">Do you need grace period after booking?</label>
+                <div class="flex items-center gap-6">
+                  <label class="flex items-center cursor-pointer group">
+                    <input type="radio" name="needs_grace_period" value="1" class="hidden peer" id="grace-yes"
+                           {{ $hasGracePeriod == 1 ? 'checked' : '' }}>
+                    <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                      <div class="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
+                    <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">Yes</span>
+                  </label>
+                  <label class="flex items-center cursor-pointer group">
+                    <input type="radio" name="needs_grace_period" value="0" class="hidden peer" id="grace-no"
+                           {{ $hasGracePeriod == 0 ? 'checked' : '' }}>
+                    <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                      <div class="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
+                    <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">No</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Grace Period Modal -->
+              <div id="graceModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 hidden">
+                <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xs">
+                  <h2 class="text-lg font-bold mb-4 text-gray-800">Set Grace Period (in days)</h2>
+                  <input type="number"  max="30" id="gracePeriodInput" 
+                         value="{{ $gracePeriodValue }}"
+                         class="w-full border border-gray-200 rounded-xl px-4 py-2.5 mb-4 outline-none focus:border-[#009A5C]" 
+                         placeholder="Enter number of days">
+                  <div class="flex justify-end gap-2">
+                    <button type="button" id="graceCancelBtn" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-semibold">Cancel</button>
+                    <button type="button" id="graceSaveBtn" class="px-4 py-2 rounded-lg bg-[#009A5C] text-white font-semibold">Save</button>
+                  </div>
+                </div>
+              </div>
+              <input type="hidden" name="grace_period_days" id="gracePeriodDaysHidden" value="{{ $gracePeriodValue }}">
+
+            <!-- Featured -->
+            @php
+                $isFeatured = old('is_featured', $parentHoarding->is_featured ?? 0);
+            @endphp
+            <div class="flex items-center justify-between p-4 bg-blue-50/30 rounded-2xl border border-blue-100/50">
+                <label class="text-sm font-bold text-gray-700">Do you want Featured? </label>
+                <div class="flex items-center gap-6">
+                    <label class="flex items-center cursor-pointer group">
+                      <input type="radio" name="is_featured" value="1" 
+                             class="hidden peer" id="featured-yes"
+                             {{ $isFeatured == 1 ? 'checked' : '' }}>
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">Yes</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer group">
+                      <input type="radio" name="is_featured" value="0" 
+                             class="hidden peer" id="featured-no"
+                             {{ $isFeatured == 0 ? 'checked' : '' }}>
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">No</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Recommended -->
+            {{-- @php
+                $isRecommended = old('is_recommended', $parentHoarding->is_recommended ?? 0);
+            @endphp
+            <div class="flex items-center justify-between p-4 bg-purple-50/30 rounded-2xl border border-purple-100/50">
+                <label class="text-sm font-bold text-gray-700">Mark this hoarding as Recommended? </label>
+                <div class="flex items-center gap-6">
+                    <label class="flex items-center cursor-pointer group">
+                      <input type="radio" name="is_recommended" value="1" 
+                             class="hidden peer" id="recommended-yes"
+                             {{ $isRecommended == 1 ? 'checked' : '' }}>
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">Yes</span>
+                    </label>
+                    <label class="flex items-center cursor-pointer group">
+                      <input type="radio" name="is_recommended" value="0" 
+                             class="hidden peer" id="recommended-no"
+                             {{ $isRecommended == 0 ? 'checked' : '' }}>
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-full flex items-center justify-center peer-checked:border-[#009A5C] peer-checked:bg-[#009A5C] transition-all">
+                        <div class="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <span class="ml-2 text-sm font-semibold text-gray-600 peer-checked:text-[#009A5C]">No</span>
+                    </label>
+                </div>
+            </div> --}}
+        </div>
+    </div>
+   
+    <!-- GazeFlow Section -->
+    <div class="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
+        <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+            <span class="w-1.5 h-6 bg-[#009A5C] rounded-full mr-3"></span>
+            GazeFlow
+        </h3>
+
+        <div class="bg-[#FBFBFB] rounded-2xl p-6 border border-gray-50">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-2">
+                    <label class="text-sm font-bold text-gray-700">Expected Footfall</label>
+                    <input type="number" 
+                        name="expected_footfall" 
+                        value="{{ old('expected_footfall', $parentHoarding->expected_footfall ?? '') }}"
+                        placeholder="1000" 
+                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-[#009A5C]/10 focus:border-[#009A5C] outline-none transition-all bg-white shadow-inner">
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-bold text-gray-700">Expected Eyeball</label>
+                    <input type="number" 
+                        name="expected_eyeball" 
+                        value="{{ old('expected_eyeball', $parentHoarding->expected_eyeball ?? '') }}"
+                        placeholder="5000" 
+                        class="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-[#009A5C]/10 focus:border-[#009A5C] outline-none transition-all bg-white shadow-inner">
+                </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-4 flex items-center italic">
+                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                Metrics help advertisers understand the visibility potential of this digital asset.
+            </p>
+        </div>
+    </div>
+
+    <!-- Audience Type Section -->
+    <div class="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 space-y-10">
+        <div>
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-1.5 h-6 bg-[#009A5C] rounded-full"></div>
+                <h3 class="text-xl font-bold text-gray-800">Select Audience Type</h3>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                @php
+                    $audiences = ['Political activities', 'Students', 'Luxury consumers', 'Environments freeks', 'Average Class', 'Public', 'Tourism', 'Foodies'];
+                    $selectedAudiences = old('audience_type', 
+                        is_array($parentHoarding->audience_types ?? null) 
+                            ? $parentHoarding->audience_types 
+                            : (is_string($parentHoarding->audience_types ?? null) 
+                                ? json_decode($parentHoarding->audience_types, true) 
+                                : []
+                            )
+                    );
+                @endphp
+                @foreach($audiences as $audience)
+                <label class="flex items-center gap-2.5 p-2 md:p-2.5 cursor-pointer group">
+                    <input type="checkbox" name="audience_type[]" value="{{ $audience }}" 
+                           {{ in_array($audience, (array)$selectedAudiences) ? 'checked' : '' }}
+                       class="w-4 h-4 md:w-5 md:h-5 rounded border-gray-300 text-[#009A5C] accent-[#009A5C] focus:ring-[#009A5C] shrink-0">
+                  <span class="text-sm font-medium leading-5 text-gray-700 group-hover:text-[#009A5C]">{{ $audience }}</span>
+                </label>
+                @endforeach
+            </div>
+        </div>
+
+        <!-- Brand Logos Section -->
+            <!-- Brand Logos Section -->
+        <div>
+            <div class="flex items-center gap-3 mb-8">
+                <div class="w-1.5 h-6 bg-[#009A5C] rounded-full"></div>
+                <h3 class="text-xl font-bold text-gray-800">Recently Booked by</h3>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">Upload up to 10 brand logos.</p>
+
+            {{-- Existing logos with × delete button --}}
+              @php
+                $existingLogos = collect();
+
+                if (isset($parentHoarding)) {
+                    if ($parentHoarding->hoarding_type === 'dooh' && $parentHoarding->doohScreen) {
+                        $existingLogos = $parentHoarding->doohScreen->brandLogos ?? collect();
+                    } elseif ($parentHoarding->hoarding_type === 'ooh' && $parentHoarding->brandLogos->count() > 0) {
+                        $existingLogos = $parentHoarding->brandLogos ?? collect();
+                    }
+                }
+            @endphp
+            <!-- @dump($parentHoarding->brandLogos) -->
+         @if($existingLogos->isNotEmpty())
+            <div class="mb-4 flex gap-4 overflow-x-auto whitespace-nowrap pb-2" id="existingBrandLogos">
+                @foreach($existingLogos as $logo)
+                    @php
+                        $logoId  = $logo->id;
+                        $logoUrl = isset($logo->is_spatie) ? $logo->url : asset('storage/' . $logo->file_path);
+                    @endphp
+                    <div class="relative flex-none w-24 h-20" id="brand-logo-existing-{{ $logoId }}">
+                        <img src="{{ $logoUrl }}" alt="Brand Logo"
+                            class="w-full h-full object-contain border border-gray-200 rounded-lg p-2 bg-white">
+                        <button
+                            type="button"
+                            onclick="removeExistingBrandLogo({{ $logoId }}, this)"
+                            class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full
+                                flex items-center justify-center text-xs hover:bg-red-600 shadow">
+                            ✕
+                        </button>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+
+            {{-- Hidden input — comma-separated deleted IDs --}}
+            <input type="hidden" name="delete_brand_logos" id="deleteBrandLogosHidden" value="">
+
+            {{-- New logo previews --}}
+            <div id="newBrandLogoPreview" class="flex flex-row flex-wrap gap-4 mb-4"></div>
+
+            {{-- File input --}}
+            <div class="flex items-center w-full">
+                <label class="flex flex-row items-center w-full h-14 border border-gray-200 rounded-xl
+                            overflow-hidden cursor-pointer hover:border-[#009A5C] transition-all">
+                    <div class="bg-gray-100 px-6 h-full flex items-center justify-center text-sm
+                                font-bold text-gray-500 border-r border-gray-200">Browse</div>
+                    <div class="px-4 text-sm text-gray-400" id="brand-logo-name">Choose file</div>
+                    <input type="file" name="brand_logos[]" multiple accept="image/*"
+                        class="hidden" id="brand-logos-input">
+                </label>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Supported: JPG, PNG, WEBP • Max 10 logos • 2MB each</p>
+        </div>
+    </div>
+
+    <!-- Hoardings Attributes -->
+    <div class="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
+        <div class="flex items-center gap-3 mb-8">
+            <div class="w-1.5 h-6 bg-[#009A5C] rounded-full"></div>
+            <h3 class="text-xl font-bold text-gray-800">Hoardings Attributes</h3>
+        </div>
+
+        <!-- Visible From -->
+        <div class="mb-8">
+            <label class="text-sm font-bold text-gray-500 mb-4 block uppercase tracking-wider">Visible From</label>
+            <div class="grid grid-cols-2 gap-3 md:gap-4">
+                @php 
+                    $visibleOptions = ['Metro Ride', 'From Flyover', 'From the road', 'Roof top', 'Wall hanging']; 
+                    $selectedVisible = old('visible_from', 
+                        is_array($parentHoarding->visible_from ?? null) 
+                            ? $parentHoarding->visible_from 
+                            : (is_string($parentHoarding->visible_from ?? null) 
+                                ? json_decode($parentHoarding->visible_from, true) 
+                                : []
+                            )
+                    );
+                @endphp
+                @foreach($visibleOptions as $option)
+                <label class="flex items-center gap-2 p-2.5 md:p-3 min-h-[56px] border border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-green-50/50 hover:border-[#009A5C] transition-all group">
+                    <input type="checkbox" name="visible_from[]" value="{{ $option }}" 
+                           {{ in_array($option, (array)$selectedVisible) ? 'checked' : '' }}
+                       class="w-4 h-4 md:w-5 md:h-5 rounded border-gray-300 text-[#009A5C] accent-[#009A5C] focus:ring-[#009A5C] shrink-0">
+                  <span class="text-sm font-medium text-gray-700 leading-5 group-hover:text-[#009A5C]">{{ $option }}</span>
+                </label>
+                @endforeach
+            </div>
+        </div>
+
+        <!-- Located At -->
+        <div>
+            <label class="text-sm font-bold text-gray-500 mb-4 block uppercase tracking-wider">Located At</label>
+            <div class="grid grid-cols-2 gap-y-3 gap-x-4 md:gap-x-8">
+                @php 
+                    $locationOptions = ['Highway hoarding', 'At Square', 'Shopping Mall', 'Airport', 'Park', 'Main Road', 'Intracity Highway', 'Pause Area']; 
+                    $selectedLocations = old('located_at', 
+                        is_array($parentHoarding->located_at ?? null) 
+                            ? $parentHoarding->located_at 
+                            : (is_string($parentHoarding->located_at ?? null) 
+                                ? json_decode($parentHoarding->located_at, true) 
+                                : []
+                            )
+                    );
+                @endphp
+                @foreach($locationOptions as $loc)
+                <label class="flex items-center gap-2 p-2 cursor-pointer group">
+                    <input type="checkbox" name="located_at[]" value="{{ $loc }}" 
+                           {{ in_array($loc, (array)$selectedLocations) ? 'checked' : '' }}
+                       class="w-4 h-4 md:w-5 md:h-5 rounded border-gray-300 text-[#009A5C] accent-[#009A5C] focus:ring-[#009A5C] shrink-0">
+                  <span class="text-sm font-medium text-gray-700 leading-5 group-hover:text-[#009A5C]">{{ $loc }}</span>
+                </label>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    <!-- Hoardings Visibility -->
+    @php
+        $currentVisibility = old('visibility_type', $parentHoarding->visibility_type ?? 'one_way');
+        $visibilityData = old('visibility_data', 
+            is_string($parentHoarding->visibility_data ?? null) 
+                ? json_decode($parentHoarding->visibility_data, true) 
+                : ($parentHoarding->visibility_data ?? [])
+        );
+        $oneWayStart = $visibilityData['one_way']['start'] ?? '';
+        $oneWayEnd = $visibilityData['one_way']['end'] ?? '';
+        $bothSideStart = $visibilityData['both_side']['start'] ?? '';
+        $bothSideEnd = $visibilityData['both_side']['end'] ?? '';
+    @endphp
+    <div 
+      x-data="{ visibility: '{{ $currentVisibility }}' }"
+      class="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100"
+    >
+      <h3 class="text-xl font-bold text-gray-800 mb-8 flex items-center">
+        <span class="w-1.5 h-6 bg-[#009A5C] rounded-full mr-3"></span>
+        Hoardings View For Visitors
+      </h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- ONE WAY -->
+        <div class="space-y-4">
+          <label
+            class="flex items-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all"
+            :class="visibility === 'one_way'
+              ? 'border-[#009A5C] bg-green-50/40'
+              : 'border-gray-200 hover:border-[#009A5C]'"
+          >
+            <input
+              type="radio"
+              name="visibility_type"
+              value="one_way"
+              x-model="visibility"
+              {{ $currentVisibility === 'one_way' ? 'checked' : '' }}
+              class="w-5 h-5 text-[#009A5C] focus:ring-[#009A5C]"
+            >
+            <span class="ml-3 text-sm font-bold text-gray-700">
+              One Way Visibility
+            </span>
+          </label>
+
+          <div
+            class="grid grid-cols-2 gap-4 transition-all"
+            x-show="visibility === 'one_way'"
+            x-transition
+          >
+            <div>
+              <label class="text-xs font-bold text-gray-400 mb-1 block">Going From</label>
+              <input
+                type="text"
+                name="visibility_start[]"
+                value="{{ old('visibility_start.0', $oneWayStart) }}"
+                placeholder="Eg. Santacruz"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#009A5C] outline-none"
+              >
+            </div>
+            <div>
+              <label class="text-xs font-bold text-gray-400 mb-1 block">To</label>
+              <input
+                type="text"
+                name="visibility_end[]"
+                value="{{ old('visibility_end.0', $oneWayEnd) }}"
+                placeholder="Eg. Fun Mall"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#009A5C] outline-none"
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTH WAY -->
+        <div class="space-y-4">
+          <label
+            class="flex items-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all"
+            :class="visibility === 'both_side'
+              ? 'border-[#009A5C] bg-green-50/40'
+              : 'border-gray-200 hover:border-[#009A5C]'"
+          >
+            <input
+              type="radio"
+              name="visibility_type"
+              value="both_side"
+              x-model="visibility"
+              {{ $currentVisibility === 'both_side' ? 'checked' : '' }}
+              class="w-5 h-5 text-[#009A5C] focus:ring-[#009A5C]"
+            >
+            <span class="ml-3 text-sm font-bold text-gray-700">
+              Both Side Visibility
+            </span>
+          </label>
+
+          <div
+            class="grid grid-cols-2 gap-4 transition-all"
+            x-show="visibility === 'both_side'"
+            x-transition
+          >
+            <div>
+              <label class="text-xs font-bold text-gray-400 mb-1 block">Going From</label>
+              <input
+                type="text"
+                name="visibility_start[]"
+                value="{{ old('visibility_start.0', $bothSideStart) }}"
+                placeholder="Eg. Santacruz"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#009A5C] outline-none"
+              >
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-gray-400 mb-1 block">To</label>
+              <input
+                type="text"
+                name="visibility_end[]"
+                value="{{ old('visibility_end.0', $bothSideEnd) }}"
+                placeholder="Eg. Fun Mall"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-[#009A5C] outline-none"
+              >
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+{{-- </div> --}}
+
+<!-- JavaScript for Modal Interactions -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Grace period modal logic
+    const graceYes = document.getElementById('grace-yes');
+    const graceNo = document.getElementById('grace-no');
+    const graceModal = document.getElementById('graceModal');
+    const graceInput = document.getElementById('gracePeriodInput');
+    const graceSaveBtn = document.getElementById('graceSaveBtn');
+    const graceCancelBtn = document.getElementById('graceCancelBtn');
+    const graceHidden = document.getElementById('gracePeriodDaysHidden');
+
+    if (graceYes && graceModal && graceInput && graceSaveBtn && graceCancelBtn && graceHidden) {
+        // Show modal if grace period is already set
+        if (graceHidden.value && parseInt(graceHidden.value) > 0) {
+            graceYes.checked = true;
+        }
+
+        graceYes.addEventListener('change', function() {
+            if (this.checked) {
+                graceModal.classList.remove('hidden');
+                graceInput.value = graceHidden.value || '';
+            }
+        });
+        
+        graceNo.addEventListener('change', function() {
+            if (this.checked) {
+                graceHidden.value = '';
+                graceInput.value = '';
+            }
+        });
+        
+        graceSaveBtn.addEventListener('click', function() {
+            const val = parseInt(graceInput.value, 10);
+            if (!isNaN(val) && val > 0 && val <= 30) {
+                graceHidden.value = val;
+                graceModal.classList.add('hidden');
+                graceInput.classList.remove('border-red-500');
+            } else {
+                alert('Please enter a valid number between 1 and 30');
+                graceInput.classList.add('border-red-500');
+                graceInput.focus();
+            }
+        });
+        
+        graceCancelBtn.addEventListener('click', function() {
+            graceModal.classList.add('hidden');
+            if (!graceHidden.value) {
+                graceYes.checked = false;
+                graceNo.checked = true;
+            }
+            graceInput.classList.remove('border-red-500');
+        });
+
+        // Prevent form submission if grace period is selected but not filled
+        const form = graceYes.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (graceYes.checked && (!graceHidden.value || graceHidden.value === '')) {
+                    e.preventDefault();
+                    alert('Please set the grace period days or select "No"');
+                    graceModal.classList.remove('hidden');
+                    graceInput.focus();
+                    return false;
+                }
+            });
+        }
+    }
+
+    // Block Dates modal logic
+    const blockYes = document.getElementById('block-yes');
+    const blockNo = document.getElementById('block-no');
+    const blockModal = document.getElementById('blockDatesModal');
+    const blockCalendar = document.getElementById('blockDatesCalendar');
+    const blockSaveBtn = document.getElementById('blockDatesSaveBtn');
+    const blockCancelBtn = document.getElementById('blockDatesCancelBtn');
+    const blockHidden = document.getElementById('blockedDatesHidden');
+    let blockSelectedDates = [];
+
+    if (blockYes && blockModal && blockCalendar && blockSaveBtn && blockCancelBtn && blockHidden) {
+        // Pre-populate blocked dates from existing data
+        try {
+            const existingDates = blockHidden.value ? JSON.parse(blockHidden.value) : [];
+            if (existingDates.length > 0) {
+                blockSelectedDates = existingDates;
+                blockYes.checked = true;
+            }
+        } catch (e) {
+            console.error('Error parsing blocked dates:', e);
+        }
+
+        blockYes.addEventListener('change', function() {
+            if (this.checked) {
+                blockModal.classList.remove('hidden');
+            }
+        });
+        
+        blockNo.addEventListener('change', function() {
+            if (this.checked) {
+                blockHidden.value = '[]';
+                blockSelectedDates = [];
+            }
+        });
+        
+        blockSaveBtn.addEventListener('click', function() {
+            if (blockSelectedDates.length > 0) {
+                blockHidden.value = JSON.stringify(blockSelectedDates);
+                blockModal.classList.add('hidden');
+                blockCalendar.classList.remove('border-red-500');
+            } else {
+                blockCalendar.classList.add('border-red-500');
+                blockCalendar.focus();
+            }
+        });
+        
+        blockCancelBtn.addEventListener('click', function() {
+            blockModal.classList.add('hidden');
+            blockYes.checked = false;
+            blockNo.checked = true;
+            blockHidden.value = '[]';
+            blockSelectedDates = [];
+        });
+
+        // Initialize flatpickr calendar
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(blockCalendar, {
+                mode: 'multiple',
+                inline: true,
+                dateFormat: 'Y-m-d',
+                minDate: new Date(),
+                defaultDate: blockSelectedDates,
+                onChange: function(selectedDates, dateStrArr) {
+                    blockSelectedDates = dateStrArr;
+                }
+            });
+        }
+    }
+
+    // Nagar Nigam toggle - simple yes/no without modal
+    // Values save directly when selected
+    // ─── NAGAR NIGAM ───────────────────────────────────────────────
+        const nagarYes             = document.getElementById('nagar-yes');
+        const nagarNo              = document.getElementById('nagar-no');
+        const nagarModal           = document.getElementById('nagarModal');
+        const permitNumberInput    = document.getElementById('permitNumberInput');
+        const permitValidTillInput = document.getElementById('permitValidTillInput');
+        const nagarSaveBtn         = document.getElementById('nagarSaveBtn');
+        const nagarCancelBtn       = document.getElementById('nagarCancelBtn');
+        const permitNumberHidden   = document.getElementById('permitNumberHidden');
+        const permitValidTillHidden= document.getElementById('permitValidTillHidden');
+
+        let nagarSaved = !!(permitNumberHidden.value && permitValidTillHidden.value);
+
+        nagarYes.addEventListener('change', function () {
+            if (this.checked) {
+                permitNumberInput.value    = permitNumberHidden.value || '';
+                permitValidTillInput.value = permitValidTillHidden.value || '';
+                nagarModal.classList.remove('hidden');
+            }
+        });
+
+        nagarNo.addEventListener('change', function () {
+            if (this.checked) {
+                permitNumberHidden.value    = '';
+                permitValidTillHidden.value = '';
+                permitNumberInput.value     = '';
+                permitValidTillInput.value  = '';
+                nagarSaved = false;
+            }
+        });
+
+        nagarSaveBtn.addEventListener('click', function () {
+            const num  = permitNumberInput.value.trim();
+            const date = permitValidTillInput.value;
+
+            if (num && date) {
+                permitNumberHidden.value    = num;
+                permitValidTillHidden.value = date;
+                nagarSaved = true;
+                nagarModal.classList.add('hidden');
+                permitNumberInput.classList.remove('border-red-500');
+                permitValidTillInput.classList.remove('border-red-500');
+            } else {
+                if (!num)  permitNumberInput.classList.add('border-red-500');
+                if (!date) permitValidTillInput.classList.add('border-red-500');
+                if (!num)  permitNumberInput.focus();
+                else       permitValidTillInput.focus();
+            }
+        });
+
+        nagarCancelBtn.addEventListener('click', function () {
+            nagarModal.classList.add('hidden');
+            permitNumberInput.classList.remove('border-red-500');
+            permitValidTillInput.classList.remove('border-red-500');
+
+            if (!nagarSaved) {
+                nagarYes.checked = false;
+                nagarNo.checked  = true;
+            }
+
+            permitNumberInput.value    = permitNumberHidden.value || '';
+            permitValidTillInput.value = permitValidTillHidden.value || '';
+        });
+});
+</script>
+<script>
+const brandLogoInput    = document.getElementById('brand-logos-input');
+const brandLogoName     = document.getElementById('brand-logo-name');
+const newBrandPreview   = document.getElementById('newBrandLogoPreview');
+const deleteBrandHidden = document.getElementById('deleteBrandLogosHidden');
+
+let newBrandFiles  = [];
+let deletedLogoIds = [];
+
+// ✅ Count existing logos still in DOM (not yet deleted)
+function countExistingLogos() {
+    const container = document.getElementById('existingBrandLogos');
+    return container ? container.querySelectorAll('[id^="brand-logo-existing-"]').length : 0;
+}
+brandLogoInput.addEventListener('change', function () {
+  const files = Array.from(this.files);
+  this.value = '';
+
+  const existingCount = countExistingLogos();
+  const currentNewCount = newBrandFiles.length;
+  const totalAllowed = 10;
+  const slotsRemaining = totalAllowed - existingCount - currentNewCount;
+
+  let errorMessages = [];
+  let rejected = 0;
+
+  if (slotsRemaining <= 0) {
+    errorMessages.push(`Maximum 10 logos allowed. You already have ${existingCount + currentNewCount} logo(s).`);
+  } else {
+    files.forEach(file => {
+      const currentTotal = countExistingLogos() + newBrandFiles.length;
+
+      if (currentTotal >= totalAllowed) {
+        rejected++;
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        errorMessages.push(`❌ "${file.name}" is not a valid image.`);
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        errorMessages.push(`❌ "${file.name}" exceeds 2MB limit. Please select a smaller image.`);
+        return;
+      }
+      newBrandFiles.push(file);
+    });
+  }
+
+  if (rejected > 0) {
+    errorMessages.push(`Only ${slotsRemaining} more logo(s) allowed. ${rejected} file(s) were skipped.`);
+  }
+
+  if (errorMessages.length > 0) {
+    showBrandLogoError(errorMessages.join('\n'));
+  }
+
+  brandLogoName.textContent = newBrandFiles.length
+    ? newBrandFiles.length + ' file(s) selected'
+    : 'Choose file';
+  syncBrandInput();
+  renderBrandPreviews();
+});
+
+
+function showBrandLogoError(msg) {
+  let box = document.getElementById('brandLogoErrorBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'brandLogoErrorBox';
+    box.className = 'mt-2 px-4 py-3 bg-red-100 border border-red-400 text-red-800 text-sm rounded-xl font-semibold whitespace-pre-line shadow-sm animate-shake';
+    brandLogoInput.closest('div.flex')?.after(box);
+  }
+  box.textContent = msg;
+  box.style.display = 'block';
+  box.focus && box.focus();
+  box.scrollIntoView({behavior: 'smooth', block: 'center'});
+  clearTimeout(box._timer);
+  box._timer = setTimeout(() => { box.style.display = 'none'; }, 9000);
+}
+
+function syncBrandInput() {
+    const dt = new DataTransfer();
+    newBrandFiles.forEach(f => dt.items.add(f));
+    brandLogoInput.files = dt.files;
+}
+
+function renderBrandPreviews() {
+    newBrandPreview.innerHTML = '';
+    newBrandFiles.forEach((file, idx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative flex-shrink-0 w-24 h-20 group';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.className = 'w-full h-full object-contain border border-gray-200 rounded-lg p-2 bg-white';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow z-10';
+        btn.textContent = '✕';
+        btn.addEventListener('click', () => {
+            newBrandFiles.splice(idx, 1);
+            syncBrandInput();
+            renderBrandPreviews();
+            brandLogoName.textContent = newBrandFiles.length
+                ? newBrandFiles.length + ' file(s) selected'
+                : 'Choose file';
+        });
+        wrapper.appendChild(img);
+        wrapper.appendChild(btn);
+        newBrandPreview.appendChild(wrapper);
+    });
+}
+
+function removeExistingBrandLogo(id, btnEl) {
+    deletedLogoIds.push(id);
+    deleteBrandHidden.value = deletedLogoIds.join(',');
+    const wrapper = btnEl.closest('[id^="brand-logo-existing-"]');
+    if (wrapper) {
+        wrapper.style.transition = 'opacity 0.2s';
+        wrapper.style.opacity = '0';
+        setTimeout(() => wrapper.remove(), 200);
+    }
+}
+</script>
+<style>
+    #existingBrandLogos::-webkit-scrollbar {
+    height: 6px;
+    }
+    #existingBrandLogos::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 10px;
+    }
+    .flatpickr-day.selected {
+    background: #ef4444 !important;
+    border-color: #ef4444 !important;
+    color: #fff !important;
+    border-radius: 9999px;
+}
+
+@keyframes shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+.animate-shake {
+  animation: shake 0.4s;
+}
+</style>
+

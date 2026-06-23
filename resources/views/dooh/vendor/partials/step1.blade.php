@@ -1,0 +1,1021 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+@php
+    $isEdit = isset($draft) && $draft->hoarding_id;
+    $hoarding = $isEdit ? $draft->hoarding : null;
+    $resolutionValue = ($draft?->resolution_width && $draft?->resolution_height)
+        ? $draft->resolution_width.'x'.$draft->resolution_height
+        : '';
+    $landmarks = $hoarding?->landmark
+        ? json_decode($hoarding->landmark, true)
+        : [''];
+    $existingMedia = $draft->media ?? collect();
+    $source = $draft->hoarding ?? null;
+    $isWeeklyEnabled = old('enable_weekly_booking', $source->enable_weekly_booking ?? false);
+    
+ @endphp
+
+<div class="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8">
+    <div class="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- Page Header -->
+        <!-- <div class="mb-6 lg:mb-8">
+            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+                {{ $isEdit ? 'Edit' : 'Create' }} DOOH Screen
+            </h1>
+            <p class="mt-2 text-sm sm:text-base text-gray-600">
+                {{ $isEdit ? 'Update your digital hoarding details' : 'Add a new digital out-of-home advertising screen' }}
+            </p>
+        </div> -->
+
+        <div class="space-y-6 lg:space-y-8">
+
+            <!-- ========================================
+                 SECTION 1: HOARDING DETAILS
+            ======================================== -->
+            <div class="bg-white rounded-2xl lg:rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-[#009A5C] mb-6 flex items-center">
+                    <span class="w-1.5 h-6 bg-[#009A5C] rounded-full mr-3"></span>
+                    Hoarding Details
+                </h3>
+
+                <div class="space-y-6">
+                    <!-- Row 1: Hoarding Type & Category -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Hoarding Type -->
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700">
+                                Hoarding Type <span class="text-red-500">*</span>
+                            </label>
+                            <div class="w-full bg-[#0094FF] border-2 border-[#0094FF] rounded-xl px-4 py-2.5 text-white font-bold  text-sm sm:text-base">
+                                DOOH (Digital Out-of-Home)
+                            </div>
+                        </div>
+
+                        <!-- Category -->
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700">
+                                Category <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select name="category" required
+                                    class="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm sm:text-base
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           appearance-none bg-white cursor-pointer transition-all
+                                           hover:border-gray-300">
+                                    <option value="">Select Category</option>
+                                    @if(isset($attributes['category']))
+                                        @foreach($attributes['category'] as $cat)
+                                            <option value="{{ $cat->value }}"
+                                                {{ old('category', $screen->hoarding->category ?? $hoarding->category ?? '') == $cat->value ? 'selected' : '' }}>
+                                                {{ $cat->value }}
+                                            </option>
+                                        @endforeach
+                                    @endif
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Screen Type -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-bold text-gray-700">
+                            Screen Type <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <select name="screen_type" required
+                                class="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm sm:text-base
+                                       focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                       appearance-none bg-white cursor-pointer transition-all
+                                       hover:border-gray-300">
+                                <option value="LED" {{ old('screen_type', $screen->hoarding->screen_type ?? '') == 'LED' ? 'selected' : '' }}>LED Display</option>
+                                <option value="LCD" {{ old('screen_type', $screen->hoarding->screen_type ?? '') == 'LCD' ? 'selected' : '' }}>LCD Display</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Screen Size -->
+                    <div class="space-y-3">
+                        <label class="text-sm font-bold text-gray-700">
+                               Screen Size 
+                            </label>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                            <!-- Unit -->
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-medium text-gray-600">Unit</label>
+                                <div class="relative">
+                                    <select id="unit" name="measurement_unit" required 
+                                        class="w-full border-2 border-gray-200 rounded-lg px-3 py-2.5 text-sm
+                                               focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                               appearance-none bg-white cursor-pointer">
+                                        <option value="sqft" {{ old('measurement_unit', $draft->measurement_unit ?? '') == 'sqft' ? 'selected' : '' }}>Sqft</option>
+                                        <option value="sqm" {{ old('measurement_unit', $draft->measurement_unit ?? '') == 'sqm' ? 'selected' : '' }}>Sqm</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Width -->
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-medium text-gray-600">
+                                    Width <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" id="width" name="width" 
+                                    value="{{ old('width', $draft->width ?? '') }}" 
+                                    placeholder="500" required min="1" max="10000"
+                                    class="w-full border-2 border-gray-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           placeholder:text-gray-400">
+                            </div>
+
+                            <!-- Height -->
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-medium text-gray-600">
+                                    Height <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" id="height" name="height" 
+                                    value="{{ old('height', $draft->height ?? '') }}" 
+                                    placeholder="300" required min="1" max="10000"
+                                    class="w-full border-2 border-gray-200 rounded-lg px-3 py-2.5 text-sm
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           placeholder:text-gray-400">
+                            </div>
+
+                            <!-- Size Preview -->
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-medium text-gray-600">Preview</label>
+                                <input type="text" id="sizePreview" readonly
+                                    class="w-full bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-200 
+                                           rounded-lg px-3 py-2.5 text-sm text-gray-700 font-medium outline-none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================
+                 SECTION 2: LOCATION
+            ======================================== -->
+            @include('components.hoardings.create.location')
+
+            <!-- ========================================
+                 SECTION 3: PRICING
+            ======================================== -->
+            <div class="bg-white rounded-2xl lg:rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-[#009A5C] mb-6 flex items-center">
+                    <span class="w-1.5 h-6 bg-[#009A5C] rounded-full mr-3"></span>
+                    Pricing Details
+                </h3>
+
+                <div class="space-y-6">
+                    <!-- System-locked Campaign Inputs -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Spot Duration (sec)  <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" name="spot_duration"  required min="1" max="10000" step="1"
+                                value="{{ old('spot_duration', $draft?->slot_duration_seconds) }}"
+                                class="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm sm:text-base
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           placeholder:text-gray-400 ">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Price Per Spot (₹) <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
+                                <input type="number" name="price_per_slot" min="0.01" step="0.01" required 
+                                    value="{{ old('price_per_slot', $draft?->price_per_slot) }}" 
+                                    placeholder="" required min ="1"
+                                    class="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm sm:text-base
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           placeholder:text-gray-400">
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Spots Per Day  <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" name="spots_per_day"  required min="1" max="5000" step="1"
+                                value="{{ old('spots_per_day', $draft?->total_slots_per_day) }}"
+                                class="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm sm:text-base
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           placeholder:text-gray-400 ">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Daily Runtime (hrs) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" name="daily_runtime"  required min="0.5" max="24"   step="any"
+                                value="{{ old('daily_runtime', $draft?->screen_run_time) }}"
+                                class="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm sm:text-base
+                                           focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                           placeholder:text-gray-400">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Campaign Price Monthly  (30 Days)
+                            </label>
+                            
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 font-bold">₹</span>
+                                <input type="text" id="base_campaign_price" readonly min="1" step="any" required
+                                    class="w-full  bg-[#FFF5E7] 
+                                           rounded-xl pl-10 pr-4 py-2.5 text-sm sm:text-base
+                                           text-gray-900 font-bold cursor-not-allowed">
+                                <input type="hidden" name="base_monthly_price" value="{{ old('base_monthly_price', $draft?->base_monthly_price) }}" id="base_monthly_price_input" required>
+                            </div>
+                        </div>
+
+                         <!-- <div class="space-y-2">
+                            <label class="block text-sm font-semibold text-gray-700">
+                              
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 font-bold">₹</span>
+                                <input type="text" id="base_campaign_price" readonly
+                                    class="w-full border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 
+                                           rounded-xl pl-8 pr-4 py-2.5 text-sm sm:text-base
+                                           text-gray-900 font-bold">
+                            </div>
+                        </div> -->
+                    </div>
+
+                    <!-- Discount -->
+                    <div class="grid grid-cols-1 sm:grid-cols-5 gap-4 lg:gap-6">
+
+                       <div class="sm:col-span-1 space-y-3">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Discount Type
+                            </label>
+
+                            <div class="relative">
+                               <select id="discount_type" name="discount_type"
+                                    class="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm sm:text-base
+                                    focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C] outline-none
+                                    appearance-none bg-white cursor-pointer transition-all
+                                    hover:border-gray-300">
+
+                                    <option value="percent"
+                                        {{ old('discount_type', $hoarding->discount_type ?? '') == 'percent' ? 'selected' : '' }}>
+                                        Percentage (%)
+                                    </option>
+
+                                    <option value="amount"
+                                        {{ old('discount_type', $hoarding->discount_type ?? '') == 'amount' ? 'selected' : '' }}>
+                                        Fixed (₹)
+                                    </option>
+                                </select>
+
+
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sm:col-span-1 space-y-3">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                                Discount Value
+                            </label>
+                            <div class="relative">
+                                <input type="number"
+                                    id="discount_value"
+                                    name="discount_value"
+                                    value="{{ old('discount_value', $hoarding->discount_value ?? '') }}"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="eg. 10"
+                                    class="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5
+                                        focus:ring-2 focus:ring-[#009A5C]/20 focus:border-[#009A5C]">
+
+                                        
+                                <span id="discount_symbol"
+                                    class="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 font-medium">%</span>
+                            </div>
+                        </div>
+
+
+                         <div class="sm:col-span-1 space-y-3">
+                            <label class="text-sm font-bold text-gray-700 sm:whitespace-nowrap">
+                               Final  Campaign Price Monthly
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-700 font-bold">₹</span>
+                                <input type="text" id="monthly_price" readonly  min="0" step="any"
+                                    class="w-full  bg-[#FFF5E7] 
+                                           rounded-xl pl-10 pr-4 py-2.5 text-sm sm:text-base
+                                           text-gray-900 font-bold cursor-not-allowed">
+                                    <input type="hidden" name="monthly_price" id="monthly_price_input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Info Banner -->
+                    <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <h4 class="text-sm font-bold text-blue-900 mb-1">Pricing Calculation</h4>
+                                <p class="text-xs sm:text-sm text-blue-800">
+                                    Base price = Spots per day × Campaign days (30) × Price per spot.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================
+                 SECTION 4: MEDIA UPLOAD
+            ======================================== -->
+            <!-- <div class="bg-white rounded-2xl lg:rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+              
+                 <h3 class="text-lg font-bold text-[#009A5C] mb-6 flex items-center">
+                    <span class="w-1.5 h-6 bg-[#009A5C] rounded-full mr-3"></span>
+                    Upload Media <span class="text-red-500">*</span>
+                </h3>
+
+                <p class="text-sm sm:text-base text-gray-600 mb-6">
+                    Upload high-quality images or videos showcasing your screen (Max 10 files, 5MB each)
+                </p>
+
+                 @php
+                    $existingMedia = collect();
+
+                    if (isset($screen) && $screen->media) {
+                        $existingMedia = $screen->media;
+                    } elseif (isset($hoarding) && $hoarding->doohScreen && $hoarding->doohScreen->media) {
+                        $existingMedia = $hoarding->doohScreen->media;
+              }
+                @endphp
+                @if($existingMedia->count())
+                    <div class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Existing Media</h3>
+
+                        <div class="flex flex-wrap gap-3" id="existingMediaPreview">
+                            @foreach($existingMedia as $media)
+                                <div class="relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-xl overflow-hidden 
+                                            border-2 border-gray-200 bg-gray-50 flex-shrink-0 group">
+                                    @if(Str::startsWith($media->media_type, 'image'))
+                                        <img src="{{ asset('storage/'.$media->file_path) }}"
+                                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                                    @else
+                                        {{-- Video: show thumbnail via canvas-friendly poster --}}
+                                        <video
+                                            src="{{ asset('storage/'.$media->file_path) }}"
+                                            class="w-full h-full object-cover"
+                                            muted
+                                            playsinline
+                                            preload="metadata"
+                                            onloadedmetadata="this.currentTime=0.5"
+                                        ></video>
+                                        <div class="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                                            <div class="bg-black/50 rounded-full p-1.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M8 5v14l11-7z"/>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    @endif
+                                    <button type="button"
+                                        data-media-id="{{ $media->id }}"
+                                        onclick="removeExistingMedia({{ $media->id }}, this)"
+                                        class="absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full p-1.5 
+                                            shadow-lg text-red-600 hover:bg-red-50 hover:scale-110 
+                                            transition-all duration-200">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <input type="hidden" name="deleted_media_ids" id="deletedMediaIds">
+
+                <div id="newMediaPreview" class="flex flex-wrap gap-3 mb-6 empty:mb-0"></div>
+
+                <label for="mediaInput"
+                    class="flex items-center justify-between w-full px-4 sm:px-6 py-4 sm:py-5
+                           border-2 border-dashed border-gray-300 rounded-xl cursor-pointer
+                           hover:border-[#009A5C] hover:bg-gray-50 transition-all duration-200 group">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gray-100 rounded-lg p-2.5 group-hover:bg-[#009A5C]/10 transition-colors">
+                            <svg class="w-6 h-6 text-gray-600 group-hover:text-[#009A5C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="block text-sm sm:text-base font-semibold text-gray-700">Choose files to upload</span>
+                            <span class="block text-xs sm:text-sm text-gray-500 mt-0.5">or drag and drop</span>
+                        </div>
+                    </div>
+                    <span class="text-sm font-medium text-[#009A5C] hidden sm:inline">Browse</span>
+                </label>
+
+                <input id="mediaInput" type="file" name="media[]" multiple
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                    class="hidden"
+                    @if(!(isset($screen) && $screen->media && $screen->media->count())) required @endif>
+
+                <p class="text-xs sm:text-sm text-gray-500 mt-3">
+                    <span class="font-medium">Supported formats:</span> JPG, PNG, WEBP, MP4, WEBM • 
+                    <span class="font-medium">Max:</span> 10 files, 5MB each
+                </p>
+            </div> -->
+            <!-- SECTION 4: MEDIA UPLOAD -->
+            <div class="bg-white rounded-2xl lg:rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100">
+                <h3 class="text-lg font-bold text-[#009A5C] mb-6 flex items-center">
+                    <span class="w-1.5 h-6 bg-[#009A5C] rounded-full mr-3"></span>
+                    Upload Media <span class="text-red-500 ml-1">*</span>
+                </h3>
+
+                <p class="text-sm sm:text-base text-gray-600 mb-6">
+                    Upload high-quality images or videos showcasing your screen (Max 10 files, 5MB each)
+                </p>
+
+                @php
+                    // ✅ Single unified source — works for both create ($draft) and edit ($screen)
+                    $doohScreen    = $screen ?? $draft ?? null;
+                    $existingMedia = $doohScreen?->media ?? collect();
+                @endphp
+
+                @if($existingMedia->isNotEmpty())
+                    <div class="mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Existing Media</h3>
+                        <div class="flex flex-wrap gap-3" id="existingMediaPreview">
+                            @foreach($existingMedia as $media)
+                                <div class="relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-xl overflow-hidden
+                                            border-2 border-gray-200 bg-gray-50 flex-shrink-0 group"
+                                    id="existing-media-{{ $media->id }}">
+
+                                    @if(Str::startsWith($media->media_type, 'image'))
+                                        <img src="{{ asset('storage/' . $media->file_path) }}"
+                                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                                    @else
+                                        <video src="{{ asset('storage/' . $media->file_path) }}"
+                                            class="w-full h-full object-cover"
+                                            muted playsinline preload="metadata"
+                                            onloadedmetadata="this.currentTime=0.5"></video>
+                                        <div class="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                                            <div class="bg-black/50 rounded-full p-1.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M8 5v14l11-7z"/>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    <button type="button"
+                                        onclick="removeExistingMedia({{ $media->id }}, this)"
+                                        class="absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full p-1.5
+                                            shadow-lg text-red-600 hover:bg-red-50 hover:scale-110 transition-all duration-200">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <input type="hidden" name="deleted_media_ids" id="deletedMediaIds" value="">
+
+                <!-- New Media Preview -->
+                <div id="newMediaPreview" class="flex flex-wrap gap-3 mb-6 empty:mb-0"></div>
+
+                <!-- Upload Area -->
+                <label for="mediaInput"
+                    class="flex items-center justify-between w-full px-4 sm:px-6 py-4 sm:py-5
+                        border-2 border-dashed border-gray-300 rounded-xl cursor-pointer
+                        hover:border-[#009A5C] hover:bg-gray-50 transition-all duration-200 group">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-gray-100 rounded-lg p-2.5 group-hover:bg-[#009A5C]/10 transition-colors">
+                            <svg class="w-6 h-6 text-gray-600 group-hover:text-[#009A5C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="block text-sm sm:text-base font-semibold text-gray-700">Choose files to upload</span>
+                            <span class="block text-xs sm:text-sm text-gray-500 mt-0.5">or drag and drop</span>
+                        </div>
+                    </div>
+                    <span class="text-sm font-medium text-[#009A5C] hidden sm:inline">Browse</span>
+                </label>
+
+                {{-- ✅ Required only when no existing media --}}
+                <input id="mediaInput" type="file" name="media[]" multiple
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                    class="hidden"
+                    @if($existingMedia->isEmpty()) required @endif>
+
+                {{-- ✅ Server-side validation error --}}
+                @error('media')
+                    <p class="text-red-500 text-sm mt-2 font-medium flex items-center gap-1">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        {{ $message }}
+                    </p>
+                @enderror
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================================
+     SCRIPTS
+======================================== -->
+<script>
+// ============================================
+// MEDIA UPLOAD/PREVIEW/REMOVE
+// ============================================
+let deletedMediaIds = [];
+let newFiles = [];
+const maxFiles = 10;
+const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+const mediaInput = document.getElementById('mediaInput');
+const newMediaPreview = document.getElementById('newMediaPreview');
+const existingMediaPreview = document.getElementById('existingMediaPreview');
+const deletedMediaIdsInput = document.getElementById('deletedMediaIds');
+
+function renderNewPreviews() {
+    newMediaPreview.innerHTML = '';
+
+    newFiles.forEach((file, idx) => {
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        if (!isImage && !isVideo) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-xl overflow-hidden border-2 border-gray-200 bg-gray-50 flex-shrink-0 group';
+
+        if (isImage) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.className = 'object-cover w-full h-full group-hover:scale-105 transition-transform duration-200';
+            wrapper.appendChild(img);
+
+        } else if (isVideo) {
+            // Spinner while thumbnail generates
+            wrapper.classList.add('bg-gray-800', 'flex', 'items-center', 'justify-center');
+            wrapper.innerHTML = `<svg class="animate-spin h-6 w-6 text-white opacity-60"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>`;
+
+            // Generate thumbnail via canvas
+            getVideoThumbnail(file).then((dataUrl) => {
+                wrapper.innerHTML = '';
+                if (dataUrl) {
+                    const thumb = document.createElement('img');
+                    thumb.src = dataUrl;
+                    thumb.className = 'object-cover w-full h-full';
+                    const overlay = document.createElement('div');
+                    overlay.className = 'absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none';
+                    overlay.innerHTML = `<div class="bg-black/50 rounded-full p-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </div>`;
+                    wrapper.appendChild(thumb);
+                    wrapper.appendChild(overlay);
+                } else {
+                    wrapper.classList.add('bg-gray-800');
+                    wrapper.innerHTML = `<div class="flex flex-col items-center justify-center w-full h-full text-gray-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M4 8a2 2 0 012-2h9a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"/>
+                        </svg>
+                        <span class="text-xs text-white">Video</span>
+                    </div>`;
+                }
+                // Add remove button after thumbnail loads
+                wrapper.appendChild(makeRemoveBtn(idx));
+            });
+        }
+
+        // Add remove button immediately for images
+        if (isImage) {
+            wrapper.appendChild(makeRemoveBtn(idx));
+        }
+
+        newMediaPreview.appendChild(wrapper);
+    });
+}
+
+function makeRemoveBtn(idx) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'absolute top-2 right-2 bg-white/90 backdrop-blur rounded-full p-1.5 shadow-lg text-red-600 hover:bg-red-50 hover:scale-110 transition-all duration-200 z-10';
+    btn.title = 'Remove';
+    btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+    </svg>`;
+    btn.addEventListener('click', () => removeNewFile(idx));
+    return btn;
+}
+
+function getVideoThumbnail(file) {
+    return new Promise((resolve) => {
+        const blobUrl = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+
+        let resolved = false;
+        const done = (result) => {
+            if (resolved) return;
+            resolved = true;
+            URL.revokeObjectURL(blobUrl);
+            video.src = '';
+            resolve(result);
+        };
+
+        video.addEventListener('loadedmetadata', () => {
+            video.currentTime = Math.min(0.5, video.duration * 0.1 || 0.1);
+        });
+
+        video.addEventListener('seeked', () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 112;
+                canvas.getContext('2d').drawImage(video, 0, 0, 112, 112);
+                done(canvas.toDataURL('image/jpeg', 0.85));
+            } catch (e) { done(null); }
+        });
+
+        video.addEventListener('error', () => done(null));
+        setTimeout(() => done(null), 8000);
+
+        video.src = blobUrl;
+        video.load();
+    });
+}
+
+function removeNewFile(idx) {
+    newFiles.splice(idx, 1);
+    updateInputFiles();
+    renderNewPreviews();
+}
+
+// function removeExistingMedia(id) {
+//     deletedMediaIds.push(id);
+//     deletedMediaIdsInput.value = deletedMediaIds.join(',');
+//     const button = existingMediaPreview.querySelector(`[onclick*='removeExistingMedia(${id})']`);
+//     if (button && button.parentElement) {
+//         button.parentElement.remove();
+//     }
+// }
+function removeExistingMedia(id, btnEl) {
+    deletedMediaIds.push(id);
+    deletedMediaIdsInput.value = deletedMediaIds.join(',');
+
+    // ✅ Find by stable ID — not fragile class selector
+    const wrapper = document.getElementById('existing-media-' + id);
+    if (wrapper) {
+        wrapper.style.transition = 'opacity 0.2s';
+        wrapper.style.opacity = '0';
+        setTimeout(() => wrapper.remove(), 200);
+    }
+}
+
+function updateInputFiles() {
+    const dt = new DataTransfer();
+    newFiles.forEach(f => dt.items.add(f));
+    mediaInput.files = dt.files;
+}
+
+mediaInput.addEventListener('change', function(e) {
+    const files = Array.from(e.target.files);
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'];
+    
+    for (const file of files) {
+        if (newFiles.length >= maxFiles) {
+            alert(`Maximum ${maxFiles} files allowed`);
+            break;
+        }
+        if (!validTypes.includes(file.type)) {
+            alert(`${file.name} is not a supported format`);
+            continue;
+        }
+        if (file.size > maxFileSize) {
+            alert(`${file.name} exceeds 5MB size limit`);
+            continue;
+        }
+        newFiles.push(file);
+    }
+    
+    updateInputFiles();
+    renderNewPreviews();
+});
+
+// ============================================
+// PRICING CALCULATION
+// ============================================
+// document.addEventListener('DOMContentLoaded', function() {
+//     const spotsPerDay = 300;
+//     const campaignDays = 30;
+//     const pricePerSpotInput = document.querySelector('[name="price_per_spot"]');
+//     const discountInput = document.querySelector('[name="discount_percent"]');
+//     const baseCampaignPriceInput = document.getElementById('base_campaign_price');
+
+//     function updatePricing() {
+//         const pricePerSpot = parseFloat(pricePerSpotInput?.value) || 0;
+//         const discount = parseFloat(discountInput?.value) || 0;
+//         const totalSpots = spotsPerDay * campaignDays;
+        
+//         let basePrice = totalSpots * pricePerSpot;
+        
+//         if (discount > 0 && discount <= 100) {
+//             basePrice = basePrice * (1 - discount / 100);
+//         }
+        
+//         if (baseCampaignPriceInput) {
+//             baseCampaignPriceInput.value = basePrice > 0 
+//                 ? basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+//                 : '';
+//         }
+//     }
+
+//     if (pricePerSpotInput) pricePerSpotInput.addEventListener('input', updatePricing);
+//     if (discountInput) discountInput.addEventListener('input', updatePricing);
+    
+//     // Initial calculation
+//     updatePricing();
+// });
+
+// ============================================
+// SIZE PREVIEW
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+    const unitSelect = document.getElementById('unit');
+    const sizePreview = document.getElementById('sizePreview');
+
+    if (!widthInput || !heightInput || !unitSelect || !sizePreview) return;
+
+    function updateSizePreview() {
+        const width = widthInput.value || '0';
+        const height = heightInput.value || '0';
+        const unit = unitSelect.value === 'sqft' ? 'sq.ft' : 'sq.m';
+        sizePreview.value = `${width} × ${height} ${unit}`;
+    }
+
+    widthInput.addEventListener('input', updateSizePreview);
+    heightInput.addEventListener('input', updateSizePreview);
+    unitSelect.addEventListener('change', updateSizePreview);
+
+    // Initial update
+    updateSizePreview();
+});
+
+// ============================================
+// MAP INITIALIZATION (if location component exists)
+// ============================================
+@if($isEdit && $hoarding?->latitude && $hoarding?->longitude)
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof map !== 'undefined' && typeof marker !== 'undefined') {
+        const editLat = {{ $hoarding->latitude }};
+        const editLng = {{ $hoarding->longitude }};
+        map.setView([editLat, editLng], 15);
+        marker.setLatLng([editLat, editLng]);
+        const successEl = document.getElementById('geotagSuccess');
+        if (successEl) successEl.classList.remove('hidden');
+    }
+});
+@endif
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const campaignDays = 30;
+
+    const pricePerSpotInput = document.querySelector('[name="price_per_slot"]');
+    const spotsPerDayInput = document.querySelector('[name="spots_per_day"]');
+    const discountTypeSelect = document.getElementById('discount_type');
+    const discountValueInput = document.getElementById('discount_value');
+    const discountSymbol = document.getElementById('discount_symbol');
+    const basePriceHiddenInput = document.getElementById('base_monthly_price_input');
+    const finalPriceHiddenInput = document.getElementById('monthly_price_input');
+
+    const basePriceInput = document.getElementById('base_campaign_price');
+    const finalPriceInput = document.getElementById('monthly_price');
+
+    function formatINR(value) {
+        return value.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function updateDiscountSymbol() {
+        const discountType = discountTypeSelect.value;
+        discountSymbol.textContent = discountType === 'percent' ? '%' : '₹';
+        updatePricing();
+    }
+
+    function updatePricing() {
+        const pricePerSpot = parseFloat(pricePerSpotInput?.value) || 0;
+        const spotsPerDay = parseInt(spotsPerDayInput?.value) || 0;
+        const discountValue = parseFloat(discountValueInput?.value) || 0;
+        const discountType = discountTypeSelect.value;
+
+        // Base price (NO discount)
+        const basePrice = spotsPerDay * campaignDays * pricePerSpot;
+
+        // Calculate discounted price
+        let finalPrice = basePrice;
+        let discountAmount = 0;
+
+        if (discountValue > 0) {
+            if (discountType === 'percent') {
+                // Percentage discount
+                if (discountValue <= 100) {
+                    discountAmount = basePrice * (discountValue / 100);
+                    finalPrice = basePrice - discountAmount;
+                } else {
+                    // Invalid percentage
+                    discountValueInput.value = 100;
+                    discountAmount = basePrice;
+                    finalPrice = 0;
+                }
+            } else {
+                // Fixed amount discount
+                discountAmount = discountValue;
+                finalPrice = basePrice - discountAmount;
+                
+                // Prevent negative final price
+                if (finalPrice < 0) {
+                    finalPrice = 0;
+                    discountValueInput.value = basePrice.toFixed(2);
+                }
+            }
+        }
+
+        // Display values
+        basePriceInput.value = basePrice > 0 ? formatINR(basePrice) : '';
+        finalPriceInput.value = finalPrice >= 0 ? formatINR(finalPrice) : '';
+        basePriceHiddenInput.value = basePrice > 0 ? basePrice.toFixed(2) : 0;
+        finalPriceHiddenInput.value = finalPrice >= 0 ? finalPrice.toFixed(2) : 0;
+    }
+
+    // Event listeners
+    pricePerSpotInput?.addEventListener('input', updatePricing);
+    spotsPerDayInput?.addEventListener('input', updatePricing);
+    discountTypeSelect?.addEventListener('change', updateDiscountSymbol);
+    discountValueInput?.addEventListener('input', updatePricing);
+
+    // Initial calculation
+    updateDiscountSymbol();
+    updatePricing();
+});
+</script>
+
+<script>
+// ============================================
+// FRONTEND MEDIA VALIDATION
+// ============================================
+document.addEventListener('DOMContentLoaded', function () {
+
+    const form = document.querySelector('form');
+    if (!form) return;
+
+    // ✅ Remove HTML5 required so browser doesn't silently block — we handle it in JS
+    const mediaInputEl = document.getElementById('mediaInput');
+    if (mediaInputEl) mediaInputEl.removeAttribute('required');
+
+    function countTotal() {
+        const existingCount = document.querySelectorAll('[id^="existing-media-"]').length;
+        const newCount = (typeof newFiles !== 'undefined') ? newFiles.length : 0;
+        return existingCount + newCount;
+    }
+
+    // ✅ Show error immediately when last existing image is removed
+    // We hook into removeExistingMedia by watching DOM changes
+    const observer = new MutationObserver(function () {
+        if (countTotal() === 0) {
+            showMediaError('At least one image or video is required before proceeding.');
+        } else {
+            clearMediaError();
+        }
+    });
+
+    const existingPreview = document.getElementById('existingMediaPreview');
+    if (existingPreview) {
+        observer.observe(existingPreview, { childList: true, subtree: false });
+    }
+
+    // ✅ Clear error when new file added
+    mediaInputEl?.addEventListener('change', function () {
+        if ((typeof newFiles !== 'undefined') && newFiles.length > 0) {
+            clearMediaError();
+        }
+    });
+
+    // ✅ AFTER — note the true at the end (useCapture) and stopImmediatePropagation
+    form.addEventListener('submit', function (e) {
+        const stepInput = form.querySelector('input[name="step"]');
+        const currentStep = stepInput ? parseInt(stepInput.value) : 1;
+        if (currentStep !== 1) return;
+
+        const goBackInput = form.querySelector('input[name="go_back"]');
+        if (goBackInput && goBackInput.value === '1') return;
+
+        if (countTotal() === 0) {
+            e.preventDefault();
+            e.stopImmediatePropagation(); // ✅ stops create.blade.php overlay listener
+
+            showMediaError('At least one image or video is required before proceeding.');
+
+            const errorEl = document.getElementById('media-validation-error');
+            if (errorEl) {
+                errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                document.querySelector('label[for="mediaInput"]')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return false;
+        }
+
+        clearMediaError();
+    }, true); // ✅ useCapture: true — fires BEFORE the create.blade.php listener
+
+    function showMediaError(message) {
+        // ✅ Insert error BEFORE the upload label (visible), not after hidden input
+        let errorEl = document.getElementById('media-validation-error');
+        if (!errorEl) {
+            errorEl = document.createElement('p');
+            errorEl.id        = 'media-validation-error';
+            errorEl.className = 'text-red-500 text-sm mb-3 font-medium flex items-center gap-2';
+            errorEl.innerHTML = `
+                <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <span id="media-error-text"></span>`;
+
+            // ✅ Insert BEFORE the upload label, not after hidden input
+            const uploadLabel = document.querySelector('label[for="mediaInput"]');
+            if (uploadLabel) {
+                uploadLabel.parentNode.insertBefore(errorEl, uploadLabel);
+            }
+        }
+
+        document.getElementById('media-error-text').textContent = message;
+        errorEl.classList.remove('hidden');
+
+        // Highlight upload area
+        const uploadLabel = document.querySelector('label[for="mediaInput"]');
+        if (uploadLabel) {
+            uploadLabel.classList.add('border-red-400', 'bg-red-50');
+            uploadLabel.classList.remove('border-gray-300');
+        }
+    }
+
+    function clearMediaError() {
+        const errorEl = document.getElementById('media-validation-error');
+        if (errorEl) errorEl.classList.add('hidden');
+
+        const uploadLabel = document.querySelector('label[for="mediaInput"]');
+        if (uploadLabel) {
+            uploadLabel.classList.remove('border-red-400', 'bg-red-50');
+            uploadLabel.classList.add('border-gray-300');
+        }
+    }
+
+});
+</script>

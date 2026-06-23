@@ -1,0 +1,602 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\HasSnapshots;
+use App\Traits\Auditable;
+use App\Traits\HasTimeline;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Booking extends Model
+{
+    use HasFactory, HasSnapshots, Auditable, HasTimeline;
+    
+    protected $snapshotType = 'booking';
+    protected $snapshotOnCreate = true;
+    protected $snapshotOnUpdate = true;
+    
+    protected $auditModule = 'booking';
+    protected $priceFields = ['total_amount'];
+    
+    protected $fillable = [
+        'quotation_id',
+        'customer_id',
+        'vendor_id',
+        'hoarding_id',
+        'start_date',
+        'end_date',
+        'duration_type',
+        'duration_days',
+        'total_amount',
+        'status',
+        'payment_status',
+        'payment_mode',
+        'milestone_total',
+        'milestone_paid',
+        'milestone_amount_paid',
+        'milestone_amount_remaining',
+        'current_milestone_id',
+        'all_milestones_paid_at',
+        'hold_expiry_at',
+        'razorpay_order_id',
+        'razorpay_payment_id',
+        'payment_error_code',
+        'payment_error_description',
+        'payment_authorized_at',
+        'payment_captured_at',
+        'payment_failed_at',
+        'capture_attempted_at',
+        'pod_approved_at',
+        'booking_snapshot',
+        'customer_notes',
+        'cancellation_reason',
+        'confirmed_at',
+        'cancelled_at',
+        'refund_id',
+        'refund_amount',
+        'refunded_at',
+        'refund_error',
+        'campaign_started_at',
+    ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'total_amount' => 'decimal:2',
+        'milestone_amount_paid' => 'decimal:2',
+        'milestone_amount_remaining' => 'decimal:2',
+        'refund_amount' => 'decimal:2',
+        'hold_expiry_at' => 'datetime',
+        'payment_authorized_at' => 'datetime',
+        'payment_captured_at' => 'datetime',
+        'payment_failed_at' => 'datetime',
+        'capture_attempted_at' => 'datetime',
+        'pod_approved_at' => 'datetime',
+        'all_milestones_paid_at' => 'datetime',
+        'booking_snapshot' => 'array',
+        'confirmed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'refunded_at' => 'datetime',
+        'campaign_started_at' => 'datetime',
+    ];
+
+    // Status constants
+    const STATUS_PENDING_PAYMENT_HOLD = 'pending_payment_hold';
+    const STATUS_PAYMENT_HOLD = 'payment_hold';
+    const STATUS_CONFIRMED = 'confirmed';
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_REFUNDED = 'refunded';
+
+    // Duration type constants
+    const DURATION_DAYS = 'days';
+    const DURATION_WEEKS = 'weeks';
+    const DURATION_MONTHS = 'months';
+
+    /**
+     * Relationships
+     */
+    public function quotation(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'vendor_id');
+    }
+
+    public function hoarding(): BelongsTo
+    {
+        return $this->belongsTo(Hoarding::class);
+    }
+
+    /**
+     * PROMPT 70: Milestone relationship
+     */
+    public function currentMilestone(): BelongsTo
+    {
+        return $this->belongsTo(QuotationMilestone::class, 'current_milestone_id');
+    }
+
+    public function statusLogs(): HasMany
+    {
+        return $this->hasMany(BookingStatusLog::class)->orderBy('created_at', 'desc');
+    }
+
+    public function priceSnapshot(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BookingPriceSnapshot::class);
+    }
+
+    public function bookingPayment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BookingPayment::class);
+    }
+
+    public function commissionLog(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(CommissionLog::class);
+    }
+
+    public function invoices(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\Invoice::class);
+    }
+
+    public function invoice(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Models\Invoice::class)->latest();
+    }
+
+    public function podSubmissions(): HasMany
+    {
+        return $this->hasMany(\Modules\POD\Models\PODSubmission::class)->orderBy('submission_date', 'desc');
+    }
+
+    /**
+     * Scopes
+     */
+    public function scopePendingPaymentHold($query)
+    {
+        return $query->where('status', self::STATUS_PENDING_PAYMENT_HOLD);
+    }
+
+    public function scopePaymentHold($query)
+    {
+        return $query->where('status', self::STATUS_PAYMENT_HOLD);
+    }
+
+    public function scopeConfirmed($query)
+    {
+        return $query->where('status', self::STATUS_CONFIRMED);
+    }
+
+    public function scopeCancelled($query)
+    {
+        return $query->where('status', self::STATUS_CANCELLED);
+    }
+
+    public function scopeRefunded($query)
+    {
+        return $query->where('status', self::STATUS_REFUNDED);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', [
+            self::STATUS_PAYMENT_HOLD,
+            self::STATUS_CONFIRMED
+        ]);
+    }
+
+    public function scopeExpiredHolds($query)
+    {
+        return $query->where('status', self::STATUS_PAYMENT_HOLD)
+            ->where('hold_expiry_at', '<', now());
+    }
+
+    /**
+     * Vendor Panel Scopes (PROMPT 48)
+     */
+    public function scopeNew($query)
+    {
+        // New bookings: pending payment hold or payment hold (not yet confirmed)
+        return $query->whereIn('status', [
+            self::STATUS_PENDING_PAYMENT_HOLD,
+            self::STATUS_PAYMENT_HOLD
+        ])->where(function($q) {
+            $q->whereNull('start_date')
+              ->orWhere('start_date', '>', now()->toDateString());
+        });
+    }
+
+    public function scopeOngoing($query)
+    {
+        // Ongoing: confirmed status AND today between start_date and end_date
+        return $query->where('status', self::STATUS_CONFIRMED)
+            ->whereDate('start_date', '<=', now())
+            ->whereDate('end_date', '>=', now());
+    }
+
+    public function scopeCompleted($query)
+    {
+        // Completed: confirmed status AND end_date < today
+        return $query->where('status', self::STATUS_CONFIRMED)
+            ->whereDate('end_date', '<', now());
+    }
+
+    public function scopeCancelledBookings($query)
+    {
+        // Cancelled bookings
+        return $query->whereIn('status', [
+            self::STATUS_CANCELLED,
+            self::STATUS_REFUNDED
+        ]);
+    }
+
+    public function scopeByVendor($query, int $vendorId)
+    {
+        return $query->where('vendor_id', $vendorId);
+    }
+
+    /**
+     * Status checks
+     */
+    public function isPendingPaymentHold(): bool
+    {
+        return $this->status === self::STATUS_PENDING_PAYMENT_HOLD;
+    }
+
+    public function isPaymentHold(): bool
+    {
+        return $this->status === self::STATUS_PAYMENT_HOLD;
+    }
+
+    public function isConfirmed(): bool
+    {
+        return $this->status === self::STATUS_CONFIRMED;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
+    public function isRefunded(): bool
+    {
+        return $this->status === self::STATUS_REFUNDED;
+    }
+
+    public function isHoldExpired(): bool
+    {
+        return $this->isPaymentHold() 
+            && $this->hold_expiry_at 
+            && $this->hold_expiry_at->isPast();
+    }
+
+    /**
+     * Action checks
+     */
+    public function canConfirm(): bool
+    {
+        return $this->isPaymentHold() && !$this->isHoldExpired();
+    }
+
+    public function canCancel(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_PENDING_PAYMENT_HOLD,
+            self::STATUS_PAYMENT_HOLD,
+            self::STATUS_CONFIRMED
+        ]);
+    }
+
+    /**
+     * Helpers
+     */
+    public function getSnapshotValue(string $key, $default = null)
+    {
+        return data_get($this->booking_snapshot, $key, $default);
+    }
+
+    public function getFormattedTotalAmount(): string
+    {
+        return '₹' . number_format($this->total_amount, 2);
+    }
+
+    public function getDurationInDays(): int
+    {
+        return $this->start_date->diffInDays($this->end_date);
+    }
+
+    public function getHoldTimeRemaining(): ?int
+    {
+        if (!$this->hold_expiry_at) {
+            return null;
+        }
+
+        $seconds = now()->diffInSeconds($this->hold_expiry_at, false);
+        return max(0, $seconds);
+    }
+
+    public function getHoldMinutesRemaining(): ?int
+    {
+        $seconds = $this->getHoldTimeRemaining();
+        return $seconds !== null ? (int) ceil($seconds / 60) : null;
+    }
+
+    public function getStatusBadgeClass(): string
+    {
+        return match($this->status) {
+            self::STATUS_PENDING_PAYMENT_HOLD => 'bg-warning text-dark',
+            self::STATUS_PAYMENT_HOLD => 'bg-info',
+            self::STATUS_CONFIRMED => 'bg-success',
+            self::STATUS_CANCELLED => 'bg-danger',
+            self::STATUS_REFUNDED => 'bg-secondary',
+            default => 'bg-secondary',
+        };
+    }
+
+    public function getStatusLabel(): string
+    {
+        return match($this->status) {
+            self::STATUS_PENDING_PAYMENT_HOLD => 'Pending Payment Hold',
+            self::STATUS_PAYMENT_HOLD => 'Payment Hold',
+            self::STATUS_CONFIRMED => 'Confirmed',
+            self::STATUS_CANCELLED => 'Cancelled',
+            self::STATUS_REFUNDED => 'Refunded',
+            default => ucfirst(str_replace('_', ' ', $this->status)),
+        };
+    }
+
+    /**
+     * Get booking proofs (POD)
+     */
+    public function bookingProofs(): HasMany
+    {
+        return $this->hasMany(BookingProof::class);
+    }
+
+    /**
+     * Get approved booking proof
+     */
+    public function approvedProof()
+    {
+        return $this->hasOne(BookingProof::class)->where('status', 'approved');
+    }
+
+    /**
+     * PROMPT 70: Milestone payment helper methods
+     */
+    
+    /**
+     * Check if booking uses milestone payment mode
+     */
+    public function hasMilestones(): bool
+    {
+        return $this->payment_mode === 'milestone' && $this->milestone_total > 0;
+    }
+
+    /**
+     * Check if booking uses full payment mode
+     */
+    public function isFullPayment(): bool
+    {
+        return $this->payment_mode === 'full' || !$this->hasMilestones();
+    }
+
+    /**
+     * Get all milestones for this booking's quotation
+     */
+    public function getMilestones()
+    {
+        if (!$this->quotation_id || !$this->hasMilestones()) {
+            return collect();
+        }
+
+        return QuotationMilestone::where('quotation_id', $this->quotation_id)
+            ->orderBy('sequence_no')
+            ->get();
+    }
+
+    /**
+     * Get next unpaid milestone
+     */
+    public function getNextMilestone(): ?QuotationMilestone
+    {
+        if (!$this->hasMilestones()) {
+            return null;
+        }
+
+        return QuotationMilestone::where('quotation_id', $this->quotation_id)
+            ->whereIn('status', ['due', 'overdue'])
+            ->orderBy('sequence_no')
+            ->first();
+    }
+
+    /**
+     * Check if all milestones are paid
+     */
+    public function allMilestonesPaid(): bool
+    {
+        if (!$this->hasMilestones()) {
+            return false;
+        }
+
+        return $this->milestone_paid >= $this->milestone_total;
+    }
+
+    /**
+     * Get milestone payment progress percentage
+     */
+    public function getMilestoneProgressPercentage(): int
+    {
+        if (!$this->hasMilestones() || $this->milestone_total === 0) {
+            return 0;
+        }
+
+        return (int) (($this->milestone_paid / $this->milestone_total) * 100);
+    }
+
+    /**
+     * Update milestone payment status
+     */
+    public function updateMilestoneStatus(): void
+    {
+        if (!$this->hasMilestones()) {
+            return;
+        }
+
+        $milestones = $this->getMilestones();
+        $paidCount = $milestones->where('status', 'paid')->count();
+        $paidAmount = $milestones->where('status', 'paid')->sum('calculated_amount');
+        $remainingAmount = $this->total_amount - $paidAmount;
+
+        $this->update([
+            'milestone_paid' => $paidCount,
+            'milestone_amount_paid' => $paidAmount,
+            'milestone_amount_remaining' => max(0, $remainingAmount),
+            'current_milestone_id' => $this->getNextMilestone()?->id,
+        ]);
+
+        // If all milestones paid, mark booking as confirmed
+        if ($this->allMilestonesPaid() && !$this->all_milestones_paid_at) {
+            $this->update([
+                'all_milestones_paid_at' => now(),
+                'status' => self::STATUS_CONFIRMED,
+                'confirmed_at' => now(),
+                'payment_status' => 'paid',
+            ]);
+        }
+    }
+
+    /**
+     * PROMPT 101: Overlap Detection Methods
+     */
+
+    /**
+     * Check if this booking overlaps with given date range
+     * 
+     * @param string|\Carbon\Carbon $startDate
+     * @param string|\Carbon\Carbon $endDate
+     * @return bool
+     */
+    public function overlapsWith($startDate, $endDate): bool
+    {
+        $start = $startDate instanceof \Carbon\Carbon ? $startDate : \Carbon\Carbon::parse($startDate);
+        $end = $endDate instanceof \Carbon\Carbon ? $endDate : \Carbon\Carbon::parse($endDate);
+
+        // Overlap if: (StartA <= EndB) AND (EndA >= StartB)
+        return $this->start_date->lte($end) && $this->end_date->gte($start);
+    }
+
+    /**
+     * Scope: Get bookings that overlap with date range
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string|\Carbon\Carbon $startDate
+     * @param string|\Carbon\Carbon $endDate
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeOverlapping($query, $startDate, $endDate)
+    {
+        $start = $startDate instanceof \Carbon\Carbon ? $startDate->format('Y-m-d') : $startDate;
+        $end = $endDate instanceof \Carbon\Carbon ? $endDate->format('Y-m-d') : $endDate;
+
+        return $query->where(function ($q) use ($start, $end) {
+            $q->where('start_date', '<=', $end)
+              ->where('end_date', '>=', $start);
+        });
+    }
+
+    /**
+     * Scope: Get active bookings that occupy dates (excludes cancelled/refunded)
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeOccupying($query)
+    {
+        return $query->whereIn('status', [
+            self::STATUS_CONFIRMED,
+            self::STATUS_PAYMENT_HOLD,
+            self::STATUS_PENDING_PAYMENT_HOLD,
+        ]);
+    }
+
+    /**
+     * Scope: Get only active holds (not expired)
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeActiveHolds($query)
+    {
+        return $query->where('status', self::STATUS_PENDING_PAYMENT_HOLD)
+                     ->where('hold_expiry_at', '>', now());
+    }
+
+    /**
+     * Check if hoarding is available for given date range
+     * Static method for easy access
+     * 
+     * @param int $hoardingId
+     * @param string|\Carbon\Carbon $startDate
+     * @param string|\Carbon\Carbon $endDate
+     * @param int|null $excludeBookingId
+     * @return bool
+     */
+    public static function isHoardingAvailable(
+        int $hoardingId,
+        $startDate,
+        $endDate,
+        ?int $excludeBookingId = null
+    ): bool {
+        $query = static::where('hoarding_id', $hoardingId)
+            ->occupying()
+            ->overlapping($startDate, $endDate);
+
+        if ($excludeBookingId) {
+            $query->where('id', '!=', $excludeBookingId);
+        }
+
+        return !$query->exists();
+    }
+
+    /**
+     * Get conflicting bookings for given date range
+     * 
+     * @param int $hoardingId
+     * @param string|\Carbon\Carbon $startDate
+     * @param string|\Carbon\Carbon $endDate
+     * @param int|null $excludeBookingId
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public static function getConflicts(
+        int $hoardingId,
+        $startDate,
+        $endDate,
+        ?int $excludeBookingId = null
+    ) {
+        $query = static::where('hoarding_id', $hoardingId)
+            ->occupying()
+            ->overlapping($startDate, $endDate)
+            ->with(['customer', 'vendor']);
+
+        if ($excludeBookingId) {
+            $query->where('id', '!=', $excludeBookingId);
+        }
+
+        return $query->get();
+    }
+}
+
+

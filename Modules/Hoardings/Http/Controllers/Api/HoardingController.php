@@ -1,0 +1,962 @@
+<?php
+
+namespace Modules\Hoardings\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Modules\Hoardings\Http\Resources\HoardingResource;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Modules\Hoardings\Services\HoardingService;
+use Modules\Hoardings\Services\HoardingAvailabilityService;
+use App\Models\Hoarding;
+use Modules\Hoardings\Models\HoardingAttribute;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use App\Helpers\HoardingHelper;
+use Carbon\Carbon;
+class HoardingController extends Controller
+{
+    /**
+     * @var HoardingService
+     */
+    protected $hoardingService;
+    protected $availabilityService;
+
+    /**
+     * HoardingController constructor.
+     *
+     * @param HoardingService $hoardingService
+     */
+    public function __construct(HoardingService $hoardingService, HoardingAvailabilityService $availabilityService)
+    {
+        $this->hoardingService = $hoardingService;
+        $this->availabilityService = $availabilityService;
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/hoardings",
+     *     operationId="getActiveHoardings",
+     *     tags={"Hoardings"},
+     *     summary="Get active hoardings for homepage display",
+     *     description="Returns a paginated list of active and approved hoardings to display on the homepage. Supports filtering by location, type, and other criteria.",
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Number of items per page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1, example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="hoarding_type",
+     *         in="query",
+     *         description="Filter by hoarding type (ooh or dooh)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"ooh", "dooh"}, example="ooh")
+     *     ),
+     *     @OA\Parameter(
+     *         name="category",
+     *         in="query",
+     *         description="Filter by hoarding category",
+     *         required=false,
+     *         @OA\Schema(type="string", example="billboard")
+     *     ),
+     *     @OA\Parameter(
+     *         name="city",
+     *         in="query",
+     *         description="Filter by city",
+     *         required=false,
+     *         @OA\Schema(type="string", example="Mumbai")
+     *     ),
+     *     @OA\Parameter(
+     *         name="state",
+     *         in="query",
+     *         description="Filter by state",
+     *         required=false,
+     *         @OA\Schema(type="string", example="Maharashtra")
+     *     ),
+     *     @OA\Parameter(
+     *         name="min_price",
+     *         in="query",
+     *         description="Minimum price per day",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float", example=1000)
+     *     ),
+     *     @OA\Parameter(
+     *         name="max_price",
+     *         in="query",
+     *         description="Maximum price per day",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float", example=50000)
+     *     ),
+     *     @OA\Parameter(
+     *         name="lat",
+     *         in="query",
+     *         description="Latitude for location-based search",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float", example=19.0760)
+     *     ),
+     *     @OA\Parameter(
+     *         name="lng",
+     *         in="query",
+     *         description="Longitude for location-based search",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float", example=72.8777)
+     *     ),
+     *     @OA\Parameter(
+     *         name="radius",
+     *         in="query",
+     *         description="Search radius in kilometers (used with lat/lng)",
+     *         required=false,
+     *         @OA\Schema(type="number", format="float", default=10, example=5)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Search keyword for title or description",
+     *         required=false,
+     *         @OA\Schema(type="string", example="Premium Billboard")
+     *     ),
+     *     @OA\Parameter(
+     *         name="sort_by",
+     *         in="query",
+     *         description="Sort field",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"price", "created_at", "title", "rating"}, default="created_at", example="price")
+     *     ),
+     *     @OA\Parameter(
+     *         name="sort_order",
+     *         in="query",
+     *         description="Sort order",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"asc", "desc"}, default="desc", example="asc")
+     *     ),
+     *     @OA\Parameter(
+     *         name="featured",
+     *         in="query",
+     *         description="Filter only featured hoardings",
+     *         required=false,
+     *         @OA\Schema(type="boolean", example=true)
+     *     ),
+     *     @OA\Parameter(
+     *         name="filter",
+     *         in="query",
+     *         description="Special filter. Use 'weekly' to return only hoardings where enable_weekly_booking is true and weekly_price_1 is set. When applied, the price in the response will be weekly_price_1.",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"weekly"}, example="weekly")
+     *     ),
+     *     @OA\Parameter(
+     *         name="start_date",
+     *         in="query",
+     *         description="Filter hoardings by availability from this start date (YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2026-03-12")
+     *     ),
+     *     @OA\Parameter(
+     *         name="end_date",
+     *         in="query",
+     *         description="Filter hoardings by availability until this end date (YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2026-03-15")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="title", type="string", example="Premium Billboard - Mumbai Central"),
+     *                     @OA\Property(property="description", type="string", example="High-traffic location near railway station"),
+     *                     @OA\Property(property="hoarding_type", type="string", example="ooh"),
+     *                     @OA\Property(property="category", type="string", example="billboard"),
+     *                     @OA\Property(property="width", type="number", format="float", example=20),
+     *                     @OA\Property(property="height", type="number", format="float", example=10),
+     *                     @OA\Property(property="monthly_price", type="number", format="float", example=5000),
+     *                     @OA\Property(property="city", type="string", example="Mumbai"),
+     *                     @OA\Property(property="state", type="string", example="Maharashtra"),
+     *                     @OA\Property(property="latitude", type="number", format="float", example=19.0760),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=72.8777),
+     *                     @OA\Property(property="address", type="string", example="Near Mumbai Central Railway Station"),
+     *                     @OA\Property(property="status", type="string", example="active"),
+     *                     @OA\Property(property="is_featured", type="boolean", example=true),
+     *                     @OA\Property(
+     *                         property="media",
+     *                         type="array",
+     *                         @OA\Items(
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="url", type="string", example="https://example.com/storage/hoardings/image.jpg"),
+     *                             @OA\Property(property="type", type="string", example="image")
+     *                         )
+     *                     ),
+     *                     @OA\Property(
+     *                         property="vendor",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=5),
+     *                         @OA\Property(property="name", type="string", example="ABC Media Solutions"),
+     *                         @OA\Property(property="company_name", type="string", example="ABC Media Pvt Ltd")
+     *                     )
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="from", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=10),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="to", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=150)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Invalid parameters"),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 @OA\Property(property="lat", type="array", @OA\Items(type="string", example="The latitude must be a valid number"))
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $filters = [
+            'vendor_id' => $request->input('vendor_id'),
+            'hoarding_type' => $request->input('hoarding_type'),
+            'category' => $request->input('category'),
+            'status' => 'active',
+            'search' => $request->input('search'),
+            'city' => $request->input('city'),
+            'state' => $request->input('state'),
+            'min_price' => $request->input('min_price'),
+            'max_price' => $request->input('max_price'),
+            'lat' => $request->input('lat'),
+            'lng' => $request->input('lng'),
+            'radius' => $request->input('radius', 10),
+            'featured' => $request->input('featured'),
+            'sort_by' => $request->input('sort_by', 'created_at'),
+            'sort_order' => $request->input('sort_order', 'desc'),
+            'filter' => $request->input('filter'),
+        ];
+
+        $perPage = $request->input('per_page', 15);
+        $hoardings = $this->hoardingService->getAll($filters, $perPage);
+
+        // Filter by availability if start_date and end_date are provided
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+        if ($startDate && $endDate) {
+            $hoardings = $hoardings->filter(function ($hoarding) use ($startDate, $endDate) {
+                $availabilityService = app(HoardingAvailabilityService::class);
+                $calendar = $availabilityService->getAvailabilityCalendar($hoarding->id, $startDate, $endDate);
+                // Check if all days in the range are available
+                if (!empty($calendar['calendar'])) {
+                    foreach ($calendar['calendar'] as $day) {
+                        if (empty($day['status']) || $day['status'] !== 'available') {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            });
+            // Convert to paginator if filtered
+            $hoardings = $hoardings->values();
+        }
+
+        $weeklyFilter = $request->input('filter') === 'weekly';
+        $data = HoardingResource::collection($hoardings)->additional([
+            'weekly_filter' => $weeklyFilter
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+            'meta' => [
+                'current_page' => method_exists($hoardings, 'currentPage') ? $hoardings->currentPage() : 1,
+                'from' => method_exists($hoardings, 'firstItem') ? $hoardings->firstItem() : 1,
+                'last_page' => method_exists($hoardings, 'lastPage') ? $hoardings->lastPage() : 1,
+                'per_page' => method_exists($hoardings, 'perPage') ? $hoardings->perPage() : $perPage,
+                'to' => method_exists($hoardings, 'lastItem') ? $hoardings->lastItem() : count($hoardings),
+                'total' => method_exists($hoardings, 'total') ? $hoardings->total() : count($hoardings),
+            ],
+        ]);
+    }
+
+
+       /**
+     * @OA\Get(
+     *     path="/hoardings/vendor/{vendorId}/active",
+     *     operationId="getVendorActiveHoardings",
+     *     tags={"Hoardings"},
+     *     summary="Get active hoardings by vendor",
+     *     description="Returns paginated active hoardings for a specific vendor with optional recommended filter and rating/price sorting.",
+     *     @OA\Parameter(
+     *         name="vendorId",
+     *         in="path",
+     *         description="Vendor ID",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=12)
+     *     ),
+     *     @OA\Parameter(
+     *         name="recommended",
+     *         in="query",
+     *         description="Filter by recommended hoardings",
+     *         required=false,
+     *         @OA\Schema(type="boolean", example=true)
+     *     ),
+     *     @OA\Parameter(
+     *         name="rating_sort",
+     *         in="query",
+     *         description="Sort by average rating",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"high_to_low", "low_to_high", "asc", "desc"}, example="high_to_low")
+     *     ),
+     *     @OA\Parameter(
+     *         name="price_sort",
+     *         in="query",
+     *         description="Sort by price",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"high_to_low", "low_to_high", "asc", "desc"}, example="low_to_high")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Number of items per page",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=15, minimum=1, maximum=100, example=15)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="from", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=2),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="to", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=28)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="The given data was invalid."),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     )
+     * )
+     */
+
+    public function vendorActive(Request $request, int $vendorId): JsonResponse
+    {
+        $validated = $request->validate([
+            'recommended' => ['nullable', 'boolean'],
+            'rating_sort' => ['nullable', 'in:high_to_low,low_to_high,asc,desc'],
+            'price_sort' => ['nullable', 'in:high_to_low,low_to_high,asc,desc'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'filter' => ['nullable', 'string'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $ratingSort = $this->mapSortDirection($validated['rating_sort'] ?? null);
+        $priceSort = $this->mapSortDirection($validated['price_sort'] ?? null);
+        $weeklyFilter = ($validated['filter'] ?? null) === 'weekly';
+
+        $startDate = $validated['start_date'] ?? now()->toDateString();
+        $endDate = $validated['end_date'] ?? $startDate;
+
+        $filters = [
+            'vendor_id' => $vendorId,
+            'status' => 'active',
+            'recommended' => $validated['recommended'] ?? null,
+            'filter' => $validated['filter'] ?? null,
+        ];
+
+        if ($ratingSort !== null) {
+            $filters['sort_by'] = 'rating';
+            $filters['sort_order'] = $ratingSort;
+        } elseif ($priceSort !== null) {
+            $filters['sort_by'] = 'price';
+            $filters['sort_order'] = $priceSort;
+        }
+
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $hoardings = $this->hoardingService->getAll($filters, $perPage);
+
+        $hoardings->getCollection()->loadMissing(['vendor']);
+
+        $firstHoarding = $hoardings->getCollection()->first();
+        $vendor = $firstHoarding?->vendor;
+
+        return response()->json([
+            'success' => true,
+            'vendor' => [
+                'id' => $vendorId,
+                'name' => data_get($vendor, 'name', 'vendor'),
+                'email' => data_get($vendor, 'email'),
+                'address' => $vendor->getVendorAddress(),
+                'total_hoardings' => Hoarding::where('vendor_id', $vendorId)
+                    ->where('status', 'active')
+                    ->count(),
+            ],
+            'hoardings' => $hoardings->getCollection()
+                ->map(fn ($hoarding) => $this->transformVendorActiveHoarding(
+                    $hoarding,
+                    $weeklyFilter,
+                    $startDate,
+                    $endDate
+                ))
+                ->values(),
+            'meta' => [
+                'current_page' => $hoardings->currentPage(),
+                'from' => $hoardings->firstItem(),
+                'last_page' => $hoardings->lastPage(),
+                'per_page' => $hoardings->perPage(),
+                'to' => $hoardings->lastItem(),
+                'total' => $hoardings->total(),
+            ],
+        ]);
+    }
+
+
+
+ 
+   private function transformVendorActiveHoarding(
+        $hoarding,
+        bool $weeklyFilter = false,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): array {
+        $basePrice = $weeklyFilter
+            ? (float) ($hoarding->base_weekly_price_1 ?? $hoarding->weekly_price_1 ?? 0)
+            : (float) ($hoarding->base_monthly_price ?? $hoarding->monthly_price ?? 0);
+
+        $sellPrice = $weeklyFilter
+            ? (float) ($hoarding->weekly_price_1 ?? 0)
+            : (float) ($hoarding->monthly_price ?? 0);
+
+        $price = HoardingHelper::discountBeforeOffer($basePrice, $sellPrice);
+
+        $pricing = [
+            ...$price,
+        ];
+
+        $rangeStart = $startDate ?? now()->toDateString();
+        $rangeEnd = $endDate ?? $rangeStart;
+
+        $availabilityCalendar = $this->availabilityService->getAvailabilityCalendar(
+            $hoarding->id,
+            $rangeStart,
+            $rangeEnd
+        );
+
+        $calendar = collect(data_get($availabilityCalendar, 'calendar', []));
+        $isAvailable = $calendar->isNotEmpty()
+            ? $calendar->every(fn ($day) => data_get($day, 'status') === 'available')
+            : false;
+
+        $firstAvailableDayInRange = $calendar->first(
+            fn ($day) => data_get($day, 'status') === 'available'
+        );
+
+        $availableFrom = data_get($firstAvailableDayInRange, 'date')
+            ?? data_get($firstAvailableDayInRange, 'day')
+            ?? data_get($firstAvailableDayInRange, 'slot_date');
+
+        // If booked in requested range, find next available date after end_date
+        if (!$isAvailable && empty($availableFrom)) {
+            $availableFrom = $this->findNextAvailableDate(
+                (int) $hoarding->id,
+                Carbon::parse($rangeEnd)->addDay()->toDateString()
+            );
+        }
+
+        $availability = [
+            'status' => $isAvailable ? 'active' : 'inactive',
+            'is_available' => $isAvailable,
+            'available_from' => $availableFrom,
+            'calendar' => $calendar->values(),
+        ];
+
+        return [
+            'id' => (int) $hoarding->id,
+            'title' => $hoarding->title,
+            'slug' => $hoarding->slug ?? $hoarding->title ?? null,
+            'hoarding_type' => strtoupper((string) ($hoarding->hoarding_type ?? '')),
+            'category' => $hoarding->category,
+            'city' => $hoarding->city,
+            'packages' => $hoarding->packages,
+            'image_url' => $hoarding->heroImage(),
+            'rating' => (float) ($hoarding->average_rating ?? $hoarding->rating ?? 0),
+            'pricing' => $pricing,
+            'availability' => $availability,
+            'recommended' => (bool) ($hoarding->recommended ?? false),
+        ];
+    }
+
+    private function findNextAvailableDate(int $hoardingId, string $fromDate, int $maxDays = 365): ?string
+    {
+        $cursor = Carbon::parse($fromDate)->startOfDay();
+        $limit = $cursor->copy()->addDays($maxDays);
+
+        while ($cursor->lte($limit)) {
+            $windowEnd = $cursor->copy()->addDays(29);
+            if ($windowEnd->gt($limit)) {
+                $windowEnd = $limit->copy();
+            }
+
+            $calendarResponse = $this->availabilityService->getAvailabilityCalendar(
+                $hoardingId,
+                $cursor->toDateString(),
+                $windowEnd->toDateString()
+            );
+
+            $days = collect(data_get($calendarResponse, 'calendar', []));
+            $firstAvailable = $days->first(
+                fn ($day) => data_get($day, 'status') === 'available'
+            );
+
+            if ($firstAvailable) {
+                return data_get($firstAvailable, 'date')
+                    ?? data_get($firstAvailable, 'day')
+                    ?? data_get($firstAvailable, 'slot_date');
+            }
+
+            $cursor = $windowEnd->addDay();
+        }
+
+        return null;
+    }
+
+      private function formatVendorAddress($vendor): string
+    {
+        if (!$vendor) {
+            return '';
+        }
+        $address = data_get($vendor, 'address');
+        return implode(', ', array_filter([
+            data_get($vendor, 'addres'),
+            data_get($vendor, 'city'),
+            data_get($vendor, 'state'),
+            data_get($vendor, 'pincode'),
+        ]));
+    }
+// ...existing code...
+    private function mapSortDirection(?string $direction): ?string
+    {
+        if ($direction === null || $direction === '') {
+            return null;
+        }
+
+        $direction = strtolower($direction);
+
+        if (in_array($direction, ['desc', 'high_to_low'], true)) {
+            return 'desc';
+        }
+
+        if (in_array($direction, ['asc', 'low_to_high'], true)) {
+            return 'asc';
+        }
+
+        return null;
+    }
+    /**
+     * @OA\Get(
+     *     path="/hoardings/{id}",
+     *     operationId="getHoardingById",
+     *     tags={"Hoardings"},
+     *     summary="Get hoarding details by ID",
+     *     description="Returns detailed information about a specific hoarding",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="Hoarding ID",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="title", type="string", example="Premium Billboard - Mumbai Central"),
+     *                 @OA\Property(property="description", type="string", example="High-traffic location near railway station"),
+     *                 @OA\Property(property="hoarding_type", type="string", example="ooh"),
+     *                 @OA\Property(property="category", type="string", example="billboard"),
+     *                 @OA\Property(property="width", type="number", format="float", example=20),
+     *                 @OA\Property(property="height", type="number", format="float", example=10),
+     *                 @OA\Property(property="monthly_price", type="number", format="float", example=5000),
+     *                 @OA\Property(property="city", type="string", example="Mumbai"),
+     *                 @OA\Property(property="state", type="string", example="Maharashtra"),
+     *                 @OA\Property(property="address", type="string", example="Near Mumbai Central Railway Station"),
+     *                 @OA\Property(property="status", type="string", example="active")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Hoarding not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Hoarding not found")
+     *         )
+     *     )
+     * )
+     */
+    public function show($id): JsonResponse
+    {
+        $hoarding = $this->hoardingService->getById($id);
+
+        if (!$hoarding) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hoarding not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => new HoardingResource($hoarding),
+        ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/hoardings/live-categories",
+     *     operationId="getHoardingCategories",
+     *     tags={"Hoardings"},
+     *     summary="Get all hoarding categories/types(of live hoarding)",
+     *     description="Returns a list of available hoarding categories and types for filtering",
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="categories",
+     *                     type="array",
+     *                     @OA\Items(type="string", example="billboard")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="types",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="value", type="string", example="billboard"),
+     *                         @OA\Property(property="label", type="string", example="Billboard"),
+     *                         @OA\Property(property="count", type="integer", example=45)
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
+     */
+  public function getLiveCategories(): JsonResponse
+{
+    $categories = HoardingAttribute::query() // change table name if needed
+        ->where('type', 'category')
+        ->where('is_active', 1)
+        ->orderBy('label')
+        ->get([
+            'label',
+            'value',
+        ]);
+
+    return response()->json([
+        'success' => true,
+        'data' => $categories,
+    ]);
+}
+
+
+       /**
+     * @OA\Get(
+     *     path="/hoardings/cities",
+     *     operationId="getHoardingCities",
+     *     tags={"Hoardings"},
+     *     summary="Get cities with active hoardings ordered by count",
+     *     description="Returns a list of cities with the number of active hoardings in each city, ordered by count descending.",
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="city", type="string", example="Mumbai"),
+     *                     @OA\Property(property="count", type="integer", example=42)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="No cities found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="No cities found")
+     *         )
+     *     )
+     * )
+     */
+    public function getCitiesWithActiveHoardings(): JsonResponse
+    {
+        // 🔥 Get top cities (like states)
+            $topCities = $this->getTopCities();
+
+            if (empty($topCities)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No cities found',
+                ], 404);
+            }
+
+            // 🔥 Fetch all hoardings in ONE query
+            $allHoardings = Hoarding::where('status', 'active')
+                ->whereNotNull('city')
+                ->get()
+                ->groupBy(fn($item) => strtoupper(trim($item->city)));
+
+        // 🔥 Map response
+        $result = collect($topCities)->map(function ($cityItem) use ($allHoardings) {
+            $cityName = $cityItem['name'];
+
+            return [
+                'city' => $cityName,
+                'count' => $cityItem['count'],
+                'image' => $cityItem['image'],
+                'hoardings' => HoardingResource::collection(
+                    $allHoardings[$cityName] ?? collect()
+                ),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
+
+   
+private function getTopCities(int $limit = 8): array
+{
+    $priorityStates = [
+        'UTTAR PRADESH',
+        'DELHI',
+        'MAHARASHTRA',
+        'GOA',
+        'HIMACHAL PRADESH',
+        'JAMMU & KASHMIR',
+        'GUJARAT',
+        'RAJASTHAN',
+    ];
+
+    $images = [
+        'UTTAR PRADESH'    => asset('images/states/up.jpeg'),
+        'DELHI'            => asset('images/states/delhi.jpg'),
+        'MAHARASHTRA'      => asset('images/states/mumbai.jpg'),
+        'GOA'              => asset('images/states/goa.jpg'),
+        'HIMACHAL PRADESH' => asset('images/states/himanchal.jpeg'),
+        'JAMMU & KASHMIR'  => asset('images/states/jammu.jpeg'),
+        'GUJARAT'          => asset('images/states/gujrat.jpg'),
+        'RAJASTHAN'        => asset('images/states/Rajasthan.jpg'),
+    ];
+
+    $defaultImage = asset('images/states/default.jpg');
+
+    // 🔥 SINGLE QUERY WITH NORMALIZATION + MAPPING
+   $states = DB::table('hoardings')
+    ->selectRaw("
+        CASE
+            -- 🔥 FIRST: Try city → state mapping (more reliable)
+            WHEN UPPER(TRIM(city)) IN ('NEW DELHI', 'DELHI', 'NOIDA', 'GURGAON', 'FARIDABAD', 'GHAZIABAD',  'SONIPAT', 'YAMUNANAGAR', 'PALWAL','WEST DELHI', 'EAST DELHI', 'SOUTH DELHI', 'NORTH DELHI') 
+                THEN 'DELHI'
+
+            WHEN UPPER(TRIM(city)) IN ('MUMBAI', 'PUNE', 'NAGPUR') 
+                THEN 'MAHARASHTRA'
+
+            WHEN UPPER(TRIM(city)) IN ('LUCKNOW', 'KANPUR', 'VARANASI') 
+                THEN 'UTTAR PRADESH'
+
+            WHEN UPPER(TRIM(city)) IN ('JAIPUR', 'UDAIPUR') 
+                THEN 'RAJASTHAN'
+
+            WHEN UPPER(TRIM(city)) IN ('AHMEDABAD', 'SURAT') 
+                THEN 'GUJARAT'
+
+            WHEN UPPER(TRIM(city)) IN ('SHIMLA', 'MANALI') 
+                THEN 'HIMACHAL PRADESH'
+
+            WHEN UPPER(TRIM(city)) IN ('SRINAGAR') 
+                THEN 'JAMMU & KASHMIR'
+
+            WHEN UPPER(TRIM(city)) IN ('PANAJI') 
+                THEN 'GOA'
+
+            -- 🔥 SECOND: fallback to state if exists
+            WHEN state IS NOT NULL AND TRIM(state) != '' 
+                THEN UPPER(TRIM(state))
+
+            -- ❌ ELSE ignore
+            ELSE NULL
+        END as normalized_state,
+
+        COUNT(*) as total
+    ")
+    ->where('status', 'active')
+    ->where(function ($q) {
+        $q->whereNotNull('state')
+          ->orWhereNotNull('city');
+    })
+    ->groupBy('normalized_state')
+    ->havingNotNull('normalized_state')
+    ->get()
+    ->keyBy('normalized_state');
+
+    $result = [];
+
+    foreach ($priorityStates as $state) {
+        if (!isset($states[$state])) {
+            continue;
+        }
+
+        $result[] = [
+            'name'  => $state,
+            'count' => (int) $states[$state]->total,
+            'image' => $images[$state] ?? $defaultImage,
+        ];
+    }
+
+    // 🔥 Sort by count (important)
+    usort($result, fn($a, $b) => $b['count'] <=> $a['count']);
+
+    return array_slice($result, 0, $limit);
+}
+
+    /**
+     * @OA\Get(
+     *     path="/hoardings/activeOOHAndDOOH",
+     *     operationId="getOnlyActiveOOHAndDOOH",
+     *     tags={"Hoardings"},
+     *     summary="Get only active OOH & DOOH hoardings",
+     *     description="Returns paginated list of active hoardings of type OOH and DOOH only",
+     *     @OA\Parameter(
+     *         name="hoarding_type",
+     *         in="query",
+     *         description="Filter by hoarding type (ooh or dooh)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"ooh","dooh"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         @OA\Schema(type="integer", default=15)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success"
+     *     )
+     * )
+     */
+     public function activeOOHAndDOOH(Request $request): JsonResponse
+    {
+        $hoardings = $this->hoardingService->getActiveOOHAndDOOH(
+            $request->only(['hoarding_type', 'category']),
+            (int) $request->input('per_page', 15)
+        );
+
+        return response()->json([
+            'success' => true,
+            'data'    => HoardingResource::collection($hoardings),
+            'meta'    => [
+                'current_page' => $hoardings->currentPage(),
+                'per_page'     => $hoardings->perPage(),
+                'total'        => $hoardings->total(),
+                'last_page'    => $hoardings->lastPage(),
+            ],
+        ]);
+    }
+
+   /**
+     * @OA\Delete(
+     *     path="/hoardings/{id}",
+     *     operationId="deleteHoarding",
+     *     tags={"Hoardings"},
+     *     summary="Delete a hoarding by ID (soft delete)",
+     *     description="Soft deletes a hoarding and cascades to related child record (OOH hoarding or DOOH screen) along with their packages and media. Physical media files are deleted from storage.",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="Hoarding ID",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful deletion",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Hoarding deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Hoarding not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Hoarding not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error during deletion",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to delete hoarding")
+     *         )
+     *     )
+     * )
+     */
+
+
+}

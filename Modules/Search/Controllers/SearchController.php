@@ -1,0 +1,378 @@
+<?php
+
+namespace Modules\Search\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Modules\Cart\Services\CartService;
+use Modules\Hoardings\Services\HoardingAvailabilityService;
+
+class SearchController extends Controller
+{
+    public function index(Request $request, CartService $cartService): View
+    {
+        $isWeekly = $request->get('duration') === 'weekly';
+
+        $query = DB::table('hoardings')
+            ->join('vendor_profiles', function ($join) {
+                $join->on('vendor_profiles.user_id', '=', 'hoardings.vendor_id')
+                    ->where('vendor_profiles.onboarding_status', 'approved')
+                    ->whereNull('vendor_profiles.deleted_at');
+            })
+            // -----------------------------------------------------------------
+            // FIX: leftJoin ki jagah subquery — per hoarding sirf 1 row milegi
+            // pehle leftJoin se agar ek hoarding ke 5 ooh_hoardings records the
+            // toh woh hoarding 5 baar aati thi. Subquery mein LIMIT 1 se sirf
+            // pehla active record lega, duplicates khatam.
+            // -----------------------------------------------------------------
+            ->leftJoinSub(
+                DB::table('ooh_hoardings')
+                    ->select('hoarding_id', 'width', 'height')
+                    ->whereNull('deleted_at')
+                    ->orderBy('id')
+                    ->limit(PHP_INT_MAX), // Laravel subquery workaround
+                'ooh_hoardings',
+                'ooh_hoardings.hoarding_id',
+                '=',
+                'hoardings.id'
+            )
+            ->leftJoinSub(
+                DB::table('dooh_screens')
+                    ->select('hoarding_id', 'resolution_width', 'resolution_height')
+                    ->whereNull('deleted_at')
+                    ->orderBy('id')
+                    ->limit(PHP_INT_MAX),
+                'dooh_screens',
+                'dooh_screens.hoarding_id',
+                '=',
+                'hoardings.id'
+            )
+            // -----------------------------------------------------------------
+            ->leftJoin(
+                DB::raw('(
+                    SELECT hoarding_id,
+                        ROUND(AVG(rating),1) as avg_rating,
+                        COUNT(*) as reviews_count
+                    FROM ratings
+                    GROUP BY hoarding_id
+                ) as rating_stats'),
+                'rating_stats.hoarding_id',
+                '=',
+                'hoardings.id'
+            )
+            ->where('hoardings.status', 'active')
+            ->whereNull('hoardings.deleted_at')
+            ->select([
+                'hoardings.slug',
+                'hoardings.id',
+                'hoardings.vendor_id',
+                'hoardings.title',
+                'hoardings.address',
+                'hoardings.city',
+                'hoardings.hoarding_type',
+                'hoardings.available_from',
+                'hoardings.is_featured',
+                'hoardings.is_recommended',
+                'hoardings.view_count',
+                'hoardings.expected_eyeball',
+                'hoardings.latitude as lat',
+                'hoardings.longitude as lng',
+                'ooh_hoardings.width',
+                'ooh_hoardings.height',
+                'hoardings.base_monthly_price',
+                'hoardings.monthly_price',
+                'hoardings.enable_weekly_booking',
+                'hoardings.weekly_price_1',
+                DB::raw("
+                    CASE
+                        WHEN hoardings.hoarding_type = 'dooh'
+                            THEN dooh_screens.resolution_width
+                        ELSE ooh_hoardings.width
+                    END AS display_width
+                "),
+                DB::raw("
+                    CASE
+                        WHEN hoardings.hoarding_type = 'dooh'
+                            THEN dooh_screens.resolution_height
+                        ELSE ooh_hoardings.height
+                    END AS display_height
+                "),
+                DB::raw("
+                    CASE
+                        WHEN hoardings.base_monthly_price IS NOT NULL
+                        AND hoardings.base_monthly_price > 0
+                        AND (
+                            CASE
+                                WHEN hoardings.monthly_price IS NOT NULL AND hoardings.monthly_price > 0
+                                    THEN hoardings.monthly_price
+                                ELSE hoardings.base_monthly_price
+                            END
+                        ) > 0
+                        AND (
+                            CASE
+                                WHEN hoardings.monthly_price IS NOT NULL AND hoardings.monthly_price > 0
+                                    THEN hoardings.monthly_price
+                                ELSE hoardings.base_monthly_price
+                            END
+                        ) < hoardings.base_monthly_price
+                        THEN ROUND(
+                            (
+                                hoardings.base_monthly_price -
+                                (
+                                    CASE
+                                        WHEN hoardings.monthly_price IS NOT NULL AND hoardings.monthly_price > 0
+                                            THEN hoardings.monthly_price
+                                        ELSE hoardings.base_monthly_price
+                                    END
+                                )
+                            ) / hoardings.base_monthly_price * 100
+                        )
+                        ELSE NULL
+                    END AS discount_percent
+                "),
+                DB::raw("
+                    CASE
+                        WHEN hoardings.hoarding_type = 'dooh'
+                            THEN 'px'
+                        ELSE 'ft'
+                    END AS display_unit
+                "),
+                DB::raw("
+                    CASE
+                        /* WEEKLY MODE */
+                        WHEN '{$request->duration}' = 'weekly'
+                            THEN hoardings.weekly_price_1
+
+                        /* MONTHLY MODE - unified for OOH/DOOH */
+                        WHEN hoardings.monthly_price IS NOT NULL AND hoardings.monthly_price > 0
+                            THEN hoardings.monthly_price
+
+                        /* FALLBACK */
+                        ELSE hoardings.base_monthly_price
+                    END AS price
+                "),
+                DB::raw("COALESCE(rating_stats.avg_rating,0) as avg_rating"),
+                DB::raw("COALESCE(rating_stats.reviews_count,0) as reviews_count"),
+            ]);
+
+        if ($request->duration === 'weekly') {
+            $query->where('hoardings.enable_weekly_booking', 1)
+                ->whereNotNull('hoardings.weekly_price_1');
+        }
+        if ($request->filled('location')) {
+            $loc = strtolower($request->location);
+            $query->where(function ($q) use ($loc) {
+                $q->whereRaw('LOWER(hoardings.city) LIKE ?', ["%{$loc}%"])
+                    ->orWhereRaw('LOWER(hoardings.state) LIKE ?', ["%{$loc}%"])
+                    ->orWhereRaw('LOWER(hoardings.address) LIKE ?', ["%{$loc}%"])
+                    ->orWhereRaw('LOWER(hoardings.title) LIKE ?', ["%{$loc}%"]);
+            });
+        }
+        if ($request->filled('type')) {
+            $query->where('hoardings.hoarding_type', $request->type);
+        }
+        if ($request->filled('category')) {
+            $query->whereIn('hoardings.category', $request->category);
+        }
+        if ($request->filled('vendor')) {
+            $query->whereIn('vendor_profiles.company_name', $request->vendor);
+        }
+        if ($request->filled('visibility')) {
+            $query->where(function ($q) use ($request) {
+                foreach ($request->visibility as $vis) {
+                    $q->orWhereJsonContains('hoardings.visibility_details', $vis);
+                }
+            });
+        }
+        if ($request->filled('audience')) {
+            $query->where(function ($q) use ($request) {
+                foreach ($request->audience as $aud) {
+                    $q->orWhereJsonContains('hoardings.audience_types', $aud);
+                }
+            });
+        }
+        if ($request->filled('min_gazeflow')) {
+            $query->where('hoardings.expected_eyeball', '>=', $request->min_gazeflow);
+        }
+        if ($request->filled('max_gazeflow')) {
+            $query->where('hoardings.expected_eyeball', '<=', $request->max_gazeflow);
+        }
+        if ($request->filled('min_height')) {
+            $query->where('ooh_hoardings.height', '>=', $request->min_height);
+        }
+        if ($request->filled('max_height')) {
+            $query->where('ooh_hoardings.height', '<=', $request->max_height);
+        }
+        if ($request->filled('min_price')) {
+            $query->having('price', '>=', $request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $query->having('price', '<=', $request->max_price);
+        }
+       if ($request->filled('rating')) {
+                $ratings = array_map('intval', (array)$request->rating);
+
+                $conditions = [];
+                $bindings = [];
+
+                foreach ($ratings as $r) {
+                    if ($r == 5) {
+                        $conditions[] = 'avg_rating >= ?';
+                        $bindings[] = 5;
+                    } else {
+                        $conditions[] = '(avg_rating >= ? AND avg_rating < ?)';
+                        $bindings[] = $r;
+                        $bindings[] = $r + 1;
+                    }
+                }
+
+                $query->havingRaw(implode(' OR ', $conditions), $bindings);
+        }
+        if ($request->filled('near_me') && $request->filled('lat') && $request->filled('lng')) {
+            $lat = (float) $request->lat;
+            $lng = (float) $request->lng;
+            $radius = 25;
+            $query->whereRaw("
+                (6371 * acos(
+                    cos(radians(?)) *
+                    cos(radians(hoardings.latitude)) *
+                    cos(radians(hoardings.longitude) - radians(?)) +
+                    sin(radians(?)) *
+                    sin(radians(hoardings.latitude))
+                )) <= ?
+            ", [$lat, $lng, $lat, $radius]);
+        }
+            // Change 'from_date' and 'to_date' to 'date_from' and 'date_to'
+        if ($request->filled('date_from')) {
+            $from = $request->date_from;
+            // Fallback: If date_to is empty, use date_from (single day search)
+            $to = $request->filled('date_to') ? $request->date_to : $from;
+
+            $candidateIds = DB::table('hoardings')
+                ->where('status', 'active')
+                ->whereNull('deleted_at')
+                ->where(function ($q) use ($from, $to) {
+                    $q->where(function ($qq) use ($to) {
+                        $qq->whereNull('available_from')
+                            ->orWhere('available_from', '<=', $to);
+                    });
+                    $q->where(function ($qq) use ($from) {
+                        $qq->whereNull('available_to')
+                            ->orWhere('available_to', '>=', $from);
+                    });
+                })
+                ->pluck('id')
+                ->toArray();
+
+            $availabilityService = app(HoardingAvailabilityService::class);
+            $availableIds = $availabilityService->filterAvailableIds($candidateIds, $from, $to);
+
+            $query->whereIn('hoardings.id', empty($availableIds) ? [0] : $availableIds);
+        }
+
+        switch ($request->sort) {
+            case 'rating':
+                $query->orderByDesc('avg_rating')
+                    ->orderByDesc('reviews_count')
+                    ->orderByDesc('hoardings.created_at');
+                break;
+            case 'price_asc':
+                $query->orderBy('price', 'asc');
+                break;
+            case 'price_desc':
+                $query->orderBy('price', 'desc');
+                break;
+            case 'recommended':
+                $query->where(function ($q) {
+                    $q->where('hoardings.is_recommended', true)
+                        ->orWhere('hoardings.view_count', '>=', 50)
+                        ->orWhere('hoardings.expected_eyeball', '>=', 5000);
+                })
+                    ->orderByDesc('hoardings.is_recommended')
+                    ->orderByDesc('hoardings.is_featured')
+                    ->orderByDesc('hoardings.view_count')
+                    ->orderByDesc('hoardings.expected_eyeball')
+                    ->orderByDesc('hoardings.created_at');
+                break;
+            default:
+                if ($request->filled('rating')) {
+                    $query->orderByDesc('avg_rating')
+                        ->orderByDesc('reviews_count')
+                        ->orderByDesc('hoardings.created_at');
+                } else {
+                    $query->orderByDesc('hoardings.created_at');
+                }
+        }
+
+        $results = $query->paginate(8)->withQueryString();
+        $hoardingIds = $results->pluck('id')->toArray();
+
+        $oohImages = DB::table('hoarding_media')
+            ->whereIn('hoarding_id', $hoardingIds)
+            ->orderByDesc('is_primary')
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('hoarding_id');
+
+        $doohImages = DB::table('dooh_screen_media')
+            ->join('dooh_screens', 'dooh_screens.id', '=', 'dooh_screen_media.dooh_screen_id')
+            ->whereIn('dooh_screens.hoarding_id', $hoardingIds)
+            ->orderByDesc('dooh_screen_media.is_primary')
+            ->orderBy('dooh_screen_media.sort_order')
+            ->get()
+            ->groupBy('hoarding_id');
+
+        $availabilityService = app(HoardingAvailabilityService::class);
+        $today = now()->toDateString();
+
+        $results->getCollection()->transform(function ($item) use ($oohImages, $doohImages, $availabilityService, $today) {
+            $item->images = $item->hoarding_type === 'ooh'
+                ? ($oohImages[$item->id] ?? collect())
+                : ($doohImages[$item->id] ?? collect());
+
+            $calendar = $availabilityService->getAvailabilityCalendar($item->id, $today, $today);
+            $todayStatus = $calendar['calendar'][0]['status'] ?? 'unknown';
+            $item->today_availability_status = $todayStatus;
+
+            if ($todayStatus !== 'available') {
+                $next = $availabilityService->getNextAvailableDates($item->id, 1, $today);
+                $item->next_available_date = $next['dates'][0]['date'] ?? null;
+            } else {
+                $item->next_available_date = null;
+            }
+
+            return $item;
+        });
+
+        $cartHoardingIds = Auth::check()
+            ? $cartService->getCartHoardingIds()
+            : [];
+
+        return view('search.index', [
+            'results' => $results,
+            'cartHoardingIds' => $cartHoardingIds,
+        ]);
+    }
+
+    /**
+     * SEO-friendly search handler. Accepts city and area as route parameters.
+     * Allows SEO developer to change URL structure via config.
+     */
+    public function seoSearch(Request $request, CartService $cartService, $city = null, $locality = null)
+    {
+        $mergeParams = [];
+        if ($city && strtolower($city) !== 'india') {
+            $mergeParams['location'] = $city;
+        }
+        if (isset($locality) && $locality !== '') {
+            $mergeParams['locality'] = $locality;
+        }
+        if (!empty($mergeParams)) {
+            $request->merge($mergeParams);
+        }
+        return $this->index($request, $cartService);
+    }
+}

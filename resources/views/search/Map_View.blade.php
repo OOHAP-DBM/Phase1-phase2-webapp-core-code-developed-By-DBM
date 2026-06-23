@@ -1,0 +1,234 @@
+<div id="mapView" class="bg-white">
+        <div class="max-w-[1460px] mx-auto px-6 py-6">
+            <h2 class="text-lg text-black font-semibold mb-4 mt-5">
+                {{ $results->total() }} Hoardings in {{ request('location') ?? 'India' }}
+            </h2>
+            <div class="map-view-container flex gap-6">
+                 {{-- RIGHT: LISTINGS --}}
+                <div class="w-1/2 overflow-y-auto" style="max-height: 700px;">
+                    @forelse($results as $item)
+                          @php
+                                $mainImage = null;
+                                $thumbs = collect();
+                                if(($item->hoarding_type ?? '') === 'ooh'){
+
+                                    $allMedia = \Modules\Hoardings\Models\HoardingMedia::where('hoarding_id', $item->id)
+                                        ->orderByDesc('is_primary')
+                                        ->orderBy('sort_order')
+                                        ->get();
+                                    $primary = $allMedia->first();
+                                    $mainImage = $primary ? asset('storage/'.$primary->file_path) : null;
+
+                                    $thumbs = $allMedia->skip(1)->take(4);
+                                }
+                                elseif(($item->hoarding_type ?? '') === 'dooh'){
+                                    $screen = \Modules\DOOH\Models\DOOHScreen::where('hoarding_id', $item->id)->first();
+                                    if($screen){
+                                        $allMedia = \Modules\DOOH\Models\DoohScreenMedia::where('dooh_screen_id', $screen->id)
+                                            ->orderByDesc('is_primary')
+                                            ->orderBy('sort_order')
+                                            ->get();
+
+                                        $primary = $allMedia->first();
+                                        $mainImage = $primary ? asset('storage/'.$primary->file_path) : null;
+                                        $thumbs = $allMedia->skip(1)->take(4);
+                                    }
+                                }
+                        @endphp
+                        <div class="rounded-lg p-4 mb-4 shadow bg-[#F8F8F8] cursor-pointer" onclick="if(event.target.closest('button, a') === null)
+                        window.location.href='{{ route('hoardings.show', $item->id) }}';">
+                            <div class="flex gap-3">
+                                {{-- THUMBNAIL --}}
+                                <div class="w-50 flex-shrink-0">
+                            <div class="relative group">
+                                <div class="w-full h-[120px] overflow-hidden rounded-lg bg-gray-100">
+                                    @if(isset($primary) && $primary)
+                                        <x-media-preview :media="$primary" :alt="$item->title ?? 'Hoarding'" />
+                                    @else
+                                        <div class="w-full h-full flex items-center justify-center text-xs bg-gray-200">
+                                            No Image
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <!-- RECOMMENDED TAG -->
+                                     @php
+                                        if (($item->is_recommended ?? 0) == 1) {
+                                            $isRecommended = true;
+                                        } else {
+                                            $isRecommended = ($item->view_count ?? 0) >= 50 || 
+                                                            ($item->expected_eyeball ?? 0) >= 5000;
+                                        }
+                                    @endphp
+
+                                    @if($isRecommended)
+                                <span class="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded z-10">
+                                    RECOMMENDED
+                                </span>
+                                @endif
+
+                                <!-- SAVE (BOOKMARK) ICON -->
+                                 @php
+                                    $isWishlisted = auth()->check()
+                                        ? auth()->user()->wishlist()->where('hoarding_id', $item->id)->exists()
+                                        : false;
+                                @endphp
+                                @php
+                                    $isOwnerVendor = false;
+
+                                    if (
+                                        auth()->check()
+                                        && auth()->user()->active_role === 'vendor'
+                                        && isset($item->vendor_id)
+                                        && auth()->id() === (int) $item->vendor_id
+                                    ) {
+                                        $isOwnerVendor = true;
+                                    }
+                                @endphp
+                                @if(!$isOwnerVendor)
+                                <button
+                                    class="absolute top-2 right-2 z-20 w-8 h-8 rounded-full flex items-center justify-center shortlist-btn cursor-pointer
+                                        {{ $isWishlisted ? 'bg-[#daf2e7] is-wishlisted' : 'bg-[#9e9e9b]' }}
+                                        {{ $isOwnerVendor ? 'opacity-50' : '' }}"
+
+                                    data-id="{{ $item->id }}"
+                                    data-auth="{{ auth()->check() ? '1' : '0' }}"
+                                    data-role="{{ auth()->check() ? auth()->user()->role : '' }}"
+
+                                    {{-- 🔥 THIS IS THE KEY --}}
+                                    onmouseenter="this.style.cursor='{{ $isOwnerVendor ? 'not-allowed' : 'pointer' }}'"
+                                    onmouseleave="this.style.cursor='default'"
+
+                                    @if($isOwnerVendor)
+                                        disabled
+                                        onclick="event.stopPropagation(); return false;"
+                                    @else
+                                        onclick="event.stopPropagation(); toggleShortlist(this);"
+                                    @endif
+                                >
+                                        <svg
+                                            class="wishlist-icon"
+                                            width="20"
+                                            height="19"
+                                            viewBox="0 0 20 19"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                                d="M5.5 0.75C2.877 0.75 0.75 3.01 0.75 5.797C0.75 11.375 9.75 17.75 9.75 17.75C9.75 17.75 18.75 11.375 18.75 5.797C18.75 2.344 16.623 0.75 14 0.75C12.14 0.75 10.53 1.886 9.75 3.54C8.97 1.886 7.36 0.75 5.5 0.75Z"
+                                                stroke="white"
+                                                stroke-width="1.5"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                            />
+                                        </svg>
+                                    </button>
+                                    @endif
+                            </div>
+
+                            <div class="flex gap-2 mt-2">
+                                @if($thumbs->isNotEmpty())
+                                <div class="flex gap-2 mt-2 overflow-x-auto">
+                                    @foreach($thumbs as $thumb)
+                                        <div class="w-[44px] h-[48px] rounded overflow-hidden border border-gray-300">
+                                            <x-media-preview :media="$thumb" alt="" />
+                                        </div>
+                                    @endforeach
+                                </div>
+                                @endif
+
+                            </div>
+                        </div>
+                                
+                                
+                                {{-- DETAILS --}}
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-sm">{{ $item->title ?? 'Unipole Hazaratganj Lucknow' }}</h4>
+                                    <p class="text-xs text-gray-500 mt-1">{{ $item->address ?? 'Vipul khand gomti nagar' }}</p>
+                                    
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <span>{{ $item->hoarding_type }}</span>
+                                        @if($item->display_width && $item->display_height)
+                                            <span>
+                                                | {{ $item->display_width }} × {{ $item->display_height }}
+                                                {{ $item->display_unit === 'px' ? 'px' : 'Sq.ft' }}
+                                            </span>
+                                        @endif
+                                        <span class="flex items-center gap-1 text-xs">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffc83d" class="w-3 h-3">
+                                                <polygon points="12 2 15 8.5 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 9 8.5 12 2" />
+                                            </svg>
+                                            <span>{{ $item->avg_rating }}</span>
+                                        </span>
+                                    </div>
+                                    <div class="my-2">
+                                        <span class="bg-[#ffb854]  text-xs px-2 py-0.5 rounded">
+                                                    Limited Time Offer
+                                        </span>
+                                    </div>
+                                    
+                                     {{-- PRICE --}}
+                                    @php
+                                        $displayPrice = $item->price ?? $item->monthly_price ?? $item->base_monthly_price ?? 0;
+                                    @endphp
+                                    <div class="mt-1">
+                                        <span class="text-xl font-bold price-display" data-base-price="{{ $displayPrice }}">
+                                            ₹{{ number_format($displayPrice) }}
+                                        </span>
+
+                                        <span class="text-sm text-gray-500">
+                                            {{ request('duration') === 'weekly' ? '/ Week' : '/ Month' }}
+                                        </span>
+                                    </div>
+
+
+                                    @if(
+                                        request('duration') !== 'weekly'
+                                        && !empty($item->monthly_price)
+                                        && $item->monthly_price > 0
+                                        && !empty($item->base_monthly_price)
+                                        && $item->base_monthly_price > $item->monthly_price
+                                    )
+                                        <div class="text-xs mt-1">
+                                            <span class="line-through text-red-500">
+                                                ₹{{ number_format($item->base_monthly_price) }}
+                                            </span>
+                                            <span class="ml-1 bg-green-200 text-green-700 px-2 py-0.5 rounded">
+                                                ₹{{ number_format($item->base_monthly_price - $item->monthly_price) }} OFF
+                                            </span>
+                                        </div>
+                                    @endif
+                                    <!-- <p class="text-xs text-gray-500 my-2">
+                                        Taxes excluded
+                                    </p> -->
+
+                                    {{-- GAZEFLOW --}}
+                                    @if($item->expected_eyeball)
+                                        <p class="text-xs text-gray-500 my-1">
+                                            Approx {{ number_format($item->expected_eyeball) }} daily eyeballs
+                                        </p>
+                                    @endif                                    
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="bg-white p-4 text-center text-gray-500 rounded border">
+                            No hoardings found.
+                        </div>
+                    @endforelse
+                </div>
+                {{-- LEFT: MAP --}}
+                <div class="w-2/3">
+                    <div class="bg-gray-300 rounded-xl h-[700px] flex items-center justify-center">
+                        <div class="rounded-xl overflow-hidden h-[700px] w-full">
+                            <div id="priceMap" class="h-full w-full"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @if($results->total() > $results->perPage())
+                <div class="mt-6 flex justify-end">
+                    {{ $results->links('pagination.vendor-compact') }}
+                </div>
+            @endif
+        </div>
+    </div>
