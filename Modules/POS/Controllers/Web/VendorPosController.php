@@ -881,53 +881,134 @@ class VendorPosController extends Controller
     public function searchCustomers(Request $request): JsonResponse
     {
         try {
-            $search   = $request->get('search', '');
+            $search = trim($request->get('search', ''));
             $vendorId = $this->resolveEffectiveVendorId($request);
 
             if (strlen($search) < 2) {
                 return response()->json([
                     'success' => true,
-                    'data'    => [],
+                    'data' => [],
                     'message' => 'Search term must be at least 2 characters',
                 ]);
             }
 
-            // pos_customers table mein jo is vendor ke liye registered hain
-            $posCustomerUserIds = PosCustomer::where('vendor_id', $vendorId)
-                ->whereNotNull('user_id')
-                ->pluck('user_id')
-                ->toArray();
+            // Customers linked to this vendor through bookings
+            $bookingCustomerIds = POSBooking::where('vendor_id', $vendorId)
+                ->whereNotNull('customer_id')
+                ->pluck('customer_id');
 
-            $customers = User::query()
-                ->where(function ($q) use ($posCustomerUserIds) {
-                    // active_role = 'customer' ho
-                    $q->where('active_role', 'customer')
-                        // ya pos_customers mein ho is vendor ke liye
-                        ->orWhereIn('id', $posCustomerUserIds);
-                })
-                ->where(function ($q) use ($search) {
-                    $q->where('name',  'like', "%{$search}%")
+            // Customers linked through POS profiles
+            $posProfileUserIds = PosCustomer::where('vendor_id', $vendorId)
+                ->whereNotNull('user_id')
+                ->pluck('user_id');
+
+            // Merge both customer sources
+            $allUserIds = $bookingCustomerIds
+                ->merge($posProfileUserIds)
+                ->unique()
+                ->filter()
+                ->values();
+
+            $customers = User::whereIn('id', $allUserIds)
+                ->with([
+                    'posProfile' => function ($q) use ($vendorId) {
+                        $q->where('vendor_id', $vendorId);
+                    }
+                ])
+                ->where(function ($q) use ($search, $vendorId) {
+                    $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhereHas('posProfile', function ($q2) use ($search, $vendorId) {
+                            $q2->where('vendor_id', $vendorId)
+                            ->where('business_name', 'like', "%{$search}%");
+                        });
                 })
-                ->select(['id', 'name', 'email', 'phone', 'gstin', 'address', 'billing_address', 'billing_city', 'billing_state', 'billing_pincode'])
+                ->orderBy('name')
                 ->limit(10)
-                ->get();
+                ->get()
+                ->map(function (User $user) use ($vendorId) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->posProfile?->business_name ?? $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'gstin' => $user->gstin,
+                        'address' => $user->address,
+                        'billing_address' => $user->billing_address,
+                        'billing_city' => $user->billing_city,
+                        'billing_state' => $user->billing_state,
+                        'billing_pincode' => $user->billing_pincode,
+                    ];
+                });
 
             return response()->json([
                 'success' => true,
-                'data'    => $customers,
-                'count'   => $customers->count(),
+                'data' => $customers,
+                'count' => $customers->count(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Error searching customers', ['error' => $e->getMessage()]);
+            Log::error('Error searching customers', [
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to search customers',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
+    // public function searchCustomers(Request $request): JsonResponse
+    // {
+    //     try {
+    //         $search   = $request->get('search', '');
+    //         $vendorId = $this->resolveEffectiveVendorId($request);
+
+    //         if (strlen($search) < 2) {
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'data'    => [],
+    //                 'message' => 'Search term must be at least 2 characters',
+    //             ]);
+    //         }
+
+    //         // pos_customers table mein jo is vendor ke liye registered hain
+    //         $posCustomerUserIds = PosCustomer::where('vendor_id', $vendorId)
+    //             ->whereNotNull('user_id')
+    //             ->pluck('user_id')
+    //             ->toArray();
+
+    //         $customers = User::query()
+    //             ->where(function ($q) use ($posCustomerUserIds) {
+    //                 // active_role = 'customer' ho
+    //                 $q->where('active_role', 'customer')
+    //                     // ya pos_customers mein ho is vendor ke liye
+    //                     ->orWhereIn('id', $posCustomerUserIds);
+    //             })
+    //             ->where(function ($q) use ($search) {
+    //                 $q->where('name',  'like', "%{$search}%")
+    //                     ->orWhere('email', 'like', "%{$search}%")
+    //                     ->orWhere('phone', 'like', "%{$search}%");
+    //             })
+    //             ->select(['id', 'name', 'email', 'phone', 'gstin', 'address', 'billing_address', 'billing_city', 'billing_state', 'billing_pincode'])
+    //             ->limit(10)
+    //             ->get();
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'data'    => $customers,
+    //             'count'   => $customers->count(),
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         Log::error('Error searching customers', ['error' => $e->getMessage()]);
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Failed to search customers',
+    //             'error'   => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     /**
      * Calculate total price with GST
