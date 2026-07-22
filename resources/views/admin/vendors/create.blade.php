@@ -143,7 +143,18 @@ Business Details
        required>
 @error('address') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
 </div>
-
+<div>
+<label class="block mb-1">Pincode <span class="text-red-500">*</span></label>
+<input type="text"
+       name="pincode"
+       maxlength="6"
+       id="pincodeField"
+       value="{{ old('pincode') }}"
+       class="border rounded px-3 py-2 w-full"
+       autocomplete="off"
+       required>
+@error('pincode') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+</div>
 <div>
 <label class="block mb-1">City <span class="text-red-500">*</span></label>
 <input type="text"
@@ -168,18 +179,7 @@ Business Details
 @error('state') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
 </div>
 
-<div>
-<label class="block mb-1">Pincode <span class="text-red-500">*</span></label>
-<input type="text"
-       name="pincode"
-       maxlength="6"
-       id="pincodeField"
-       value="{{ old('pincode') }}"
-       class="border rounded px-3 py-2 w-full"
-       autocomplete="off"
-       required>
-@error('pincode') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-</div>
+
 
 </div>
 

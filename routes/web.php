@@ -18,7 +18,7 @@ use App\Http\Controllers\Admin\RazorpaySettingsController;
 
 /**
  * OOHAPP Web Routes (Blade Server-Rendered Pages)
- * 
+ *
  * Multi-panel application:
  * - Customer Web Panel (/)
  * - Vendor Web Panel (/vendor/*)
@@ -257,6 +257,8 @@ Route::middleware(['auth'])->group(function () {
 });
 Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
 Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
+Route::post('/cart/remove-multiple', [CartController::class, 'removeMultiple'])->name('cart.removeMultiple');
+Route::post('/cart/clear', [CartController::class, 'clear'])->name('cart.clear');
 Route::post('/cart/select-package', [CartController::class, 'selectPackage'])->name('cart.selectPackage');
 Route::get('/cart', [\Modules\Cart\Controllers\Web\CartController::class, 'index'])->name('cart.index');
 Route::get('/hoardings', [\App\Http\Controllers\Web\HoardingController::class, 'index'])->name('hoardings.index');
@@ -996,13 +998,13 @@ Route::middleware(['auth', 'role:admin|superadmin'])->prefix('admin')->name('adm
 
     // Admin: View draft hoardings
     Route::get('hoardings/drafts', [\Modules\Hoardings\Http\Controllers\Admin\VendorHoardingController::class, 'drafts'])->name('hoardings.drafts');
-    
+
     // Admin: Add Hoardings (Multi-step wizard - OOH/DOOH) - MUST come before {id} route
     Route::get('hoardings/add', [\Modules\Admin\Controllers\Web\Hoardings\HoardingCreateController::class, 'showTypeSelection'])->name('hoardings.add');
     Route::post('hoardings/select-type', [\Modules\Admin\Controllers\Web\Hoardings\HoardingCreateController::class, 'handleTypeSelection'])->name('hoardings.select-type');
     Route::get('hoardings/create', [\Modules\Admin\Controllers\Web\Hoardings\HoardingCreateController::class, 'create'])->name('hoardings.create');
     Route::post('hoardings/store', [\Modules\Admin\Controllers\Web\Hoardings\HoardingCreateController::class, 'store'])->name('hoardings.store');
-    
+
     // Admin: View admin-owned hoardings (My Hoardings)
     Route::get('my-hoardings', [\Modules\Hoardings\Http\Controllers\Admin\AdminHoardingController::class, 'adminHoardings'])->name('my-hoardings');
     Route::get('my-hoardings/{id}/edit', [\Modules\Admin\Controllers\Web\Hoardings\HoardingCreateController::class, 'edit'])->name('my-hoardings.edit');
@@ -1010,7 +1012,7 @@ Route::middleware(['auth', 'role:admin|superadmin'])->prefix('admin')->name('adm
     Route::post('my-hoardings/{id}/recommendation', [\Modules\Hoardings\Http\Controllers\Admin\AdminHoardingController::class, 'updateRecommendation'])->name('my-hoardings.recommendation');
     Route::post('my-hoardings/bulk-action', [\Modules\Hoardings\Http\Controllers\Admin\AdminHoardingController::class, 'bulkAction'])->name('my-hoardings.bulk-action');
     Route::delete('my-hoardings/{id}', [\Modules\Hoardings\Http\Controllers\Admin\AdminHoardingController::class, 'destroy'])->name('my-hoardings.destroy');
-    
+
     // Admin: Hoarding Management (Vendor-owned hoardings approval/rejection)
     Route::get('/hoardings', [\Modules\Admin\Controllers\Web\HoardingController::class, 'index'])->name('hoardings.index');
     Route::get('/hoardings/{id}', [\Modules\Admin\Controllers\Web\HoardingController::class, 'show'])->name('hoardings.show');
@@ -1417,7 +1419,7 @@ Route::get('/twilio-test', function () {
 });
 
 
-// To download invoice PDFs for authenticated users 
+// To download invoice PDFs for authenticated users
 Route::middleware(['auth', 'role:customer|admin|vendor'])->prefix('invoices')->name('invoices.')->group(function () {
     Route::get('/{invoice}/download', [\App\Http\Controllers\InvoiceController::class, 'download'])->name('download');
 });

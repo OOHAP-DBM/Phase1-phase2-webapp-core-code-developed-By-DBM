@@ -25,7 +25,7 @@ class VendorOnboardingController extends Controller
 {
     /**
      * STEP RULE:
-     * Email signup → phone verification Optional 
+     * Email signup → phone verification Optional
      * Phone signup → email verification OPTIONAL
      */
     private function upgradeToStepTwo(User $user): void
@@ -101,7 +101,7 @@ class VendorOnboardingController extends Controller
      *     )
      *     ),
      *     @OA\Response(
-     *       response=200, 
+     *       response=200,
      *     description="Verification successful",
      *     @OA\JsonContent(@OA\Property(property="message", type="string", example="Verification successful"))
      *     ),

@@ -5,7 +5,7 @@
             <div class="block md:hidden w-full px-2 pt-2 pb-2 bg-[#FBFBFB] border-b border-gray-100">
                 @include('components.customer.home_search_mobile')
             </div>
-      
+
     </div>
 </header>
 
@@ -78,7 +78,8 @@ function openCart(event) {
             });
             return;
         }
-        window.location.href = "{{ route('cart.index') }}?ids=" + saved.join(',');
+        const cartIds = saved.map(item => typeof item === 'string' ? item : item.hoardingId).join(',');
+        window.location.href = "{{ route('cart.index') }}?ids=" + cartIds;
         return;
     }
 

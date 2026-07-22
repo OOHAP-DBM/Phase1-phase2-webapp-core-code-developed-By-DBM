@@ -51,6 +51,7 @@
                             <div>Business Name : <span>{{ $enquiry->customer->company_name ?? 'N/A' }}</span></div>
                             <div>GSTIN : <span>{{ $enquiry->customer->gstin ?? 'N/A' }}</span></div>
                             <div>Mobile : <span>{{ $enquiry->contact_number ?? $enquiry->customer->phone ?? '' }}</span></div>
+                              <div>Email : <span>{{ $enquiry->email ?? $enquiry->customer->email ?? '' }}</span></div>
                             <div>Address : <span>{{ $enquiry->customer->address ?? $enquiry->customer->billing_address ?? $enquiry->customer->billing_city ?? $enquiry->customer->billing_state ?? '' }}</span></div>
                         </div>
                     </div>
@@ -105,7 +106,7 @@
                         'DOOH' => 'Selected Digital Screens for the offer',
                         'DIGITAL-DOOH' => 'Selected Digital Screens for the offer',
                         'HOARDINGS' => 'Selected hoardings for the offer',
-                    ]; 
+                    ];
                 @endphp
                 @foreach($groups as $type => $items)
                     <div class="mb-8">

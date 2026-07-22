@@ -476,7 +476,8 @@ function openCart(event) {
             });
             return;
         }
-        window.location.href = "{{ route('cart.index') }}?ids=" + saved.join(',');
+        const cartIds = saved.map(item => typeof item === 'string' ? item : item.hoardingId).join(',');
+        window.location.href = "{{ route('cart.index') }}?ids=" + cartIds;
         return;
     }
 
