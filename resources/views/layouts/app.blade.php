@@ -85,7 +85,7 @@
             "height": 512
           },
           "telephone": "+91 8118805835",
-          "email": "info@oohapp.io",
+          "email": "enquiry@oohapp.io",
           "foundingDate": "2022",
           "areaServed": { "@type": "Country", "name": "India" }
         },
@@ -97,7 +97,7 @@
           "url": "https://oohapp.io/",
           "image": { "@type": "ImageObject", "url": "https://oohapp.io/assets/images/favicon/Vector%20(1).png" },
           "telephone": "+91 8118805835",
-          "email": "info@oohapp.io",
+          "email": "enquiry@oohapp.io",
           "priceRange": "INR"
         },
         {
@@ -113,9 +113,9 @@
 
 </head>
 <body class="antialiased">
-    <div id="app" class="min-h-screen bg-white">
+    <div id="app" class="min-h-screen bg-white w-full ">
         <!-- Main Content -->
-        <main class="md:mt-16 mt-28 md:mt-5">
+        <main class="mt-[90px]">
             @yield('content')
         </main>
 
@@ -154,12 +154,18 @@
                 b.style.display = savedWishlist.length > 0 ? 'flex' : 'none';
             });
 
-            // ─── Cart buttons restore ─────────────────────────────
-            const savedCart = JSON.parse(localStorage.getItem('guest_cart') || '[]');
+            // ─── Cart buttons restore (with new format support) ────────────────────────────
+            let savedCart = JSON.parse(localStorage.getItem('guest_cart') || '[]');
+
+            // Convert old format (array of IDs) to new format (array of objects)
+            savedCart = savedCart.map(item => typeof item === 'string' ? { hoardingId: item, vendorId: null } : item);
+
+            // Create a set of hoarding IDs for quick lookup
+            const cartIds = new Set(savedCart.map(item => String(item.hoardingId)));
 
             document.querySelectorAll('.cart-btn').forEach(function (btn) {
                 const id = String(btn.dataset.id);
-                const inCart = savedCart.includes(id);
+                const inCart = cartIds.has(id);
                 applyCartUI(btn, inCart);
             });
 
@@ -189,7 +195,7 @@
                 btn.textContent = 'Remove';
                 btn.classList.add('remove');
             } else {
-                btn.textContent = 'Add to Shortlist';
+                btn.textContent = 'Shortlist';
                 btn.classList.add('add');
             }
         }
@@ -234,34 +240,70 @@
 
         window.toggleCart = function (btn, hoardingId) {
             const isAuth = btn.dataset.auth === '1';
+            const vendorId = btn.dataset.vendorId;
             const inCart = btn.dataset.inCart === '1';
 
-            /* ─── GUEST — LocalStorage ─── */
+            /* ─── GUEST — LocalStorage with vendor validation ─── */
             if (!isAuth) {
                 let saved = JSON.parse(localStorage.getItem('guest_cart') || '[]');
-                const id  = String(hoardingId);
-                const idx = saved.indexOf(id);
 
-                if (idx === -1) {
-                    // ADD
-                    saved.push(id);
-                    applyCartUI(btn, true);
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Added to shortlist', showConfirmButton: false, timer: 1400 });
-                } else {
+                // Convert old format (array of IDs) to new format (array of objects)
+                saved = saved.map(item => typeof item === 'string' ? { hoardingId: item, vendorId: null } : item);
+
+                const itemIndex = saved.findIndex(item => String(item.hoardingId) === String(hoardingId));
+                const itemExists = itemIndex !== -1;
+
+                if (itemExists) {
                     // REMOVE
-                    saved.splice(idx, 1);
+                    saved.splice(itemIndex, 1);
                     applyCartUI(btn, false);
 
                     // ── Cart page pe ho toh: card hatao, URL update karo ──
                     if (window.location.pathname.includes('cart') || window.location.search.includes('ids=')) {
                         const card = btn.closest('.bg-white.border');
                         if (card) card.remove();
-                        updateCartUrl(saved);
+                        updateCartUrl(saved.map(item => item.hoardingId));
                         updateCartPageCount(saved.length);
                         setTimeout(function () { location.reload(); }, 400);
                     }
 
                     Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Removed from shortlist', showConfirmButton: false, timer: 1400 });
+                } else {
+                    // ADD - Check for vendor conflict
+                    if (saved.length > 0 && saved[0].vendorId && String(saved[0].vendorId) !== String(vendorId)) {
+                        // VENDOR CONFLICT in guest mode
+                        Swal.fire({
+                            title: 'Different Vendor Hoardings',
+                            html: '<p>Your cart already contains hoardings from a different vendor.</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, Remove & Add',
+                            cancelButtonText: 'Keep Existing Cart'
+                        }).then(function (result) {
+                            if (result.isConfirmed) {
+                                // Clear cart and add new hoarding
+                                saved = [{ hoardingId: String(hoardingId), vendorId: String(vendorId) }];
+                                localStorage.setItem('guest_cart', JSON.stringify(saved));
+                                applyCartUI(btn, true);
+
+                                // Update header badge
+                                document.querySelectorAll('.cart-count').forEach(function (b) {
+                                    b.textContent = saved.length;
+                                    b.style.display = saved.length > 0 ? 'flex' : 'none';
+                                });
+
+                                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Added to shortlist', showConfirmButton: false, timer: 1400 });
+                            }
+                        });
+                        return;
+                    }
+
+                    // No conflict - add the hoarding
+                    saved.push({ hoardingId: String(hoardingId), vendorId: String(vendorId) });
+                    applyCartUI(btn, true);
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Added to shortlist', showConfirmButton: false, timer: 1400 });
                 }
 
                 localStorage.setItem('guest_cart', JSON.stringify(saved));
@@ -274,12 +316,16 @@
                 return;
             }
 
-            /* ─── LOGGED IN — DB ─── */
+            /* ─── LOGGED IN — DB with vendor validation ─── */
             const url = inCart
                 ? "{{ route('cart.remove') }}"
                 : "{{ route('cart.add') }}";
 
             btn.disabled = true;
+
+            const payload = inCart
+                ? { hoarding_id: hoardingId }
+                : { hoarding_id: hoardingId, vendor_id: vendorId };
 
             fetch(url, {
                 method: 'POST',
@@ -288,25 +334,91 @@
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ hoarding_id: hoardingId })
+                body: JSON.stringify(payload)
             })
             .then(function (res) {
                 if (res.status === 401 || res.status === 419) {
                     window.location.href = '/login?intended=' + encodeURIComponent(window.location.href);
-                    return;
+                    return null;
                 }
                 return res.json();
             })
             .then(function (data) {
                 if (!data) return;
+
+                // ─── VENDOR CONFLICT DETECTED ─────────────────────
+                if (data.status === 'vendor_conflict') {
+                    Swal.fire({
+                        title: 'Different Vendor Hoardings',
+                        html: '<p>' + data.message + '</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: 'Yes, Remove & Add',
+                        cancelButtonText: 'Keep Existing Cart'
+                    }).then(function (result) {
+                        if (result.isConfirmed) {
+                            // Clear cart and then add new hoarding
+                            fetch("{{ route('cart.clear') }}", {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                            .then(res => res.json())
+                            .then(() => {
+                                // Now add the new hoarding
+                                fetch("{{ route('cart.add') }}", {
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                        'Accept': 'application/json',
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ hoarding_id: hoardingId, vendor_id: vendorId })
+                                })
+                                .then(res => res.json())
+                                .then(addData => {
+                                    if (addData.status === 'added') {
+                                        applyCartUI(btn, true);
+                                        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Hoarding added to cart', showConfirmButton: false, timer: 1400 });
+                                        setTimeout(function () { location.reload(); }, 800);
+                                    }
+                                })
+                                .catch(() => {
+                                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to add hoarding', showConfirmButton: false, timer: 2000 });
+                                });
+                            })
+                            .catch(() => {
+                                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to clear cart', showConfirmButton: false, timer: 2000 });
+                            })
+                            .finally(function () { btn.disabled = false; });
+                        } else {
+                            btn.disabled = false;
+                        }
+                    });
+                    return;
+                }
+
+                // ─── VENDOR MISMATCH ERROR ──────────────────────
+                if (data.status === 'vendor_mismatch') {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message, showConfirmButton: false, timer: 2000 });
+                    btn.disabled = false;
+                    return;
+                }
+
+                // ─── SUCCESS ─────────────────────────────────────
                 applyCartUI(btn, data.in_cart);
                 Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: data.message, showConfirmButton: false, timer: 1400 });
                 setTimeout(function () { location.reload(); }, 800);
             })
             .catch(function () {
                 Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Server error occurred', showConfirmButton: false, timer: 2000 });
-            })
-            .finally(function () { btn.disabled = false; });
+                btn.disabled = false;
+            });
         };
     </script>
 
@@ -504,9 +616,12 @@
         @if(session('merge_guest_data') && auth()->check())
             document.addEventListener('DOMContentLoaded', function () {
                 const wishlist = JSON.parse(localStorage.getItem('guest_wishlist') || '[]');
-                const cart     = JSON.parse(localStorage.getItem('guest_cart') || '[]');
+                let cart       = JSON.parse(localStorage.getItem('guest_cart') || '[]');
 
                 if (wishlist.length === 0 && cart.length === 0) return;
+
+                // Extract hoarding IDs from cart objects for merge
+                cart = cart.map(item => typeof item === 'string' ? item : item.hoardingId);
 
                 fetch('/guest/merge', {
                     method: 'POST',

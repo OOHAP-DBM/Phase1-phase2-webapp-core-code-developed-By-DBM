@@ -2,7 +2,7 @@
     <div class="max-w-[1460px] mx-auto px-6 py-6">
 
         @if($results->total() > 0)
-            <h2 class="text-lg text-black font-semibold mb-4 mt-5">
+            <h2 class="text-lg text-black font-semibold mb-4 mt-5 ">
                 {{ $results->total() }} Hoardings in {{ request('location') ?? 'India' }}
             </h2>
 
@@ -269,6 +269,7 @@
                                         id="cart-btn-{{ $item->id }}"
                                         class="cart-btn border border-[#c7c7c7] px-4 py-1.5 rounded text-sm whitespace-nowrap min-w-[96px] cursor-pointer"
                                         data-id="{{ $item->id }}"
+                                        data-vendor-id="{{ $item->vendor_id }}"
                                         data-in-cart="{{ in_array($item->id, $cartHoardingIds) ? '1' : '0' }}"
                                         data-auth="{{ auth()->check() ? '1' : '0' }}"
                                         onclick="event.preventDefault(); event.stopPropagation(); toggleCart(this, {{ $item->id }})"

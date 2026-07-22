@@ -83,7 +83,7 @@ class DashboardController extends Controller
 
                 ];
             })->toArray();
-
+            // dd($topHoardings);
         // Get Booking stats
         $bookingStatsQuery = Booking::where('vendor_id', $userId);
 

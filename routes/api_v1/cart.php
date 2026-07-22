@@ -11,4 +11,6 @@ Route::get('list', [CartController::class, 'list']);
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('add', [CartController::class, 'add']);
     Route::delete('remove/{hoardingId}', [CartController::class, 'remove']);
+    Route::post('remove-multiple', [CartController::class, 'removeMultiple']);
+    Route::post('clear', [CartController::class, 'clear']);
 });

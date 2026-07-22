@@ -227,8 +227,9 @@
         <div class="btn-group">
             <form action="{{ route('admin.settings.clear-cache') }}" method="POST" class="d-inline">
                 @csrf
-                <button type="submit" class="btn btn-outline-primary">
-                    <i class="bi bi-arrow-clockwise"></i> Clear Cache
+               <button type="submit" class="btn btn-primary save-btn">
+                    <i class="bi bi-arrow-clockwise" style="color: white;"></i>
+                    Clear Cache
                 </button>
             </form>
         </div>
@@ -268,7 +269,7 @@
     {{-- <ul class="nav nav-tabs settings-tabs" role="tablist">
         @foreach($groups as $groupKey => $groupLabel)
         <li class="nav-item" role="presentation">
-            <a class="nav-link {{ $activeGroup === $groupKey ? 'active' : '' }}" 
+            <a class="nav-link {{ $activeGroup === $groupKey ? 'active' : '' }}"
                href="{{ route('admin.settings.index', ['group' => $groupKey]) }}">
                 @switch($groupKey)
                     @case('general')

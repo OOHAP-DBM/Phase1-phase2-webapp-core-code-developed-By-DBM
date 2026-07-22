@@ -15,6 +15,7 @@ class CartService
      ===================================================== */
     public function add(
         int $hoardingId,
+        int $vendorId,
         ?int $packageId = null,
         ?string $packageSource = null
     ): array {
@@ -26,6 +27,30 @@ class CartService
         $hoarding = Hoarding::where('status', 'active')
             ->whereNull('deleted_at')
             ->findOrFail($hoardingId);
+
+        // Validate vendor ownership
+        if ($hoarding->vendor_id !== $vendorId) {
+            return $this->response(
+                'vendor_mismatch',
+                false,
+                'This hoarding does not belong to the specified vendor'
+            );
+        }
+
+        // Check if cart already has hoardings from a different vendor
+        $existingVendorId = DB::table('carts')
+            ->join('hoardings', 'hoardings.id', '=', 'carts.hoarding_id')
+            ->where('carts.user_id', Auth::id())
+            ->whereNull('hoardings.deleted_at')
+            ->value('hoardings.vendor_id');
+
+        if ($existingVendorId && $existingVendorId !== $vendorId) {
+            return $this->response(
+                'vendor_conflict',
+                false,
+                'Your cart currently has hoardings from another vendor. You can only book hoardings from one vendor at a time.'
+            );
+        }
 
         // 🔥 FORCE ADD (idempotent behaviour optional)
         DB::table('carts')->updateOrInsert(
@@ -64,6 +89,34 @@ class CartService
             ->delete();
 
         return $this->response('removed', false, 'Item removed from cart');
+    }
+
+    /**
+     * Remove multiple hoardings from cart
+     * Pass array of hoarding IDs or 'all' to clear entire cart
+     */
+    public function removeMultiple($hoardingIds): array
+    {
+        if ($hoardingIds === 'all') {
+            // Clear entire cart
+            DB::table('carts')
+                ->where('user_id', Auth::id())
+                ->delete();
+
+            return $this->response('cleared', false, 'Cart cleared successfully');
+        }
+
+        if (!is_array($hoardingIds) || empty($hoardingIds)) {
+            return $this->response('invalid_input', false, 'Please provide valid hoarding IDs');
+        }
+
+        // Remove specified hoardings
+        DB::table('carts')
+            ->where('user_id', Auth::id())
+            ->whereIn('hoarding_id', $hoardingIds)
+            ->delete();
+
+        return $this->response('removed', false, 'Items removed from cart');
     }
 
     /* =====================================================
@@ -153,6 +206,7 @@ class CartService
                 'carts.id as cart_id',
                 'carts.package_id',
                 'hoardings.id as hoarding_id',
+                'hoardings.vendor_id',
                 'hoardings.title',
                 'hoardings.slug',
                 'hoardings.city',
