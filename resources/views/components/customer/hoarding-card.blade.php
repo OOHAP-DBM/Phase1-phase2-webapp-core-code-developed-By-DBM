@@ -191,6 +191,7 @@
                 <button
                     id="cart-btn-{{ $hoarding->id }}"
                     data-id="{{ $hoarding->id }}"
+                    data-vendor-id="{{ $hoarding->vendor_id }}"
                     data-in-cart="{{ $isInCart ? '1' : '0' }}"
                     data-auth="{{ auth()->check() ? '1' : '0' }}"
                     onclick="event.preventDefault(); event.stopPropagation(); toggleCart(this, {{ $hoarding->id }})"

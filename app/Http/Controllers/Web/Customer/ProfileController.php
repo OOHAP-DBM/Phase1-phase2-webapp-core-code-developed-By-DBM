@@ -269,7 +269,7 @@ class ProfileController extends Controller
          */
         if ($validated['email'] !== $user->email) {
             $updateData['email'] = $validated['email'];
-            $updateData['email_verified_at'] = null; 
+            $updateData['email_verified_at'] = null;
         }
 
         /**
@@ -280,7 +280,7 @@ class ProfileController extends Controller
             $updateData['phone_verified_at'] = null;
         }
 
-       
+
         $user->update($updateData);
 
         return redirect()
