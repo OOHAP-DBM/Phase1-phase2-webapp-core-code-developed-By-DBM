@@ -2,10 +2,10 @@
     <!-- Desktop/Tablet Navbar -->
     <div >
         <div class="w-full px-6 md:px-10 lg:px-20 pr-4 hidden md:block">
-           
+
             <div class="flex items-center justify-between  gap-4 ">
 
-           
+
                 <div class="flex items-center gap-3 ">
                     <!-- Logo -->
                     <div class="flex items-center flex-shrink-0">
@@ -22,11 +22,11 @@
                 </div>
 
                 <!-- Search Bar (Desktop & Tablet only) -->
-         
+
                 <div class="hidden md:flex flex-1 justify-center px-6">
                     @include('components.customer.home-search')
                 </div>
-                
+
 
                 <!-- Right Side Icons: User, Bookmark, Cart -->
                 <div class="flex items-center space-x-4 lg:space-x-5">
@@ -42,7 +42,7 @@
                             </svg>
                         </a>
 
-                        
+
                         <div id="userDropdown"
                             class="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg hidden z-50">
 
@@ -109,9 +109,9 @@
                         </div>
                     </div> -->
 
-                    
 
-                
+
+
 
                     <!-- Cart Icon -->
                     <a href="javascript:void(0)"
@@ -177,7 +177,7 @@
                             </svg>
                         </button>
                     </div>
-                   
+
 
                 </div>
             </div>
@@ -205,7 +205,7 @@
             @endif
 
             <!-- Mobile Navigation Menu (Slide-in) -->
-            <div id="mobile-menu"
+           {{-- <div id="mobile-menu"
                      class="absolute right-15 mt-3 w-72 bg-white border border-gray-200 rounded-xl shadow-lg hidden z-50">
                 <div class="p-4 space-y-2 text-sm">
                     <!-- HEADER -->
@@ -214,7 +214,7 @@
                                 <x-optimized-image
                                     :src="route('brand.oohapp-logo')"
                                     alt="OOHApp  logo"
-                                
+
                                     width="150"
                                     height="48"
                                     style="max-height:48px;object-fit:contain;"
@@ -225,6 +225,59 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
                         </button> -->
+                    </div> --}}
+                     <!-- Mobile Navigation Menu (Slide-in) -->
+            <div id="mobile-menu"
+                     class="absolute right-15 mt-3 w-72 bg-white border border-gray-200 rounded-xl shadow-lg hidden z-50">
+                <div class="p-4 space-y-2 text-sm">
+                    <!-- HEADER -->
+                    <div class=" items-center justify-between px-2   border-gray-200">
+                        <div class="flex items-center gap-4">
+
+                        {{-- Avatar --}}
+                        <div  class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200 shrink-0">
+
+                        @auth
+                            @if(auth()->user()->avatar)
+                                <img
+                                    src="{{ asset('storage/' . auth()->user()->avatar) }}"
+                                    alt="Profile"
+                                    class="w-full h-full object-cover">
+                            @else
+                                <svg class="w-8 h-8 md:w-10 md:h-10 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            @endif
+                        @else
+                            <svg class="w-8 h-8 md:w-10 md:h-10 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        @endauth
+
+                    </div>
+                                    {{-- Name --}}
+                                    <div class="flex flex-col justify-center">
+                        <h2 class="text-lg md:text-xl font-semibold text-gray-800">
+                            {{ auth()->user()?->name ?? 'Guest' }}
+                        </h2>
+
+                        <p class="text-sm text-gray-500">
+                            {{ auth()->check() ? 'Customer' : 'Guest Mode' }}
+                        </p>
+                    </div>
+
                     </div>
 
                     <!-- MENU LINKS -->
@@ -252,6 +305,17 @@
                                 <path fill-rule="evenodd" clip-rule="evenodd" d="M3.5 4.25C3.5 3.69188 3.60993 3.13923 3.82351 2.6236C4.03709 2.10796 4.35015 1.63945 4.7448 1.2448C5.13944 0.850147 5.60796 0.537094 6.1236 0.323512C6.63923 0.109929 7.19188 0 7.75 0C8.30812 0 8.86077 0.109929 9.3764 0.323512C9.89204 0.537094 10.3606 0.850147 10.7552 1.2448C11.1499 1.63945 11.4629 2.10796 11.6765 2.6236C11.8901 3.13923 12 3.69188 12 4.25C12 5.37717 11.5522 6.45817 10.7552 7.2552C9.95817 8.05223 8.87717 8.5 7.75 8.5C6.62283 8.5 5.54183 8.05223 4.7448 7.2552C3.94777 6.45817 3.5 5.37717 3.5 4.25ZM7.75 1.5C7.02065 1.5 6.32118 1.78973 5.80546 2.30546C5.28973 2.82118 5 3.52065 5 4.25C5 4.97935 5.28973 5.67882 5.80546 6.19454C6.32118 6.71027 7.02065 7 7.75 7C8.47935 7 9.17882 6.71027 9.69454 6.19454C10.2103 5.67882 10.5 4.97935 10.5 4.25C10.5 3.52065 10.2103 2.82118 9.69454 2.30546C9.17882 1.78973 8.47935 1.5 7.75 1.5ZM3.75 11.5C3.15326 11.5 2.58097 11.7371 2.15901 12.159C1.73705 12.581 1.5 13.1533 1.5 13.75V14.938C1.5 14.956 1.513 14.972 1.531 14.975C5.65 15.647 9.851 15.647 13.969 14.975C13.9775 14.9731 13.9851 14.9684 13.9907 14.9617C13.9963 14.955 13.9996 14.9467 14 14.938V13.75C14 13.1533 13.7629 12.581 13.341 12.159C12.919 11.7371 12.3467 11.5 11.75 11.5H11.41C11.3832 11.5005 11.3567 11.5045 11.331 11.512L10.466 11.795C8.70118 12.3713 6.79882 12.3713 5.034 11.795L4.168 11.512C4.14296 11.5047 4.11708 11.5006 4.091 11.5H3.75ZM0 13.75C0 12.7554 0.395088 11.8016 1.09835 11.0983C1.80161 10.3951 2.75544 10 3.75 10H4.09C4.27667 10.0007 4.458 10.0293 4.634 10.086L5.5 10.369C6.96203 10.8463 8.53797 10.8463 10 10.369L10.866 10.086C11.041 10.029 11.225 10 11.409 10H11.75C12.7446 10 13.6984 10.3951 14.4017 11.0983C15.1049 11.8016 15.5 12.7554 15.5 13.75V14.938C15.5 15.692 14.954 16.334 14.21 16.455C9.93164 17.1534 5.56836 17.1534 1.29 16.455C0.930184 16.3958 0.603047 16.2108 0.366821 15.9331C0.130596 15.6553 0.000609175 15.3027 0 14.938V13.75Z" fill="#6E6E6E"/>
                                 </svg>
                                 SIGN UP
+                            </a>
+                        @endauth
+                        @auth
+                            <a href="{{ route('customer.profile.index') }}"
+                            class="flex items-center gap-3 px-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 transition">
+
+                                <svg width="32" height="30" viewBox="0 0 32 30" fill="none">
+                                    <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
+                                </svg>
+
+                                My Profile
                             </a>
                         @endauth
 
@@ -394,14 +458,34 @@
 
                             OOH
                         </a>
+                         <form method="POST" action="{{ route('logout') }}">
+                            @csrf
 
-                     
+                            <button
+                                type="submit"
+                                class="w-full flex items-center gap-3 px-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-red-600 transition cursor-pointer">
+
+                                <svg width="32" height="30" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M10 17L15 12L10 7M15 12H3M21 3V21"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"/>
+                                </svg>
+
+                                Logout
+                            </button>
+                        </form>
+
+
                     </div>
                 </div>
             </div>
         </div>
     @include('components.customer.mobile_navbar')
-           
+
     </div>
 </header>
 
