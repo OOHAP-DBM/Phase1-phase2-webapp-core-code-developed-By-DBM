@@ -78,6 +78,7 @@
                                                 $profileUrl   = route('customer.profile.index');
                                             }
                                         }
+
                                     @endphp
                                     <a href="{{ $profileUrl }}" class="block">
                                         <div class="bg-black text-white rounded-md px-3 py-2 hover:bg-gray-900 transition">
@@ -273,8 +274,20 @@
                             {{ auth()->user()?->name ?? 'Guest' }}
                         </h2>
 
-                        <p class="text-sm text-gray-500">
-                            {{ auth()->check() ? 'Customer' : 'Guest Mode' }}
+                       <p class="text-sm text-gray-500">
+                            @auth
+                                @if(auth()->user()->hasRole('admin'))
+                                    Admin
+                                @elseif(auth()->user()->hasRole('vendor'))
+                                    Vendor
+                                @elseif(auth()->user()->hasRole('customer'))
+                                    Customer
+                                @else
+                                    User
+                                @endif
+                            @else
+                                Guest Mode
+                            @endauth
                         </p>
                     </div>
 
@@ -308,14 +321,14 @@
                             </a>
                         @endauth
                         @auth
-                            <a href="{{ route('customer.profile.index') }}"
+                            <a href="{{ $profileUrl }}"
                             class="flex items-center gap-3 px-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 transition">
 
                                 <svg width="32" height="30" viewBox="0 0 32 30" fill="none">
                                     <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
                                 </svg>
 
-                                My Profile
+                                MY PROFILE
                             </a>
                         @endauth
 
@@ -475,7 +488,7 @@
                                         stroke-linejoin="round"/>
                                 </svg>
 
-                                Logout
+                                LOGOUT
                             </button>
                         </form>
 
