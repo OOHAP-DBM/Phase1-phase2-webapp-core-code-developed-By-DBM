@@ -183,9 +183,9 @@
                     <div class="alert alert-success border-0 shadow-sm rounded-3 py-3 ps-3 mb-3 position-relative">
                         {{ session('success') }}
                         @if (session('logout_time'))
-                            <div class="small text-muted mt-1">
+                            {{-- <div class="small text-muted mt-1">
                                 Logout Time: {{ \Carbon\Carbon::parse(session('logout_time'))->format('d/m/Y H:i:s') }}
-                            </div>
+                            </div> --}}
                         @endif
 
                         <button type="button"
@@ -270,7 +270,7 @@
                         Continue
                     </button>
 
-                    
+
                     <!-- Remember Me Checkbox -->
                     <div class="mt-4 text-start">
                         <div class="form-check">
