@@ -190,7 +190,7 @@
                     </div>
                 </div>
             </div>
-        </div> 
+        </div>
 
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 sm:px-6 py-1">
 
@@ -214,7 +214,7 @@
 
         </div>
 
-       
+
         <div class="bg-[#f7f7f7] px-3 sm:px-5 py-3">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h3 class="text-sm font-semibold">
@@ -243,7 +243,7 @@
 
                 @forelse($groupedItems as $type => $items)
                     <div class="mb-8">
-                        
+
                         {{-- Group Header --}}
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between bg-gray-100 px-4 py-2 rounded text-sm font-semibold border border-gray-300 mb-3">
                             <div class="flex items-center gap-2">
@@ -285,7 +285,7 @@
                                             <td class="px-4 py-3 text-gray-600 font-medium whitespace-nowrap">
                                                 {{ $index + 1 }}
                                             </td>
-                                            
+
                                             {{-- Image & Details --}}
                                             <td class="px-4 py-3 min-w-[280px]">
                                                 <a
@@ -324,7 +324,7 @@
                                                     </div>
                                                 </a>
                                             </td>
-                                            
+
                                             {{-- Package --}}
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="space-y-1">
@@ -337,7 +337,7 @@
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <div class="space-y-1">
                                                     <p class="font-medium text-gray-900">
-                                                        <span>{{ \Carbon\Carbon::parse($item->preferred_start_date)->format('d M Y') }}</span>                                                
+                                                        <span>{{ \Carbon\Carbon::parse($item->preferred_start_date)->format('d M Y') }}</span>
                                                     </p>
                                                 </div>
                                             </td>
@@ -354,7 +354,7 @@
                                                 </div>
                                             </td>
 
-                                            
+
                                             {{-- Vendor --}}
                                                                                         <td class="px-4 py-3 text-right text-gray-900 font-medium whitespace-nowrap">
                                                 <span>₹ {{ $item->final_price}}</span>
@@ -404,7 +404,8 @@
                                         {{ $offer->vendor->name ?? 'N/A' }}
                                     </td>
                                     <td class="px-4 py-3 text-center">
-                                        <span class="text-gray-900 font-semibold">{{ $offer->items->count() ?? 0 }}</span>
+
+                                        <span class="text-gray-900 font-semibold">0</span>
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap">
                                         <span class="inline-block px-2 py-1 rounded text-xs font-semibold

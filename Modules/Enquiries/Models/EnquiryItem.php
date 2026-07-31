@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\Hoarding; 
+use App\Models\Hoarding;
 use Modules\Enquiries\Models\Enquiry;
-use  Modules\Hoardings\Models\HoardingPackage;   
+use  Modules\Hoardings\Models\HoardingPackage;
 
 class EnquiryItem extends Model
 {
