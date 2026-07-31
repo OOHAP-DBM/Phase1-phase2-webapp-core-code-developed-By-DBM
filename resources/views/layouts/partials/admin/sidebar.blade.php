@@ -10,7 +10,7 @@
             <x-optimized-image
                 :src="route('brand.oohapp-logo')"
                 alt="OOHApp company logo"
-            
+
                 width="150"
                 height="48"
                 style="max-height:48px;object-fit:contain;"
@@ -385,10 +385,10 @@
                         - Direct Enquiries
                     </a>
                 </div>
-            </div>        
+            </div>
         </div>
 
-        
+
             <div
                 x-data="{ open: {{ request()->routeIs('admin.pos.*') ? 'true' : 'false' }} }"
                 class="space-y-1"
@@ -426,9 +426,9 @@
                     </a>
                 </div>
             </div>
-      
+
         <div class="mt-6 mb-2 text-xs font-bold tracking-wider px-2">PEOPLES</div>
-        <div class="space-y-1"> 
+        <div class="space-y-1">
             <div
                 x-data="{ open: @if(request()->routeIs('admin.vendors.*')) true @else false @endif }"
                 class="space-y-1"
@@ -536,7 +536,7 @@
                         - Total Customer's
                     </a>
                 </div>
-            </div> 
+            </div>
 
             <div>
                 <a href="{{ route('admin.commission.index') }}"
@@ -551,7 +551,7 @@
                         Commission
                 </a>
             </div>
-           
+
               <div class="space-y-1">
             <div x-data="{ open: @if(request()->routeIs('admin.settings.*')) true @else false @endif }" class="space-y-1">
                 {{-- Parent: Settings --}}
@@ -606,9 +606,9 @@
                     </svg>
                     LogOut
                 </button>
-            </div> 
+            </div>
         </div>
 
-        
+
     </nav>
 </aside>

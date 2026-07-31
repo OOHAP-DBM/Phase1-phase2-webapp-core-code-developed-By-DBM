@@ -1,35 +1,11 @@
-{{-- @php
-    // Prepare initial selected IDs from enquiry items if present
-    $initialSelected = [];
-    if (isset($enquiry) && $enquiry && ($items = $enquiry->items ?? null)) {
-        foreach ($items as $it) {
-            if ($it && ($h = $it->hoarding ?? null)) $initialSelected[] = $h->id;
-        }
-    }
-@endphp
-
-<!-- Use the reusable hoarding-selector component so behaviour matches POS selection -->
-<x-hoarding-selector
-    :api-url="'/vendor/pos/api'"
-    :csrf-token="csrf_token()"
-    title="Available Hoardings"
-    subtitle="Select available hoardings for your offer"
-    :show-filter-modal="true"
-    component-id="offerInventory"
-    on-change="offerInventoryChanged"
-/>
-
-<script>
-    // Pass initial selection (hoarding ids from enquiry) to the selector component
-    window.offerInventoryInitialSelected = @json($initialSelected);
-</script> --}}
+{{-- resources/views/customer/offers/components/offer-inventory.blade.php --}}
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 lg:sticky lg:top-4">
 
     <div class="px-4 sm:px-5 pt-4 sm:pt-5 flex items-center gap-3">
-        <h3 class="font-bold text-gray-800 text-sm">Available Hoardings</h3>
+        <h3 class="font-bold text-gray-800 text-sm">Vendor's Available Hoardings</h3>
         <span class="bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full text-xs font-bold" id="available-count">0</span>
     </div>
-    <p class="px-4 sm:px-5 text-xs text-gray-400 mt-0.5 mb-0">Select available hoardings for your offer.</p>
+    <p class="px-4 sm:px-5 text-xs text-gray-400 mt-0.5 mb-0">Browse and add more hoardings from this vendor.</p>
 
     <div class="p-3 sm:p-4 lg:p-5">
         <div class="relative mb-3">
@@ -49,28 +25,9 @@
     </div>
 </div>
 
-{{-- Date picker modal (shared, for setting dates on any selected hoarding) --}}
-{{-- <div id="datePickerModal" class="fixed inset-0 flex items-center justify-center z-[70] hidden">
-    <div class="bg-black/60 absolute inset-0" onclick="closeDatePickerModal()"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl p-4 w-[95vw] sm:max-w-[760px] z-10 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-start mb-3">
-            <h3 id="datePickerTitle" class="font-black text-gray-800 text-sm truncate">Select Booking Dates</h3>
-            <button onclick="closeDatePickerModal()" class="text-gray-400 hover:text-gray-700">✕</button>
-        </div>
-        <div id="dp-summary" class="text-xs text-emerald-700 font-semibold mb-2">— Pick a date</div>
-        <input id="date-picker-input" type="text" class="hidden">
-        <div id="date-picker-inline" class="w-full"></div>
-        <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
-            <button onclick="closeDatePickerModal()" class="px-5 py-2 border rounded-xl text-sm font-bold text-gray-600">Cancel</button>
-            <button onclick="confirmDateSelection()" class="px-7 py-2 bg-[#2D5A43] text-white rounded-xl text-sm font-bold">✓ Confirm Dates</button>
-        </div>
-    </div>
-</div> --}}
-{{-- Date picker modal — mirrors POS exactly --}}
 <div id="datePickerModal" class="fixed inset-0 flex items-center justify-center z-[70] hidden">
     <div class="bg-black/60 absolute inset-0" onclick="closeDatePickerModal()"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl p-4 sm:p-5 w-[95vw] sm:max-w-[760px] z-10 max-h-[98vh] overflow-y-auto">
-
+    <div class="relative bg-white rounded-2xl shadow-2xl p-4 sm:p-5 w-[95vw] sm:max-w-[760px] z-10 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-start mb-3 gap-3">
             <div class="min-w-0">
                 <h3 id="datePickerTitle" class="font-black text-gray-800 text-sm sm:text-base truncate">Select Booking Dates</h3>
@@ -105,7 +62,7 @@
         </div>
 
         <input id="date-picker-input" type="text" class="hidden">
-        <div id="date-picker-inline" class="w-full overflow-x-auto calander-picker-styling"></div>
+        <div id="date-picker-inline" class="w-full overflow-x-auto"></div>
 
         <div class="flex flex-wrap items-center gap-2 mt-3">
             <span class="text-[10px] text-gray-400 font-semibold">Quick:</span>
@@ -124,11 +81,9 @@
 </div>
 
 <style>
-/* .hoarding-card{transition:border-color .15s,box-shadow .15s;cursor:pointer}
+.hoarding-card{transition:border-color .15s,box-shadow .15s;cursor:pointer}
 .hoarding-card:hover:not(.is-selected){border-color:#6ee7b7;background:#f9fafb}
 .hoarding-card.is-selected{border-color:#16a34a!important;box-shadow:0 0 0 2px #bbf7d055;background:#f0fdf4!important}
-.flatpickr-day.avail-day{background:#dcfce7!important;border-color:#86efac!important;color:#14532d!important}
-.flatpickr-day.notAllowed{background:#fee2e2!important;color:#991b1b!important;cursor:not-allowed!important;text-decoration:line-through} */
 .flatpickr-day.avail-day       { background:#dcfce7!important; border-color:#86efac!important; color:#14532d!important; }
 .flatpickr-day.avail-day.flatpickr-disabled { background:#f3f4f6!important; border-color:#e5e7eb!important; color:#9ca3af!important; cursor:not-allowed!important; }
 .flatpickr-day.day-booked,
@@ -140,5 +95,4 @@
 .flatpickr-day.endRange     { background:#2D5A43!important; border-color:#2D5A43!important; color:#fff!important; }
 .flatpickr-day.inRange      { background:#e5e7eb!important; border-color:#d1d5db!important; color:#1f2937!important; box-shadow:none!important; }
 .dp-quick-chip.chip-active  { border-color:#059669; color:#059669; background:#ecfdf5; }
-
 </style>

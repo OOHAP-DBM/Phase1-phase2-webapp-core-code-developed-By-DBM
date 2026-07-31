@@ -14,6 +14,8 @@ use App\Http\Controllers\Web\Customer\RatingController;
 use Modules\Auth\Http\Controllers\MobileForgotPasswordController;
 use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\Admin\RazorpaySettingsController;
+use App\Http\Controllers\Customer\CustomerOfferController;
+
 
 
 /**
@@ -630,7 +632,7 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
         Route::get('/enquiries', [\App\Http\Controllers\Customer\CustomerDashboardController::class, 'myEnquiries'])->name('enquiries');
 
         // My Offers
-        Route::get('/offers', [\App\Http\Controllers\Customer\CustomerDashboardController::class, 'myOffers'])->name('offers');
+        // Route::get('/offers', [\App\Http\Controllers\Customer\CustomerDashboardController::class, 'myOffers'])->name('offers');
 
         // My Quotations
         Route::get('/quotations', [\App\Http\Controllers\Customer\CustomerDashboardController::class, 'myQuotations'])->name('quotations');
@@ -648,7 +650,33 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
 
         // Refresh Stats
         Route::post('/refresh-stats', [\App\Http\Controllers\Customer\CustomerDashboardController::class, 'refreshStats'])->name('refresh-stats');
-    });
+
+        });
+        Route::prefix('offers')->name('offers.')->group(function () {
+    Route::get('/', [CustomerOfferController::class, 'index'])->name('index');
+    Route::get('/{offer}', [CustomerOfferController::class, 'show'])->name('show');
+    Route::post('/{offer}/accept', [CustomerOfferController::class, 'accept'])->name('accept');
+    Route::post('/{offer}/reject', [CustomerOfferController::class, 'reject'])->name('reject');
+    Route::post('/{offer}/modify', [CustomerOfferController::class, 'requestModification'])->name('modify');
+     Route::get('/{offer}/modify',       [CustomerOfferController::class, 'modify'])->name('modify');
+    Route::post('/{offer}/modify',      [CustomerOfferController::class, 'storeModification'])->name('modify.store');
+    Route::get('/{offer}/api/hoardings', [CustomerOfferController::class, 'getHoardings'])->name('api.hoardings');
+});
+    // Route::middleware(['auth', 'role:customer'])
+    // ->prefix('customer.my.offers')
+    // ->name('customer.offers.')
+    // ->group(function () {
+
+    //     Route::get('/', [CustomerOfferController::class, 'index'])->name('index');
+
+    //     Route::get('/{offer}', [CustomerOfferController::class, 'show'])->name('show');
+
+    //     Route::post('/{offer}/accept', [CustomerOfferController::class, 'accept'])->name('accept');
+
+    //     Route::post('/{offer}/reject', [CustomerOfferController::class, 'reject'])->name('reject');
+
+    //     Route::post('/{offer}/modify', [CustomerOfferController::class, 'requestModification'])->name('modify');
+    // });
 
     // DOOH Creatives & Schedules (PROMPT 67)
     Route::prefix('dooh')->name('dooh.')->group(function () {
@@ -765,7 +793,20 @@ Route::middleware(['auth', 'role:vendor'])->prefix('vendor')->name('vendor.')->g
         Route::get('/offers', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'index'])->name('offers.index');
         Route::get('/offers/create', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'create'])->name('offers.create');
         Route::post('/offers', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'store'])->name('offers.store');
-        Route::get('/offers/{id}', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'show'])->name('offers.show');
+        Route::get('/offers/{offer}', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'show'])->name('offers.show');
+        Route::post('/offers/{offer}/archive', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'archive'])
+            ->name('offers.archive');
+
+        Route::post('/offers/{offer}/unarchive', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'unarchive'])
+         ->name('offers.unarchive');
+
+        Route::post('/offers/{offer}/remind', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'sendReminder'])
+            ->name('offers.remind');
+        Route::post('/offers/{offer}/accept-customer-modification', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'acceptCustomerModification'])
+            ->name('offers.accept-customer-modification');
+        Route::post('/offers/{offer}/vendor-reject', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'vendorReject'])->name('vendor-reject');
+
+
 
         // Quotations
         Route::get('/quotations', [\Modules\Quotations\Controllers\Web\QuotationController::class, 'index'])->name('quotations.index');

@@ -777,7 +777,7 @@ class VendorPosController extends Controller
 
     /**
      * Helper: Get hoarding image URL based on type
-     * 
+     *
      * OOH: Uses hoarding_media table (file_path column)
      * DOOH: Uses spatie media library on DOOHScreen child
      */
@@ -1039,8 +1039,8 @@ class VendorPosController extends Controller
     //         $vendorId = Auth::id();
     //         // $hoardingIds = array_filter(array_map('intval', explode(',', $validated['hoarding_ids'])));
     //         // Check if it's already an array (from JSON), otherwise explode it
-    //         $hoardingIds = is_array($request->hoarding_ids) 
-    //             ? $request->hoarding_ids 
+    //         $hoardingIds = is_array($request->hoarding_ids)
+    //             ? $request->hoarding_ids
     //             : explode(',', $request->hoarding_ids);
 
     //         if (empty($hoardingIds)) {
@@ -1205,12 +1205,12 @@ class VendorPosController extends Controller
     //         try {
     //             if (!empty($booking->customer_id)) {
     //                 $customer = \App\Models\User::find($booking->customer_id);
-                    
+
     //                 // DB Notification
     //                 if ($customer && method_exists($customer, 'notify')) {
     //                     $customer->notify(new \App\Notifications\PosBookingCreatedNotification($booking));
     //                 }
-                    
+
     //                 // Email — sirf tab bhejo jab valid email ho
     //                 if ($customer && !empty($customer->email) && filter_var($customer->email, FILTER_VALIDATE_EMAIL)) {
     //                     \Mail::to($customer->email)->send(new \App\Mail\PosBookingCreatedMail($booking, $customer));
@@ -2124,7 +2124,7 @@ class VendorPosController extends Controller
     //             $user->assignRole('customer');
 
     //             // 4. Create the POS Customer Profile
-    //             // We combine City, State, and Pincode into the 'address' field 
+    //             // We combine City, State, and Pincode into the 'address' field
     //             // as per your migration schema
 
     //             $user->posProfile()->create([
