@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 /**
  * Offer API Routes (v1)
  * Base: /api/v1/offers
- * 
+ *
  * Vendor offers in response to enquiries
  */
 
@@ -16,6 +16,10 @@ Route::middleware(['auth:sanctum', 'role:vendor'])->group(function () {
     Route::get('/{id}', [\Modules\Offers\Controllers\Api\OfferController::class, 'show']);
     Route::put('/{id}', [\Modules\Offers\Controllers\Api\OfferController::class, 'update']);
     Route::post('/{id}/withdraw', [\Modules\Offers\Controllers\Api\OfferController::class, 'withdraw']);
+Route::post('/enquiries/{enquiryId}/offers', [
+    \Modules\Offers\Controllers\Api\OfferController::class,
+    'createDraft'
+]);
 });
 
 // Customer routes
