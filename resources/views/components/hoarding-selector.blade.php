@@ -22,8 +22,8 @@
     'subtitle'             => 'Browse and select hoardings.',
     'showFilterModal'      => true,
     'showAvailabilityCheck'=> true,
-    'onChange'             => null,   {{-- JS callback name when selection changes --}}
-    'componentId'          => 'hs',   {{-- unique prefix if used multiple times on same page --}}
+    'onChange'             => null,    
+    'componentId'          => 'hs',   
 ])
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200" id="{{ $componentId }}-panel">

@@ -32,9 +32,9 @@ Route::get('v1/wishlist', [ShortlistController::class, 'index']);
 Route::middleware(['auth:sanctum'])
     ->prefix('v1/wishlist')
     ->group(function () {
-        Route::post('/{hoardingId}', [ShortlistController::class, 'store']); // Add
-        Route::delete('/{hoardingId}', [ShortlistController::class, 'destroy']); // Remove
-        Route::delete('/', [ShortlistController::class, 'clear']);       // Clear all
+        Route::post('/{hoardingId}', [ShortlistController::class, 'store']);  
+        Route::delete('/{hoardingId}', [ShortlistController::class, 'destroy']);  
+        Route::delete('/', [ShortlistController::class, 'clear']);        
         Route::post('/toggle/{hoardingId}', [ShortlistController::class, 'toggle']);
         Route::get('/check/{hoardingId}', [ShortlistController::class, 'check']);
         Route::get('/count', [ShortlistController::class, 'count']);

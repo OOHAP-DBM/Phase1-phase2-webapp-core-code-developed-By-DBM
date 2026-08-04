@@ -13,10 +13,10 @@ class UploadInventoryImportRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-         // Debug: Log the detected MIME type for ppt file
-            if ($this->hasFile('ppt')) {
-                \Log::info('PPT MIME: ' . $this->file('ppt')->getMimeType());
-            }
+        // Debug: Log the detected MIME type for ppt file
+        if ($this->hasFile('ppt')) {
+            \Log::info('PPT MIME: ' . $this->file('ppt')->getMimeType());
+        }
         if (!$this->hasFile('excel') && $this->hasFile('file')) {
             $this->files->set('excel', $this->file('file'));
         }
@@ -49,8 +49,8 @@ class UploadInventoryImportRequest extends FormRequest
             'ppt' => [
                 'required',
                 'file',
-                'mimetypes:application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/octet-stream',
-                'max:40960', // 40MB in KB
+                'mimes:ppt,pptx,pdf',
+                'max:40960',
             ],
             'media_type' => [
                 'required',
@@ -73,11 +73,12 @@ class UploadInventoryImportRequest extends FormRequest
             'excel.file' => 'Excel must be a valid file',
             'excel.mimes' => 'Excel file must be in XLSX format',
             'excel.max' => 'Excel file must not exceed 20MB',
-            'ppt.required' => 'PowerPoint file is required',
+            'ppt.required' => 'PowerPoint or PDF file is required',
             'ppt.file' => 'PowerPoint must be a valid file',
-            'ppt.mimes' => 'PowerPoint file must be a valid PPT or PPTX file',
-            'ppt.mimetypes' => 'PowerPoint file must be a valid PPT or PPTX file',
-             'ppt.max' => 'PowerPoint file must not exceed 40MB', 
+            'ppt.mimes' => 'File must be PPT, PPTX or PDF.',
+
+            'ppt.mimetypes' => 'File must be PPT, PPTX or PDF.',
+            'ppt.max' => 'PowerPoint file must not exceed 40MB',
             'media_type.required' => 'Media type is required',
             'media_type.string' => 'Media type must be a string',
             'media_type.in' => 'Media type must be either OOH or DOOH',
@@ -104,7 +105,7 @@ class UploadInventoryImportRequest extends FormRequest
     {
         return [
             'excel' => 'excel file',
-            'ppt' => 'PowerPoint file',
+            'ppt' => 'PowerPoint / PDF file',
             'media_type' => 'media type',
         ];
     }
