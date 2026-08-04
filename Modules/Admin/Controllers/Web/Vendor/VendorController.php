@@ -11,7 +11,8 @@ use App\Models\VendorProfile;
 use App\Mail\VendorEnabledMail;
 use App\Mail\VendorDisabledMail;
 use Illuminate\Support\Facades\Mail;
-
+use Modules\Mail\VendorWelcomeMail;
+use Illuminate\Support\Str;
 class VendorController extends Controller
 {
     // public function index(Request $request)
@@ -23,27 +24,29 @@ class VendorController extends Controller
     {
         $status = $request->get('status', 'pending_approval');
         $search = $request->get('search');
-        $query = VendorProfile::with(['user' => function($q) {
-            $q->withCount([
-                'hoardings',
-                'activeHoardings as active_hoardings_count'
-            ]);
-        }])
-        ->where(function ($main) use ($status, $search) {
-            $main->where('onboarding_status', $status);
-            if (!empty($search)) {
-                $main->where(function ($q) use ($search) {
-                    $q->whereHas('user', function ($uq) use ($search) {
-                        $uq->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                    });
-                    $q->orWhere('company_name', 'like', "%{$search}%")
-                    ->orWhere('city', 'like', "%{$search}%")
-                    ->orWhere('state', 'like', "%{$search}%");
-                });
+        $query = VendorProfile::with([
+            'user' => function ($q) {
+                $q->withCount([
+                    'hoardings',
+                    'activeHoardings as active_hoardings_count'
+                ]);
             }
-        });
+        ])
+            ->where(function ($main) use ($status, $search) {
+                $main->where('onboarding_status', $status);
+                if (!empty($search)) {
+                    $main->where(function ($q) use ($search) {
+                        $q->whereHas('user', function ($uq) use ($search) {
+                            $uq->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%");
+                        });
+                        $q->orWhere('company_name', 'like', "%{$search}%")
+                            ->orWhere('city', 'like', "%{$search}%")
+                            ->orWhere('state', 'like', "%{$search}%");
+                    });
+                }
+            });
 
         $vendors = $query->latest()->paginate(15)->withQueryString();
 
@@ -97,42 +100,46 @@ class VendorController extends Controller
 
         $businessTypes = [
             'proprietorship' => 'Proprietorship',
-            'partnership'    => 'Partnership',
-            'private_limited'=> 'Private Limited',
+            'partnership' => 'Partnership',
+            'private_limited' => 'Private Limited',
             'public_limited' => 'Public Limited',
-            'llp'            => 'LLP',
-            'other'          => 'Other',
+            'llp' => 'LLP',
+            'other' => 'Other',
         ];
 
         $fields = [
-        // Personal
-        $user->name,
-        $user->email,
-        $user->phone,
-        $user->avatar,
-        // Business
-        $vendorProfile->gstin,
-        $vendorProfile->company_name,
-        $vendorProfile->company_type,
-        $vendorProfile->pan,
-        // Bank
-        $vendorProfile->bank_name,
-        $vendorProfile->account_holder_name,
-        $vendorProfile->account_number,
-        $vendorProfile->ifsc_code,
-        // Address
-        $vendorProfile->registered_address,
-        $vendorProfile->pincode,
-        $vendorProfile->city,
-        $vendorProfile->state,
+            // Personal
+            $user->name,
+            $user->email,
+            $user->phone,
+            $user->avatar,
+            // Business
+            $vendorProfile->gstin,
+            $vendorProfile->company_name,
+            $vendorProfile->company_type,
+            $vendorProfile->pan,
+            // Bank
+            $vendorProfile->bank_name,
+            $vendorProfile->account_holder_name,
+            $vendorProfile->account_number,
+            $vendorProfile->ifsc_code,
+            // Address
+            $vendorProfile->registered_address,
+            $vendorProfile->pincode,
+            $vendorProfile->city,
+            $vendorProfile->state,
         ];
 
         $filled = count(array_filter($fields, fn($v) => !is_null($v) && $v !== ''));
         $profileCompletion = round(($filled / count($fields)) * 100);
 
         return view('admin.vendors.show', compact(
-            'user', 'vendorProfile', 'businessTypes',
-            'totalHoardings', 'commission', 'profileCompletion'
+            'user',
+            'vendorProfile',
+            'businessTypes',
+            'totalHoardings',
+            'commission',
+            'profileCompletion'
         ));
     }
 
@@ -184,9 +191,9 @@ class VendorController extends Controller
             $profile = VendorProfile::findOrFail($id);
 
             $profile->update([
-                'onboarding_status'     => 'approved',
-                'approved_at'           => now(),
-                'approved_by'           => auth()->id(),
+                'onboarding_status' => 'approved',
+                'approved_at' => now(),
+                'approved_by' => auth()->id(),
             ]);
 
             if ($profile->user) {
@@ -255,7 +262,7 @@ class VendorController extends Controller
 
             $profile->update([
                 'onboarding_status' => 'rejected',
-                'rejection_reason'  => $request->reason,
+                'rejection_reason' => $request->reason,
             ]);
 
             // Optional: Also update user status if needed
@@ -288,19 +295,19 @@ class VendorController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'          => 'required|string|max:255',
-            'phone'         => 'required|string|max:20|unique:users,phone',
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20|unique:users,phone',
             // 'email'         => 'required|email|unique:users,email',
-            'email'         => 'nullable|email|unique:users,email',
-            'password'      => 'required|min:4',
-            'company_name'  => 'required|string|max:255',
-            'gstin'         => 'nullable|string|max:20',
-            'pan'           => 'nullable|string|max:20',
-            'address'       => 'required|string|max:500',
-            'city'          => 'required|string|max:100',
-            'state'         => 'required|string|max:100',
-            'pincode'       => 'required|string|max:10',
-            'status'        => 'required|in:active,inactive',
+            'email' => 'nullable|email|unique:users,email',
+            'password' => 'required|min:4',
+            'company_name' => 'required|string|max:255',
+            'gstin' => 'nullable|string|max:20',
+            'pan' => 'nullable|string|max:20',
+            'address' => 'required|string|max:500',
+            'city' => 'required|string|max:100',
+            'state' => 'required|string|max:100',
+            'pincode' => 'required|string|max:10',
+            'status' => 'required|in:active,inactive',
         ]);
 
         DB::beginTransaction();
@@ -308,13 +315,13 @@ class VendorController extends Controller
         try {
             // ---------------- USER CREATE ----------------
             $user = User::create([
-                'name'              => $request->name,
-                'phone'             => $request->phone,
-                'email'             => $request->email,
-                'password'          => Hash::make($request->password),
+                'name' => $request->name,
+                'phone' => $request->phone,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
 
-                'active_role'       => 'vendor',
-                'status'            => $request->status,
+                'active_role' => 'vendor',
+                'status' => $request->status,
 
                 // ADMIN VERIFIED
                 'email_verified_at' => now(),
@@ -332,32 +339,32 @@ class VendorController extends Controller
 
             // ---------------- VENDOR PROFILE CREATE ----------------
             VendorProfile::create([
-                'user_id'                   => $user->id,
+                'user_id' => $user->id,
 
                 // AUTO APPROVED (ADMIN CREATED)
-                'onboarding_status'         => 'approved',
-                'onboarding_step'           => 3,
-                'onboarding_completed_at'   => now(),
-                'approved_at'               => now(),
-                'approved_by'               => auth()->id(),
+                'onboarding_status' => 'approved',
+                'onboarding_step' => 3,
+                'onboarding_completed_at' => now(),
+                'approved_at' => now(),
+                'approved_by' => auth()->id(),
 
                 // BUSINESS DETAILS
-                'company_name'              => $request->company_name,
-                'gstin'                     => $request->gstin,
-                'pan'                       => $request->pan,
-                'registered_address'        => $request->address,
-                'city'                      => $request->city,
-                'state'                     => $request->state,
-                'pincode'                   => $request->pincode,
+                'company_name' => $request->company_name,
+                'gstin' => $request->gstin,
+                'pan' => $request->pan,
+                'registered_address' => $request->address,
+                'city' => $request->city,
+                'state' => $request->state,
+                'pincode' => $request->pincode,
 
                 // KYC AUTO VERIFIED
-                'kyc_verified'              => 1,
-                'kyc_verified_at'           => now(),
+                'kyc_verified' => 1,
+                'kyc_verified_at' => now(),
 
                 // TERMS AUTO ACCEPT
-                'terms_accepted'            => 1,
-                'terms_accepted_at'         => now(),
-                'terms_ip_address'          => request()->ip(),
+                'terms_accepted' => 1,
+                'terms_accepted_at' => now(),
+                'terms_ip_address' => request()->ip(),
 
                 // DEFAULT COMMISSION
                 // 'commission_percentage'     => 10,
@@ -386,22 +393,23 @@ class VendorController extends Controller
         try {
             foreach ($request->vendor_ids as $vendorProfileId) {
                 $vendor = VendorProfile::find($vendorProfileId);
-                if(!$vendor) continue;
+                if (!$vendor)
+                    continue;
                 // vendor profile approve
                 $vendor->update([
-                    'onboarding_status'      => 'approved',
-                    'approved_at'            => now(),
-                    'approved_by'            => auth()->id(),
-                    'kyc_verified'           => 1,
-                    'kyc_verified_at'        => now(),
-                    'onboarding_completed_at'=> now(),
-                    'terms_accepted'         => 1,
-                    'terms_accepted_at'      => now(),
-                    'terms_ip_address'       => request()->ip(),
+                    'onboarding_status' => 'approved',
+                    'approved_at' => now(),
+                    'approved_by' => auth()->id(),
+                    'kyc_verified' => 1,
+                    'kyc_verified_at' => now(),
+                    'onboarding_completed_at' => now(),
+                    'terms_accepted' => 1,
+                    'terms_accepted_at' => now(),
+                    'terms_ip_address' => request()->ip(),
                 ]);
                 // user activate
                 $user = User::find($vendor->user_id);
-                if($user){
+                if ($user) {
                     $user->update([
                         'status' => 1,
                         'email_verified_at' => now(),
@@ -431,12 +439,12 @@ class VendorController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Approval failed'
-            ],500);
+            ], 500);
         }
     }
     public function bulkDisable(Request $request)
     {
-        $vendors = VendorProfile::whereIn('id',$request->vendor_ids)->get();
+        $vendors = VendorProfile::whereIn('id', $request->vendor_ids)->get();
 
         foreach ($vendors as $vendor) {
             $vendor->update([
@@ -448,7 +456,7 @@ class VendorController extends Controller
             if ($vendor->user) {
                 $vendor->user->update([
                     'is_active' => 0,
-                    'status' =>'suspended'
+                    'status' => 'suspended'
                 ]);
 
                 // Send disabled mail
@@ -463,8 +471,8 @@ class VendorController extends Controller
         }
 
         return response()->json([
-            'success'=>true,
-            'message'=>'Selected vendors disabled successfully'
+            'success' => true,
+            'message' => 'Selected vendors disabled successfully'
         ]);
     }
     public function bulkEnable(Request $request)
@@ -478,10 +486,10 @@ class VendorController extends Controller
                 'onboarding_status' => 'approved',
                 'suspended_at' => null
             ]);
-            if($vendor->user){
+            if ($vendor->user) {
                 $vendor->user->update([
                     'is_active' => 1,
-                    'status' =>'active'
+                    'status' => 'active'
                 ]);
 
                 // Send enabled mail
@@ -536,10 +544,10 @@ class VendorController extends Controller
             $html .= '</table>';
 
             return response($html, 200, [
-                'Content-Type'        => 'application/vnd.ms-excel',
+                'Content-Type' => 'application/vnd.ms-excel',
                 'Content-Disposition' => "attachment; filename={$filename}.xls",
-                'Pragma'              => 'no-cache',
-                'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+                'Pragma' => 'no-cache',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             ]);
 
         } elseif ($format === 'pdf') {
@@ -574,11 +582,11 @@ class VendorController extends Controller
         } else {
 
             $headers = [
-                'Content-Type'        => 'text/csv',
+                'Content-Type' => 'text/csv',
                 'Content-Disposition' => "attachment; filename={$filename}.csv",
-                'Pragma'              => 'no-cache',
-                'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
-                'Expires'             => '0',
+                'Pragma' => 'no-cache',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+                'Expires' => '0',
             ];
 
             $callback = function () use ($columns, $rows) {
@@ -601,22 +609,127 @@ class VendorController extends Controller
         $approvedQuery = $vendor->hoardings()->whereIn('status', ['active', 'inactive']);
         $pendingQuery = $vendor->hoardings()->where('status', 'Pending_Approval');
 
-                if ($search) {
-                        $approvedQuery->where(function($q) use ($search) {
-                                $q->where('title', 'like', "%$search%")
-                                    ->orWhere('city', 'like', "%$search%")
-                                    ;
-                        });
-                        $pendingQuery->where(function($q) use ($search) {
-                                $q->where('title', 'like', "%$search%")
-                                    ->orWhere('city', 'like', "%$search%")
-                                    ;
-                        });
-                }
+        if ($search) {
+            $approvedQuery->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%$search%")
+                    ->orWhere('city', 'like', "%$search%")
+                ;
+            });
+            $pendingQuery->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%$search%")
+                    ->orWhere('city', 'like', "%$search%")
+                ;
+            });
+        }
 
         $approvedHoardings = $approvedQuery->orderByDesc('id')->paginate(10, ['*'], 'approved_page');
         $pendingHoardings = $pendingQuery->orderByDesc('id')->paginate(10, ['*'], 'pending_page');
 
         return view('admin.vendors.hoardings', compact('vendor', 'approvedHoardings', 'pendingHoardings'));
+    }
+
+    public function createModal()
+    {
+        return view('admin.vendors.create-modal');
+    }
+
+    public function quickStore(Request $request)
+    {
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20|unique:users,phone',
+            'email' => 'nullable|email|unique:users,email',
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+
+            // Auto Generate Password
+            $plainPassword = Str::password(10);
+
+            // Create User
+            $user = User::create([
+                'name' => $request->name,
+                'phone' => $request->phone,
+                'email' => $request->email,
+                'password' => Hash::make($plainPassword),
+
+                'active_role' => 'vendor',
+                'status' => $request->status,
+
+                'email_verified_at' => now(),
+                'phone_verified_at' => now(),
+            ]);
+
+            // Assign Vendor Role
+            $user->assignRole('vendor');
+
+            // Create Minimal Vendor Profile
+            VendorProfile::create([
+                'user_id' => $user->id,
+
+                // Since popup has no company field
+                'company_name' => $request->name,
+
+                'onboarding_status' => 'approved',
+                'onboarding_step' => 3,
+                'onboarding_completed_at' => now(),
+                'approved_at' => now(),
+                'approved_by' => auth()->id(),
+
+                'kyc_verified' => 1,
+                'kyc_verified_at' => now(),
+
+                'terms_accepted' => 1,
+                'terms_accepted_at' => now(),
+                'terms_ip_address' => request()->ip(),
+            ]);
+
+            DB::commit();
+
+            // Send Welcome Email
+            try {
+
+                if (!empty($user->email)) {
+
+                    Mail::to($user->email)
+                        ->send(new VendorWelcomeMail($user, $plainPassword));
+                }
+
+            } catch (\Exception $e) {
+
+                \Log::error('Vendor welcome mail failed', [
+                    'vendor_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vendor created successfully.',
+                'vendor' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'company_name' => $profile->company_name ?? $user->name,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            \Log::error('Quick Vendor Creation Failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
