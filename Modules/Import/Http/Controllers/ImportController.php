@@ -17,54 +17,61 @@ use Modules\Import\Http\Requests\UploadInventoryImportRequest;
 use Modules\Import\Entities\InventoryImportBatch;
 use Modules\Import\Entities\InventoryImportStaging;
 use Modules\Import\Jobs\ProcessInventoryImportJob;
+use App\Models\User;
 use Exception;
 use Illuminate\Support\Facades\Schema;
 
 class ImportController extends Controller
 {
     use AuthorizesRequests;
-
-    /**
-     * Show import dashboard with role-based batch filtering
-     *
-     * Admins see all batches, vendors see only their own batches
-     *
-     * @return View
-     */
     public function dashboard(): View
     {
         $user = auth()->user();
-        
-        // Always filter by vendor_id so both admin and vendor see only their own uploads
-        $batchesQuery = InventoryImportBatch::query()
-            ->where('vendor_id', $user->id)
-            ->latest('created_at');
+        $vendors = collect();
+
+        if ($user->hasRole('admin')) {
+
+            $vendors = User::role('vendor')
+                ->orderBy('name')
+                ->get();
+        }
+
+        // $batchesQuery = InventoryImportBatch::query()
+        //     ->where('vendor_id', $user->id)
+        //     ->latest('created_at');
+
+        if ($user->hasRole('admin')) {
+
+            $batchesQuery = InventoryImportBatch::query()
+                ->with(['vendor', 'uploadedBy'])
+                ->latest('created_at');
+
+        } else {
+
+            $batchesQuery = InventoryImportBatch::query()
+                ->with(['vendor', 'uploadedBy'])
+                ->where('vendor_id', $user->id)
+                ->latest('created_at');
+
+        }
 
         $batches = $batchesQuery->paginate(15);
-
         return view('import::index', [
             'batches' => $batches,
+            'vendors' => $vendors,
             'isAdmin' => $user->hasRole('admin'),
             'layout' => $user->hasRole('admin') ? 'layouts.admin' : 'layouts.vendor',
         ]);
     }
 
-    /**
-     * Show enhanced import dashboard as separate feature page.
-     *
-     * @return View
-     */
     public function enhancedDashboard(): View
     {
         $user = auth()->user();
-
-        // Always filter by vendor_id so both admin and vendor see only their own uploads
         $batchesQuery = InventoryImportBatch::query()
             ->where('vendor_id', $user->id)
             ->latest('created_at');
 
         $batches = $batchesQuery->paginate(15);
-
         return view('import::dashboard', [
             'batches' => $batches,
             'isAdmin' => $user->hasRole('admin'),
@@ -72,18 +79,10 @@ class ImportController extends Controller
         ]);
     }
 
-    /**
-     * Show enhanced batch details page.
-     *
-     * @param InventoryImportBatch $batch
-     * @return View
-     */
     public function enhancedBatchShow(InventoryImportBatch $batch): View
     {
         $this->authorize('view', $batch);
-
         $user = auth()->user();
-
         return view('import::batch-details', [
             'batch' => $batch,
             'isAdmin' => $user->hasRole('admin'),
@@ -91,13 +90,7 @@ class ImportController extends Controller
         ]);
     }
 
-    /**
-     * Serve extracted batch image.
-     *
-     * @param InventoryImportBatch $batch
-     * @param string $imageName
-     * @return StreamedResponse|JsonResponse
-     */
+
     public function serveBatchImage(InventoryImportBatch $batch, string $imageName): StreamedResponse|JsonResponse
     {
         $this->authorize('view', $batch);
@@ -122,12 +115,7 @@ class ImportController extends Controller
         return Storage::disk(self::IMPORT_DISK)->response($imagePath);
     }
 
-    /**
-     * Download sample import template (Excel-compatible CSV).
-     *
-     * @param string $mediaType
-     * @return StreamedResponse
-     */
+
     // public function downloadSampleTemplate(string $mediaType): StreamedResponse
     // {
     //     $normalizedMediaType = strtolower(trim($mediaType));
@@ -255,111 +243,111 @@ class ImportController extends Controller
         }
 
         $oohColumns = [
-            'Media ID'                => true,
-            'Hoarding Type'           => true,
-            'Media Type'              => true,
-            'Full Address'            => true,
-            'Locality'                => true,
-            'Landmark'                => false,
-            'City'                    => true,
-            'State'                   => true,
-            'Pincode'                 => true,
-            'Width'                   => true,
-            'Height'                  => true,
-            'Unit'                    => true,
-            'Illumination'            => true,
-            'Latitude'                => true,
-            'Longitude'               => true,
+            'Media ID' => true,
+            'Hoarding Type' => true,
+            'Media Type' => true,
+            'Full Address' => true,
+            'Locality' => true,
+            'Landmark' => false,
+            'City' => true,
+            'State' => true,
+            'Pincode' => true,
+            'Width' => true,
+            'Height' => true,
+            'Unit' => true,
+            'Illumination' => true,
+            'Latitude' => true,
+            'Longitude' => true,
             'Minimum Duration (Days)' => true,
-            'DCPM / Price'            => true,
-            'Availability'            => true,
-            'Discount Type'           => false,
-            'Discount Value'          => false,
-            'Monthly Sale Price'      => false,
-            'Designing Charge'        => false,
-            'Printing Charge'         => false,
-            'Mounting Charge'         => false,
-            'Description'             => false,
+            'DCPM / Price' => true,
+            'Availability' => true,
+            'Discount Type' => false,
+            'Discount Value' => false,
+            'Monthly Sale Price' => false,
+            'Designing Charge' => false,
+            'Printing Charge' => false,
+            'Mounting Charge' => false,
+            'Description' => false,
         ];
 
         $doohColumns = [
-            'Media ID'                => true,
-            'Hoarding Type'           => true,
-            'Media Type'              => true,
-            'Full Address'            => true,
-            'Locality'                => true,
-            'Landmark'                => false,
-            'City'                    => true,
-            'State'                   => true,
-            'Pincode'                 => true,
-            'Width'                   => true,
-            'Height'                  => true,
-            'Unit'                    => true,
-            'Illumination'            => true,
-            'Latitude'                => true,
-            'Longitude'               => true,
-            'Ad Duration (Sec)'       => true,
-            'Price Per Spot (₹)'      => true,
-            'Spots Per Day'           => true,
-            'Daily Play Hours'        => true,
+            'Media ID' => true,
+            'Hoarding Type' => true,
+            'Media Type' => true,
+            'Full Address' => true,
+            'Locality' => true,
+            'Landmark' => false,
+            'City' => true,
+            'State' => true,
+            'Pincode' => true,
+            'Width' => true,
+            'Height' => true,
+            'Unit' => true,
+            'Illumination' => true,
+            'Latitude' => true,
+            'Longitude' => true,
+            'Ad Duration (Sec)' => true,
+            'Price Per Spot (₹)' => true,
+            'Spots Per Day' => true,
+            'Daily Play Hours' => true,
             'Minimum Duration (Days)' => true,
-            'DCPM / Price'            => true,
-            'Availability'            => true,
-            'Discount Type'           => false,
-            'Discount Value'          => false,
-            'Monthly Sale Price'      => false,
-            'Designing Charge'        => false,
-            'Printing Charge'         => false,
-            'Mounting Charge'         => false,
-            'Description'             => false,
+            'DCPM / Price' => true,
+            'Availability' => true,
+            'Discount Type' => false,
+            'Discount Value' => false,
+            'Monthly Sale Price' => false,
+            'Designing Charge' => false,
+            'Printing Charge' => false,
+            'Mounting Charge' => false,
+            'Description' => false,
         ];
 
-        $columns  = $normalizedMediaType === 'dooh' ? $doohColumns : $oohColumns;
+        $columns = $normalizedMediaType === 'dooh' ? $doohColumns : $oohColumns;
         $filename = 'import_sample_' . $normalizedMediaType . '.xlsx';
 
         $sampleData = [
-            'Media ID'                => strtoupper($normalizedMediaType) . '001',
-            'Hoarding Type'           => strtoupper($normalizedMediaType),
-            'Media Type'              => 'Billboard',
-            'Full Address'            => 'Connaught Place, New Delhi',
-            'Locality'                => 'Connaught Place',
-            'Landmark'                => 'Near Central Park',
-            'City'                    => 'Delhi',
-            'State'                   => 'Delhi',
-            'Pincode'                 => '110001',
-            'Width'                   => '20',
-            'Height'                  => '10',
-            'Unit'                    => 'ft',
-            'Illumination'            => 'Front Lit',
-            'Latitude'                => '28.6315',
-            'Longitude'               => '77.2167',
-            'Ad Duration (Sec)'       => '10',
-            'Price Per Spot (₹)'      => '250',
-            'Spots Per Day'           => '120',
-            'Daily Play Hours'        => '18 Hrs',
+            'Media ID' => strtoupper($normalizedMediaType) . '001',
+            'Hoarding Type' => strtoupper($normalizedMediaType),
+            'Media Type' => 'Billboard',
+            'Full Address' => 'Connaught Place, New Delhi',
+            'Locality' => 'Connaught Place',
+            'Landmark' => 'Near Central Park',
+            'City' => 'Delhi',
+            'State' => 'Delhi',
+            'Pincode' => '110001',
+            'Width' => '20',
+            'Height' => '10',
+            'Unit' => 'ft',
+            'Illumination' => 'Front Lit',
+            'Latitude' => '28.6315',
+            'Longitude' => '77.2167',
+            'Ad Duration (Sec)' => '10',
+            'Price Per Spot (₹)' => '250',
+            'Spots Per Day' => '120',
+            'Daily Play Hours' => '18 Hrs',
             'Minimum Duration (Days)' => '30',
-            'DCPM / Price'            => '120000',
-            'Availability'            => 'Available',
-            'Discount Type'           => 'fixed',
-            'Discount Value'          => '5000',
-            'Monthly Sale Price'      => '45000',
-            'Designing Charge'        => '1500',
-            'Printing Charge'         => '3000',
-            'Mounting Charge'         => '2000',
-            'Description'             => 'Prime location inventory sample',
+            'DCPM / Price' => '120000',
+            'Availability' => 'Available',
+            'Discount Type' => 'fixed',
+            'Discount Value' => '5000',
+            'Monthly Sale Price' => '45000',
+            'Designing Charge' => '1500',
+            'Printing Charge' => '3000',
+            'Mounting Charge' => '2000',
+            'Description' => 'Prime location inventory sample',
         ];
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
 
-        // ── Instructions sheet ──────────────────────────────────────────
+
         $legend = $spreadsheet->getActiveSheet();
         $legend->setTitle('Instructions');
 
         $legend->mergeCells('A1:B1');
         $legend->setCellValue('A1', 'Import Sample Template — ' . strtoupper($normalizedMediaType));
         $legend->getStyle('A1')->applyFromArray([
-            'font'      => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF'], 'name' => 'Arial'],
-            'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => '1F4E79']],
+            'font' => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF'], 'name' => 'Arial'],
+            'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => '1F4E79']],
             'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
         ]);
         $legend->getRowDimension(1)->setRowHeight(30);
@@ -367,24 +355,24 @@ class ImportController extends Controller
         $legend->setCellValue('A2', 'Colour');
         $legend->setCellValue('B2', 'Meaning');
         $legend->getStyle('A2:B2')->applyFromArray([
-            'font'      => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF'], 'name' => 'Arial'],
-            'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => '2E75B6']],
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF'], 'name' => 'Arial'],
+            'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => '2E75B6']],
             'alignment' => ['horizontal' => 'center', 'vertical' => 'center'],
         ]);
         $legend->getRowDimension(2)->setRowHeight(20);
 
         $legendRows = [
-            3 => ['🔴 Red header',  'Required field — must be filled in every row',   'FFE2E2'],
-            4 => ['⚪ Grey header', 'Optional field — leave blank if not applicable',  'F2F2F2'],
-            5 => ['🟢 Green row',   'Sample data row — replace with your actual data', 'E2EFDA'],
+            3 => ['🔴 Red header', 'Required field — must be filled in every row', 'FFE2E2'],
+            4 => ['⚪ Grey header', 'Optional field — leave blank if not applicable', 'F2F2F2'],
+            5 => ['🟢 Green row', 'Sample data row — replace with your actual data', 'E2EFDA'],
         ];
         foreach ($legendRows as $row => [$label, $meaning, $bg]) {
             $legend->setCellValue("A{$row}", $label);
             $legend->setCellValue("B{$row}", $meaning);
             foreach (['A', 'B'] as $col) {
                 $legend->getStyle("{$col}{$row}")->applyFromArray([
-                    'font'      => ['name' => 'Arial', 'size' => 10],
-                    'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => $bg]],
+                    'font' => ['name' => 'Arial', 'size' => 10],
+                    'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => $bg]],
                     'alignment' => ['horizontal' => 'left', 'vertical' => 'center', 'wrapText' => true],
                 ]);
             }
@@ -394,16 +382,16 @@ class ImportController extends Controller
         $legend->mergeCells('A7:B7');
         $legend->setCellValue('A7', '⚠  Do NOT change column header names. Max file size: 20 MB.');
         $legend->getStyle('A7')->applyFromArray([
-            'font'      => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '7F6000'], 'name' => 'Arial'],
-            'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => 'FFF2CC']],
+            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '7F6000'], 'name' => 'Arial'],
+            'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => 'FFF2CC']],
             'alignment' => ['horizontal' => 'left', 'vertical' => 'center', 'wrapText' => true],
         ]);
         $legend->getRowDimension(7)->setRowHeight(28);
         $legend->getColumnDimension('A')->setWidth(30);
         $legend->getColumnDimension('B')->setWidth(55);
 
-        // ── Import Data sheet ───────────────────────────────────────────
-        $data     = $spreadsheet->createSheet();
+
+        $data = $spreadsheet->createSheet();
         $data->setTitle('Import Data');
         $colIndex = 1;
         $totalCols = count($columns);
@@ -413,18 +401,18 @@ class ImportController extends Controller
 
             $data->setCellValue("{$colLetter}1", $colName . ($required ? ' *' : ''));
             $data->getStyle("{$colLetter}1")->applyFromArray([
-                'font'      => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF'], 'name' => 'Arial'],
-                'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => $required ? 'C00000' : '595959']],
+                'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF'], 'name' => 'Arial'],
+                'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => $required ? 'C00000' : '595959']],
                 'alignment' => ['horizontal' => 'center', 'vertical' => 'center', 'wrapText' => true],
-                'borders'   => ['allBorders' => ['borderStyle' => 'thin', 'color' => ['rgb' => 'D9D9D9']]],
+                'borders' => ['allBorders' => ['borderStyle' => 'thin', 'color' => ['rgb' => 'D9D9D9']]],
             ]);
 
             $data->setCellValue("{$colLetter}2", $sampleData[$colName] ?? '');
             $data->getStyle("{$colLetter}2")->applyFromArray([
-                'font'      => ['size' => 10, 'color' => ['rgb' => '375623'], 'name' => 'Arial'],
-                'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => 'E2EFDA']],
+                'font' => ['size' => 10, 'color' => ['rgb' => '375623'], 'name' => 'Arial'],
+                'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => 'E2EFDA']],
                 'alignment' => ['horizontal' => 'left', 'vertical' => 'center'],
-                'borders'   => ['allBorders' => ['borderStyle' => 'thin', 'color' => ['rgb' => 'D9D9D9']]],
+                'borders' => ['allBorders' => ['borderStyle' => 'thin', 'color' => ['rgb' => 'D9D9D9']]],
             ]);
 
             $data->getColumnDimension($colLetter)->setWidth(max(mb_strlen($colName) + 4, 18));
@@ -439,15 +427,15 @@ class ImportController extends Controller
         $data->mergeCells("A4:{$lastCol}4");
         $data->setCellValue('A4', '🔴 Red columns marked with * are REQUIRED.  ⚪ Grey columns are optional.  🟢 Green row is sample data — replace with your actual data. Do NOT modify the header row.');
         $data->getStyle('A4')->applyFromArray([
-            'font'      => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '7F6000'], 'name' => 'Arial'],
-            'fill'      => ['fillType' => 'solid', 'startColor' => ['rgb' => 'FFF2CC']],
+            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '7F6000'], 'name' => 'Arial'],
+            'fill' => ['fillType' => 'solid', 'startColor' => ['rgb' => 'FFF2CC']],
             'alignment' => ['horizontal' => 'left', 'vertical' => 'center', 'wrapText' => true],
         ]);
         $data->getRowDimension(4)->setRowHeight(30);
 
         $spreadsheet->setActiveSheetIndex(1);
 
-        // ── Write to a real temp file, then send as download ───────────
+
         $tempPath = tempnam(sys_get_temp_dir(), 'oohapp_sample_') . '.xlsx';
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
@@ -455,56 +443,154 @@ class ImportController extends Controller
 
         return response()->download($tempPath, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ])->deleteFileAfterSend(true);  // auto-cleans the temp file
+        ])->deleteFileAfterSend(true);
     }
-    /**
-     * Store path for imports
-     */
+
     protected const IMPORT_STORAGE_PATH = 'imports';
 
-    /**
-     * Disk name for storage
-     */
     protected const IMPORT_DISK = 'local';
 
-    /**
-     * Upload and process inventory import
-     *
-     * @param UploadInventoryImportRequest $request
-     * @return JsonResponse
-     */
+    // public function uploadInventoryImport(UploadInventoryImportRequest $request): JsonResponse
+    // {
+    //     try {
+    //         set_time_limit(300);
+    //         ini_set('upload_max_filesize', '65M');
+    //         ini_set('post_max_size', '70M');
+    //         // Create batch record
+    //         $batch = InventoryImportBatch::create([
+    //             'vendor_id' => auth()->id(),
+    //             'media_type' => $request->input('media_type'),
+    //             'status' => 'uploaded',
+    //             'total_rows' => 0,
+    //             'valid_rows' => 0,
+    //             'invalid_rows' => 0,
+    //         ]);
+
+    //         \Log::info('Created import batch', [
+    //             'batch_id' => $batch->id,
+    //             'vendor_id' => auth()->id(),
+    //             'media_type' => $request->input('media_type'),
+    //         ]);
+
+    //         // Create batch-specific storage path
+    //         $batchPath = self::IMPORT_STORAGE_PATH . '/' . $batch->id;
+
+    //         // Store files
+    //         $excelPath = $this->storeFile(
+    //             $request->file('excel'),
+    //             $batchPath,
+    //             'inventory'
+    //         );
+
+    //         $pptPath = $this->storeFile(
+    //             $request->file('ppt'),
+    //             $batchPath,
+    //             'presentation'
+    //         );
+
+    //         \Log::info('Stored import files', [
+    //             'batch_id' => $batch->id,
+    //             'excel_path' => $excelPath,
+    //             'ppt_path' => $pptPath,
+    //         ]);
+
+
+    //         ProcessInventoryImportJob::dispatch(
+    //             $batch,
+    //             Storage::disk(self::IMPORT_DISK)->path($excelPath),
+    //             Storage::disk(self::IMPORT_DISK)->path($pptPath)
+    //         )->onQueue(config('import.batch.queue', 'default'));
+
+    //         \Log::info('Dispatched import processing job', [
+    //             'batch_id' => $batch->id,
+    //         ]);
+
+    //         $batch->update([
+    //             'file_path' => $excelPath,
+    //             'ppt_path' => $pptPath,
+    //         ]);
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Import started successfully',
+    //             'batch_id' => $batch->id,
+    //             'data' => [
+    //                 'batch_id' => $batch->id,
+    //                 'status' => $batch->status,
+    //                 'media_type' => $batch->media_type,
+    //                 'created_at' => $batch->created_at,
+    //             ],
+    //         ], 201);
+    //     } catch (Exception $e) {
+    //         \Log::error('Failed to upload import', [
+    //             'vendor_id' => auth()->id(),
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Failed to process import upload',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
+
+
     public function uploadInventoryImport(UploadInventoryImportRequest $request): JsonResponse
     {
+
         try {
-             set_time_limit(300);
+
+            set_time_limit(300);
             ini_set('upload_max_filesize', '65M');
             ini_set('post_max_size', '70M');
-            // Create batch record
+
+            $user = auth()->user();
+
+
+            if ($user->hasRole('admin')) {
+
+
+                $vendorId = $request->filled('vendor_id')
+                    ? (int) $request->vendor_id
+                    : $user->id;
+
+            } else {
+                $vendorId = $user->id;
+            }
+
+
             $batch = InventoryImportBatch::create([
-                'vendor_id' => auth()->id(),
+                'vendor_id' => $vendorId,
                 'media_type' => $request->input('media_type'),
                 'status' => 'uploaded',
                 'total_rows' => 0,
                 'valid_rows' => 0,
                 'invalid_rows' => 0,
+                'uploaded_by_user_id' => $user->id,
             ]);
 
             \Log::info('Created import batch', [
                 'batch_id' => $batch->id,
-                'vendor_id' => auth()->id(),
+                'logged_in_user' => $user->id,
+                'vendor_id' => $vendorId,
                 'media_type' => $request->input('media_type'),
             ]);
 
-            // Create batch-specific storage path
+            // ==========================
+            // Storage Path
+            // ==========================
             $batchPath = self::IMPORT_STORAGE_PATH . '/' . $batch->id;
 
-            // Store files
+            // Store Excel
             $excelPath = $this->storeFile(
                 $request->file('excel'),
                 $batchPath,
                 'inventory'
             );
 
+            // Store PPT / PDF
             $pptPath = $this->storeFile(
                 $request->file('ppt'),
                 $batchPath,
@@ -517,7 +603,9 @@ class ImportController extends Controller
                 'ppt_path' => $pptPath,
             ]);
 
-            // Dispatch processing job
+            // ==========================
+            // Dispatch Queue
+            // ==========================
             ProcessInventoryImportJob::dispatch(
                 $batch,
                 Storage::disk(self::IMPORT_DISK)->path($excelPath),
@@ -527,10 +615,13 @@ class ImportController extends Controller
             \Log::info('Dispatched import processing job', [
                 'batch_id' => $batch->id,
             ]);
-            // After storing files, update the batch with the excel path
+
+            // ==========================
+            // Save File Paths
+            // ==========================
             $batch->update([
                 'file_path' => $excelPath,
-                'ppt_path'  => $pptPath,
+                'ppt_path' => $pptPath,
             ]);
 
             return response()->json([
@@ -539,14 +630,18 @@ class ImportController extends Controller
                 'batch_id' => $batch->id,
                 'data' => [
                     'batch_id' => $batch->id,
+                    'vendor_id' => $vendorId,
                     'status' => $batch->status,
                     'media_type' => $batch->media_type,
                     'created_at' => $batch->created_at,
                 ],
             ], 201);
+
         } catch (Exception $e) {
+
             \Log::error('Failed to upload import', [
-                'vendor_id' => auth()->id(),
+                'logged_in_user' => auth()->id(),
+                'vendor_id' => $vendorId ?? null,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -556,15 +651,12 @@ class ImportController extends Controller
                 'message' => 'Failed to process import upload',
                 'error' => $e->getMessage(),
             ], 500);
-        }
-    }
 
-    /**
-     * Get batch status
-     *
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
+
+        }
+
+
+    }
     public function getImportStatus(InventoryImportBatch $batch): JsonResponse
     {
         try {
@@ -595,12 +687,6 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Get batch details with staging records
-     *
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
     public function getImportDetails(InventoryImportBatch $batch): JsonResponse
     {
         try {
@@ -641,9 +727,6 @@ class ImportController extends Controller
     }
 
 
-    /**
-     * Toggle row status only.
-     */
     public function updateBatchRowStatus(Request $request, InventoryImportBatch $batch, InventoryImportStaging $row): JsonResponse
     {
         try {
@@ -667,22 +750,14 @@ class ImportController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Status updated successfully',
-                'data'    => ['id' => $row->id, 'status' => $row->status],
+                'data' => ['id' => $row->id, 'status' => $row->status],
             ]);
 
         } catch (Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-    /**
-     * Store uploaded file
-     *
-     * @param \Illuminate\Http\UploadedFile $file
-     * @param string $path
-     * @param string $name
-     * @return string
-     * @throws Exception
-     */
+
     protected function storeFile($file, string $path, string $name): string
     {
         try {
@@ -708,127 +783,123 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * List user's imports
-     *
-     * @return JsonResponse
-     */
+
     public function listImports(Request $request): JsonResponse
     {
-        \Log::info('Listing imports', $request->all());
+        // \Log::info('Listing imports', $request->all());
         try {
             $user = auth()->user();
             $validated = $request->validate([
-                    'status' => ['nullable', 'string', 'max:50'],
-                    'search' => ['nullable', 'string', 'max:100'],
-                    'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
-                    'page' => ['nullable', 'integer', 'min:1'],
-                ]);
+                'status' => ['nullable', 'string', 'max:50'],
+                'search' => ['nullable', 'string', 'max:100'],
+                'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+                'page' => ['nullable', 'integer', 'min:1'],
+            ]);
 
-                // Always filter by vendor_id so both admin and vendor see only their own uploads
-                $summaryQuery = InventoryImportBatch::query()->byVendor($user->id);
-                $summaryRows = $summaryQuery
-                    ->selectRaw('status, COUNT(*) as total')
-                    ->groupBy('status')
-                    ->get();
 
-                $summary = [
-                    'total' => (int) $summaryRows->sum('total'),
-                    'processing' => 0,
-                    'completed' => 0,
-                    'failed' => 0,
-                ];
+            $summaryQuery = InventoryImportBatch::query()->byVendor($user->id);
+            $summaryRows = $summaryQuery
+                ->selectRaw('status, COUNT(*) as total')
+                ->groupBy('status')
+                ->get();
 
-                foreach ($summaryRows as $summaryRow) {
-                    $statusKey = strtolower((string) $summaryRow->status);
-                    if (array_key_exists($statusKey, $summary)) {
-                        $summary[$statusKey] = (int) $summaryRow->total;
-                    }
+            $summary = [
+                'total' => (int) $summaryRows->sum('total'),
+                'processing' => 0,
+                'completed' => 0,
+                'failed' => 0,
+            ];
+
+            foreach ($summaryRows as $summaryRow) {
+                $statusKey = strtolower((string) $summaryRow->status);
+                if (array_key_exists($statusKey, $summary)) {
+                    $summary[$statusKey] = (int) $summaryRow->total;
                 }
+            }
 
-                $importsQuery = InventoryImportBatch::query()
-                    ->select([
-                        'id',
-                        'vendor_id',
-                        'status',
-                        'media_type',
-                        'total_rows',
-                        'valid_rows',
-                        'invalid_rows',
-                        'file_path',
-                        'ppt_path',
-                        'created_at',
-                    ])
-                    ->byVendor($user->id);
+            $importsQuery = InventoryImportBatch::query()
+                ->select([
+                    'id',
+                    'vendor_id',
+                    'status',
+                    'media_type',
+                    'uploaded_by_user_id',
+                    'total_rows',
+                    'valid_rows',
+                    'invalid_rows',
+                    'file_path',
+                    'ppt_path',
+                    'created_at',
+                ])
+                ->byVendor($user->id);
 
-                if (!empty($validated['status'])) {
-                    $importsQuery->where('status', strtolower((string) $validated['status']));
-                }
+            if (!empty($validated['status'])) {
+                $importsQuery->where('status', strtolower((string) $validated['status']));
+            }
 
-                if (!empty($validated['search'])) {
-                    $search = trim((string) $validated['search']);
-                    $importsQuery->where(function ($query) use ($search) {
-                        $query->where('media_type', 'like', "%{$search}%")
-                            ->orWhere('status', 'like', "%{$search}%")
-                            ->orWhere('id', 'like', "%{$search}%");
-                    });
-                }
+            if (!empty($validated['search'])) {
+                $search = trim((string) $validated['search']);
+                $importsQuery->where(function ($query) use ($search) {
+                    $query->where('media_type', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhere('id', 'like', "%{$search}%");
+                });
+            }
 
-                $perPage = (int) ($validated['per_page'] ?? 15);
+            $perPage = (int) ($validated['per_page'] ?? 15);
 
-                $imports = $importsQuery->orderByDesc('created_at')
-                    ->paginate($perPage);
+            $imports = $importsQuery->orderByDesc('created_at')
+                ->paginate($perPage);
 
-                return response()->json([
-                    'success' => true,
-                    'data' => collect($imports->items())->map(function ($batch) {
-                        $fileUrl = $batch->file_path
-                            ? route('import.download.file', ['batch' => $batch->id]) . '?type=excel'
-                            : null;
-                        $pptUrl = $batch->ppt_path
-                            ? route('import.download.file', ['batch' => $batch->id]) . '?type=ppt'
-                            : null;
-                        return [
-                            'batch_id' => $batch->id,
-                            'status' => $batch->status,
-                            'media_type' => $batch->media_type,
-                            'total_rows' => $batch->total_rows,
-                            'valid_rows' => $batch->valid_rows,
-                            'invalid_rows' => $batch->invalid_rows,
-                            'file_path' => $batch->file_path,
-                            'ppt_path' => $batch->ppt_path,
-                            'file_url' => $fileUrl,
-                            'ppt_url' => $pptUrl,
-                            'created_at' => $batch->created_at,
-                        ];
-                    }),
-                    'pagination' => [
-                        'total' => $imports->total(),
-                        'per_page' => $imports->perPage(),
-                        'current_page' => $imports->currentPage(),
-                        'last_page' => $imports->lastPage(),
-                        'from' => $imports->firstItem(),
-                        'to' => $imports->lastItem(),
-                    ],
-                    'summary' => $summary,
-                ]);
+            return response()->json([
+                'success' => true,
+                'data' => collect($imports->items())->map(function ($batch) {
+                    $fileUrl = $batch->file_path
+                        ? route('import.download.file', ['batch' => $batch->id]) . '?type=excel'
+                        : null;
+                    $pptUrl = $batch->ppt_path
+                        ? route('import.download.file', ['batch' => $batch->id]) . '?type=ppt'
+                        : null;
+                    return [
+                        'batch_id' => $batch->id,
+                        'status' => $batch->status,
+                        'media_type' => $batch->media_type,
+                        'total_rows' => $batch->total_rows,
+                        'valid_rows' => $batch->valid_rows,
+                        'invalid_rows' => $batch->invalid_rows,
+                        'file_path' => $batch->file_path,
+                        'ppt_path' => $batch->ppt_path,
+                        'file_url' => $fileUrl,
+                        'ppt_url' => $pptUrl,
+                        'uploaded_by' => [
+                            'id' => optional($batch->uploadedBy)->id,
+                            'name' => optional($batch->uploadedBy)->name,
+                        ],
+                        'created_at' => $batch->created_at,
+                    ];
+                }),
+                'pagination' => [
+                    'total' => $imports->total(),
+                    'per_page' => $imports->perPage(),
+                    'current_page' => $imports->currentPage(),
+                    'last_page' => $imports->lastPage(),
+                    'from' => $imports->firstItem(),
+                    'to' => $imports->lastItem(),
+                ],
+                'summary' => $summary,
+            ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),       // ← this will show in browser
-                'file'    => $e->getFile(),
-                'line'    => $e->getLine(),
-                'error'   => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Cancel import
-     *
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
+
     public function cancelImport(InventoryImportBatch $batch): JsonResponse
     {
         try {
@@ -861,33 +932,63 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Show batch details with paginated rows.
-     *
-     * @param Request $request
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
     public function showBatch(Request $request, InventoryImportBatch $batch): JsonResponse
     {
         try {
             $this->authorize('view', $batch);
 
-            $rowsQuery =  $batch->stagingRecords()->select([
-                            'id', 'batch_id', 'vendor_id', 'media_type',
-                            'code', 'city', 'category', 'address', 'locality', 'landmark', 'state', 'pincode',
-                            'latitude', 'longitude', 'width', 'height', 'measurement_unit', 'lighting_type', 'screen_type',
-                            'image_name',
-                            'base_monthly_price', 'monthly_price', 'weekly_price_1', 'weekly_price_2', 'weekly_price_3',
-                            'price_per_slot', 'slot_duration_seconds', 'screen_run_time', 'total_slots_per_day',
-                            'min_slots_per_day', 'min_booking_duration', 'minimum_booking_amount', 'commission_percent',
-                            'graphics_charge', 'survey_charge', 'printing_charge', 'mounting_charge',
-                            'remounting_charge', 'lighting_charge',
-                            'discount_type', 'discount_value',
-                            'availability', 'currency', 'available_from', 'available_to',
-                            'extra_attributes', 'status', 'error_message',
-                            'created_at', 'updated_at',
-                        ])->latest('id');
+            $rowsQuery = $batch->stagingRecords()->select([
+                'id',
+                'batch_id',
+                'vendor_id',
+                'media_type',
+                'code',
+                'city',
+                'category',
+                'address',
+                'locality',
+                'landmark',
+                'state',
+                'pincode',
+                'latitude',
+                'longitude',
+                'width',
+                'height',
+                'measurement_unit',
+                'lighting_type',
+                'screen_type',
+                'image_name',
+                'base_monthly_price',
+                'monthly_price',
+                'weekly_price_1',
+                'weekly_price_2',
+                'weekly_price_3',
+                'price_per_slot',
+                'slot_duration_seconds',
+                'screen_run_time',
+                'total_slots_per_day',
+                'min_slots_per_day',
+                'min_booking_duration',
+                'minimum_booking_amount',
+                'commission_percent',
+                'graphics_charge',
+                'survey_charge',
+                'printing_charge',
+                'mounting_charge',
+                'remounting_charge',
+                'lighting_charge',
+                'discount_type',
+                'discount_value',
+                'availability',
+                'currency',
+                'available_from',
+                'available_to',
+                'extra_attributes',
+                'status',
+                'error_message',
+                'created_at',
+                'updated_at',
+            ])->latest('id');
 
             if ($request->filled('status')) {
                 $rowsQuery->where('status', $request->input('status'));
@@ -919,7 +1020,7 @@ class ImportController extends Controller
                         'created_at' => $batch->created_at,
                         'updated_at' => $batch->updated_at,
                     ],
-                   'rows' => collect($rows->items())->map(fn($row) => $row->toArray())->values(),
+                    'rows' => collect($rows->items())->map(fn($row) => $row->toArray())->values(),
 
                     'pagination' => [
                         'total' => $rows->total(),
@@ -938,13 +1039,6 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Update an import batch.
-     *
-     * @param Request $request
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
     public function updateBatch(Request $request, InventoryImportBatch $batch): JsonResponse
     {
         try {
@@ -979,12 +1073,7 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Delete an import batch and all staging rows.
-     *
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
+
     public function deleteBatch(InventoryImportBatch $batch): JsonResponse
     {
         try {
@@ -1020,13 +1109,7 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Download the original uploaded file for a batch.
-     *
-     * @param Request $request
-     * @param InventoryImportBatch $batch
-     * @return \Symfony\Component\HttpFoundation\StreamedResponse|JsonResponse
-     */
+
     public function downloadBatchFile(Request $request, InventoryImportBatch $batch): \Symfony\Component\HttpFoundation\StreamedResponse|JsonResponse
     {
         try {
@@ -1034,7 +1117,7 @@ class ImportController extends Controller
 
             $type = $request->input('type', 'excel');
             $filePath = match ($type) {
-                'ppt'   => $batch->ppt_path,
+                'ppt' => $batch->ppt_path,
                 default => $batch->file_path,
             };
 
@@ -1053,171 +1136,147 @@ class ImportController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to download file',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
-    /**
-     * List rows of a batch.
-     *
-     * @param Request $request
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
+
     public function listBatchRows(Request $request, InventoryImportBatch $batch): JsonResponse
     {
         return $this->showBatch($request, $batch);
     }
 
-    /**
-     * Validation rules shared by createBatchRow and updateBatchRow.
-     * Covers every column in inventory_import_staging.
-     *
-     * @param bool $imageRequired
-     * @return array
-     */
     private function stagingRowRules(bool $imageRequired = false): array
     {
         return [
-            // Core
-            'code'                    => ['nullable', 'string', 'max:255'],
-            'city'                    => ['nullable', 'string', 'max:255'],
 
-            // Address
-            'address'                 => ['nullable', 'string', 'max:500'],
-            'locality'                => ['nullable', 'string', 'max:255'],
-            'landmark'                => ['nullable', 'string', 'max:255'],
-            'state'                   => ['nullable', 'string', 'max:255'],
-            'pincode'                 => ['nullable', 'string', 'max:20'],
+            'code' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
 
-            // Classification
-            'category'                => ['nullable', 'string', 'max:100'],
-            'lighting_type'           => ['nullable', 'string', 'max:100'],
-            'screen_type'             => ['nullable', 'string', 'max:100'],
 
-            // Dimensions
-            'width'                   => ['nullable', 'numeric', 'min:0'],
-            'height'                  => ['nullable', 'numeric', 'min:0'],
-            'measurement_unit'        => ['nullable', 'string', 'max:20'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'locality' => ['nullable', 'string', 'max:255'],
+            'landmark' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
+            'pincode' => ['nullable', 'string', 'max:20'],
 
-            // Geo
-            'latitude'                => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude'               => ['nullable', 'numeric', 'between:-180,180'],
 
-            // Pricing
-            'base_monthly_price'      => ['nullable', 'numeric', 'min:0'],
-            'monthly_price'           => ['nullable', 'numeric', 'min:0'],
-            'weekly_price_1'          => ['nullable', 'numeric', 'min:0'],
-            'weekly_price_2'          => ['nullable', 'numeric', 'min:0'],
-            'weekly_price_3'          => ['nullable', 'numeric', 'min:0'],
-            'price_per_slot'          => ['nullable', 'numeric', 'min:0'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'lighting_type' => ['nullable', 'string', 'max:100'],
+            'screen_type' => ['nullable', 'string', 'max:100'],
 
-            // DOOH timing
-            'slot_duration_seconds'   => ['nullable', 'numeric', 'min:0'],
-            'screen_run_time'         => ['nullable', 'string', 'max:100'],
-            'total_slots_per_day'     => ['nullable', 'integer', 'min:0'],
-            'min_slots_per_day'       => ['nullable', 'integer', 'min:0'],
-            'daily_play_hours'        => ['nullable', 'string', 'max:100'],
 
-            // Booking
-            'min_booking_duration'    => ['nullable', 'numeric', 'min:0'],
-            'minimum_booking_amount'  => ['nullable', 'numeric', 'min:0'],
-            'availability'            => ['nullable', 'string', 'max:100'],
-            'commission_percent'      => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'width' => ['nullable', 'numeric', 'min:0'],
+            'height' => ['nullable', 'numeric', 'min:0'],
+            'measurement_unit' => ['nullable', 'string', 'max:20'],
+
+
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+
+
+            'base_monthly_price' => ['nullable', 'numeric', 'min:0'],
+            'monthly_price' => ['nullable', 'numeric', 'min:0'],
+            'weekly_price_1' => ['nullable', 'numeric', 'min:0'],
+            'weekly_price_2' => ['nullable', 'numeric', 'min:0'],
+            'weekly_price_3' => ['nullable', 'numeric', 'min:0'],
+            'price_per_slot' => ['nullable', 'numeric', 'min:0'],
+
+            'slot_duration_seconds' => ['nullable', 'numeric', 'min:0'],
+            'screen_run_time' => ['nullable', 'string', 'max:100'],
+            'total_slots_per_day' => ['nullable', 'integer', 'min:0'],
+            'min_slots_per_day' => ['nullable', 'integer', 'min:0'],
+            'daily_play_hours' => ['nullable', 'string', 'max:100'],
+
+            'min_booking_duration' => ['nullable', 'numeric', 'min:0'],
+            'minimum_booking_amount' => ['nullable', 'numeric', 'min:0'],
+            'availability' => ['nullable', 'string', 'max:100'],
+            'commission_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
 
             // Charges
-            'graphics_charge'         => ['nullable', 'numeric', 'min:0'],
-            'survey_charge'           => ['nullable', 'numeric', 'min:0'],
-            'printing_charge'         => ['nullable', 'numeric', 'min:0'],
-            'mounting_charge'         => ['nullable', 'numeric', 'min:0'],
-            'remounting_charge'       => ['nullable', 'numeric', 'min:0'],
-            'lighting_charge'         => ['nullable', 'numeric', 'min:0'],
+            'graphics_charge' => ['nullable', 'numeric', 'min:0'],
+            'survey_charge' => ['nullable', 'numeric', 'min:0'],
+            'printing_charge' => ['nullable', 'numeric', 'min:0'],
+            'mounting_charge' => ['nullable', 'numeric', 'min:0'],
+            'remounting_charge' => ['nullable', 'numeric', 'min:0'],
+            'lighting_charge' => ['nullable', 'numeric', 'min:0'],
 
             // Discount
-            'discount_type'           => ['nullable', 'string', 'max:50'],
-            'discount_value'          => ['nullable', 'numeric', 'min:0'],
+            'discount_type' => ['nullable', 'string', 'max:50'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
 
             // Other
-            'currency'                => ['nullable', 'string', 'max:10'],
-            'available_from'          => ['nullable', 'date'],
-            'available_to'            => ['nullable', 'date', 'after_or_equal:available_from'],
+            'currency' => ['nullable', 'string', 'max:10'],
+            'available_from' => ['nullable', 'date'],
+            'available_to' => ['nullable', 'date', 'after_or_equal:available_from'],
 
             // Row status
-            'status'                  => ['required', Rule::in(['valid', 'invalid'])],
-            'error_message'           => ['nullable', 'string'],
-            'extra_attributes'        => ['nullable', 'array'],
+            'status' => ['required', Rule::in(['valid', 'invalid'])],
+            'error_message' => ['nullable', 'string'],
+            'extra_attributes' => ['nullable', 'array'],
 
             // Image
-            'image'                   => [
+            'image' => [
                 $imageRequired ? 'required' : 'nullable',
-                'file', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:5120',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp,gif',
+                'max:5120',
             ],
         ];
     }
 
-    /**
-     * Extract all staging-column values from a validated request array.
-     *
-     * @param array $v
-     * @return array
-     */
     private function stagingFieldsFromValidated(array $v): array
     {
         return [
-            'code'                   => $v['code'],
-            'city'                   => $v['city'] ?? null,
-            'address'                => $v['address'] ?? null,
-            'locality'               => $v['locality'] ?? null,
-            'landmark'               => $v['landmark'] ?? null,
-            'state'                  => $v['state'] ?? null,
-            'pincode'                => $v['pincode'] ?? null,
-            'category'               => $v['category'] ?? null,
-            'lighting_type'          => $v['lighting_type'] ?? null,
-            'screen_type'            => $v['screen_type'] ?? null,
-            'width'                  => $v['width'] ?? null,
-            'height'                 => $v['height'] ?? null,
-            'measurement_unit'       => $v['measurement_unit'] ?? null,
-            'latitude'               => $v['latitude'] ?? null,
-            'longitude'              => $v['longitude'] ?? null,
-            'base_monthly_price'     => $v['base_monthly_price'] ?? null,
-            'monthly_price'          => $v['monthly_price'] ?? null,
-            'weekly_price_1'         => $v['weekly_price_1'] ?? null,
-            'weekly_price_2'         => $v['weekly_price_2'] ?? null,
-            'weekly_price_3'         => $v['weekly_price_3'] ?? null,
-            'price_per_slot'         => $v['price_per_slot'] ?? null,
-            'slot_duration_seconds'  => $v['slot_duration_seconds'] ?? null,
-            'screen_run_time'        => $v['screen_run_time'] ?? null,
-            'total_slots_per_day'    => $v['total_slots_per_day'] ?? null,
-            'min_slots_per_day'      => $v['min_slots_per_day'] ?? null,
-            'daily_play_hours'       => $v['daily_play_hours'] ?? null,
-            'min_booking_duration'   => $v['min_booking_duration'] ?? null,
+            'code' => $v['code'],
+            'city' => $v['city'] ?? null,
+            'address' => $v['address'] ?? null,
+            'locality' => $v['locality'] ?? null,
+            'landmark' => $v['landmark'] ?? null,
+            'state' => $v['state'] ?? null,
+            'pincode' => $v['pincode'] ?? null,
+            'category' => $v['category'] ?? null,
+            'lighting_type' => $v['lighting_type'] ?? null,
+            'screen_type' => $v['screen_type'] ?? null,
+            'width' => $v['width'] ?? null,
+            'height' => $v['height'] ?? null,
+            'measurement_unit' => $v['measurement_unit'] ?? null,
+            'latitude' => $v['latitude'] ?? null,
+            'longitude' => $v['longitude'] ?? null,
+            'base_monthly_price' => $v['base_monthly_price'] ?? null,
+            'monthly_price' => $v['monthly_price'] ?? null,
+            'weekly_price_1' => $v['weekly_price_1'] ?? null,
+            'weekly_price_2' => $v['weekly_price_2'] ?? null,
+            'weekly_price_3' => $v['weekly_price_3'] ?? null,
+            'price_per_slot' => $v['price_per_slot'] ?? null,
+            'slot_duration_seconds' => $v['slot_duration_seconds'] ?? null,
+            'screen_run_time' => $v['screen_run_time'] ?? null,
+            'total_slots_per_day' => $v['total_slots_per_day'] ?? null,
+            'min_slots_per_day' => $v['min_slots_per_day'] ?? null,
+            'daily_play_hours' => $v['daily_play_hours'] ?? null,
+            'min_booking_duration' => $v['min_booking_duration'] ?? null,
             'minimum_booking_amount' => $v['minimum_booking_amount'] ?? null,
-            'availability'           => $v['availability'] ?? null,
-            'commission_percent'     => $v['commission_percent'] ?? null,
-            'graphics_charge'        => $v['graphics_charge'] ?? null,
-            'survey_charge'          => $v['survey_charge'] ?? null,
-            'printing_charge'        => $v['printing_charge'] ?? null,
-            'mounting_charge'        => $v['mounting_charge'] ?? null,
-            'remounting_charge'      => $v['remounting_charge'] ?? null,
-            'lighting_charge'        => $v['lighting_charge'] ?? null,
-            'discount_type'          => $v['discount_type'] ?? null,
-            'discount_value'         => $v['discount_value'] ?? null,
-            'currency'               => $v['currency'] ?? null,
-            'available_from'         => $v['available_from'] ?? null,
-            'available_to'           => $v['available_to'] ?? null,
-            'status'                 => $v['status'],
-            'error_message'          => $v['error_message'] ?? null,
-            'extra_attributes'       => $v['extra_attributes'] ?? null,
+            'availability' => $v['availability'] ?? null,
+            'commission_percent' => $v['commission_percent'] ?? null,
+            'graphics_charge' => $v['graphics_charge'] ?? null,
+            'survey_charge' => $v['survey_charge'] ?? null,
+            'printing_charge' => $v['printing_charge'] ?? null,
+            'mounting_charge' => $v['mounting_charge'] ?? null,
+            'remounting_charge' => $v['remounting_charge'] ?? null,
+            'lighting_charge' => $v['lighting_charge'] ?? null,
+            'discount_type' => $v['discount_type'] ?? null,
+            'discount_value' => $v['discount_value'] ?? null,
+            'currency' => $v['currency'] ?? null,
+            'available_from' => $v['available_from'] ?? null,
+            'available_to' => $v['available_to'] ?? null,
+            'status' => $v['status'],
+            'error_message' => $v['error_message'] ?? null,
+            'extra_attributes' => $v['extra_attributes'] ?? null,
         ];
     }
 
-    /**
-     * Create a staging row under a batch.
-     *
-     * @param Request $request
-     * @param InventoryImportBatch $batch
-     * @return JsonResponse
-     */
+
     public function createBatchRow(Request $request, InventoryImportBatch $batch): JsonResponse
     {
         try {
@@ -1233,8 +1292,8 @@ class ImportController extends Controller
             $validated = $request->validate($this->stagingRowRules());
 
             $fields = $this->stagingFieldsFromValidated($validated);
-            $fields['batch_id']   = $batch->id;
-            $fields['vendor_id']  = $batch->vendor_id;
+            $fields['batch_id'] = $batch->id;
+            $fields['vendor_id'] = $batch->vendor_id;
             $fields['media_type'] = $batch->media_type;
 
             if ($request->hasFile('image')) {
@@ -1265,14 +1324,7 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Update a staging row under a batch.
-     *
-     * @param Request $request
-     * @param InventoryImportBatch $batch
-     * @param InventoryImportStaging $row
-     * @return JsonResponse
-     */
+
     public function updateBatchRow(Request $request, InventoryImportBatch $batch, InventoryImportStaging $row): JsonResponse
     {
         try {
@@ -1335,13 +1387,7 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Delete a staging row under a batch.
-     *
-     * @param InventoryImportBatch $batch
-     * @param InventoryImportStaging $row
-     * @return JsonResponse
-     */
+
     public function deleteBatchRow(InventoryImportBatch $batch, InventoryImportStaging $row): JsonResponse
     {
         try {
@@ -1384,12 +1430,7 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Recalculate and refresh batch counters based on staging rows.
-     *
-     * @param InventoryImportBatch $batch
-     * @return void
-     */
+
     protected function refreshBatchCounts(InventoryImportBatch $batch): void
     {
         $totalRows = $batch->stagingRecords()->count();
@@ -1403,13 +1444,7 @@ class ImportController extends Controller
         ]);
     }
 
-    /**
-     * Store uploaded row image in batch image folder.
-     *
-     * @param InventoryImportBatch $batch
-     * @param \Illuminate\Http\UploadedFile $image
-     * @return string
-     */
+
     protected function storeBatchImage(InventoryImportBatch $batch, $image): string
     {
         $extension = strtolower((string) $image->getClientOriginalExtension());
@@ -1424,14 +1459,7 @@ class ImportController extends Controller
         return $filename;
     }
 
-    /**
-     * Delete image file only if no staging row references it.
-     *
-     * @param InventoryImportBatch $batch
-     * @param string $imageName
-     * @param int|null $excludeRowId
-     * @return void
-     */
+
     protected function deleteBatchImageIfUnused(InventoryImportBatch $batch, string $imageName, ?int $excludeRowId = null): void
     {
         $query = $batch->stagingRecords()->where('image_name', $imageName);
@@ -1452,11 +1480,7 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Admin: list roles and current import permissions.
-     *
-     * @return JsonResponse
-     */
+
     public function listRoleImportPermissions(): JsonResponse
     {
         try {
@@ -1474,9 +1498,11 @@ class ImportController extends Controller
                 ->get(['id', 'name']);
 
             $roles = Role::query()
-                ->with(['permissions' => function ($query) {
-                    $query->where('name', 'like', 'import.%')->orderBy('name');
-                }])
+                ->with([
+                    'permissions' => function ($query) {
+                        $query->where('name', 'like', 'import.%')->orderBy('name');
+                    }
+                ])
                 ->orderBy('name')
                 ->get(['id', 'name']);
 
@@ -1502,13 +1528,6 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * Admin: sync import permissions for a role.
-     *
-     * @param Request $request
-     * @param Role $role
-     * @return JsonResponse
-     */
     public function updateRoleImportPermissions(Request $request, Role $role): JsonResponse
     {
         try {
@@ -1526,7 +1545,7 @@ class ImportController extends Controller
             ]);
 
             $incomingPermissions = collect($validated['permissions'])
-                ->filter(fn ($permissionName) => is_string($permissionName) && str_starts_with($permissionName, 'import.'))
+                ->filter(fn($permissionName) => is_string($permissionName) && str_starts_with($permissionName, 'import.'))
                 ->values();
 
             $allowedPermissions = Permission::query()

@@ -67,7 +67,7 @@ class ProfileController extends Controller
                 return back()->withErrors([
                     'avatar' => 'Avatar upload failed. Please try again.'
                 ]);
-            }
+            }   
         }
 
         $user->update($validated);

@@ -14,10 +14,13 @@ use Modules\DOOH\Models\DOOHScreenMedia;
 use Exception;
 use Intervention\Image\Laravel\Facades\Image;
 use Modules\Import\Notifications\BulkImportApprovedNotification;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\InventoryImportedMail;
+
 
 class ImportApprovalService
 {
-        /**
+    /**
      * Image sizes to generate for each uploaded image (same as main app).
      */
     protected array $imageSizes = [100, 300, 600, 1000, 1500];
@@ -33,10 +36,10 @@ class ImportApprovalService
      */
     private function processImportImage(string $basePath, int $id, string $sourcePath): array
     {
-        $uuid  = \Illuminate\Support\Str::uuid()->toString();
-        $year  = now()->format('Y');
+        $uuid = \Illuminate\Support\Str::uuid()->toString();
+        $year = now()->format('Y');
         $month = now()->format('m');
-        $base  = "$basePath/{$year}/{$month}/{$id}";
+        $base = "$basePath/{$year}/{$month}/{$id}";
 
         $paths = [];
         $publicDisk = \Storage::disk('public');
@@ -47,8 +50,8 @@ class ImportApprovalService
                 ->scaleDown(width: $size)
                 ->toWebp(quality: 82);
             $directory = "$base/{$size}";
-            $filename  = "$uuid.webp";
-            $path      = "$directory/$filename";
+            $filename = "$uuid.webp";
+            $path = "$directory/$filename";
             $publicDisk->put($path, $image);
             $paths["path_{$size}"] = $path;
         }
@@ -64,28 +67,25 @@ class ImportApprovalService
     public function approveBatch(InventoryImportBatch $batch): array
     {
         try {
-            // Validate batch status
+
             $this->validateBatchStatus($batch);
             $createdCount = 0;
             $failedCount = 0;
             $createdHoardingIds = [];
-            // Wrap everything in transaction for atomicity
-            DB::transaction(function () use ($batch, &$createdCount, &$failedCount,  &$createdHoardingIds) {
-                // Get all valid staging records with eager loading
+
+            DB::transaction(function () use ($batch, &$createdCount, &$failedCount, &$createdHoardingIds) {
+
                 $validRows = $batch->stagingRecords()
                     ->valid()
                     ->get();
                 if ($validRows->isEmpty()) {
                     throw new Exception('No valid records found in batch to approve');
                 }
-                // \Log::info('Starting batch approval', [
-                //     'batch_id' => $batch->id,
-                //     'valid_records' => $validRows->count(),
-                // ]);
+
                 foreach ($validRows as $stagingRow) {
                     try {
-                        $hoarding = $this->processRow($batch, $stagingRow); // CHANGE: return hoarding
-                        $createdHoardingIds[] = $hoarding->id;              // ADD THIS
+                        $hoarding = $this->processRow($batch, $stagingRow);
+                        $createdHoardingIds[] = $hoarding->id;
                         $createdCount++;
 
                     } catch (Exception $e) {
@@ -96,10 +96,10 @@ class ImportApprovalService
                             'code' => $stagingRow->code,
                             'error' => $e->getMessage(),
                         ]);
-                        
+
                         // Mark row as failed
                         $stagingRow->markAsInvalid('Processing error: ' . $e->getMessage());
-                        
+
                         // Don't throw - continue processing other rows
                     }
                 }
@@ -123,7 +123,7 @@ class ImportApprovalService
             }, attempts: 3);
 
             $wasApproved = ($createdCount > 0 && $failedCount === 0);
-
+            dd($wasApproved, $createdCount, $failedCount);
             // Send notifications if approval was successful
             if ($wasApproved) {
                 // Notify all admins ONCE for the batch
@@ -139,7 +139,7 @@ class ImportApprovalService
                     );
                 }
 
-                // Notify vendor ONCE for the batch (email only, no in-app notification for bulk approval)
+
                 $vendor = $batch->vendor;
                 if ($vendor) {
                     $vendor->notify(
@@ -148,11 +148,51 @@ class ImportApprovalService
                             $createdCount,
                             $failedCount,
                             $createdHoardingIds,
-                            $autoApproval // ✅ ADD THIS
+                            $autoApproval
 
                         )
                     );
                 }
+                \Log::info('Inventory Mail Debug', [
+                    'auth_id' => auth()->id(),
+                    'batch_vendor_id' => $batch->vendor_id,
+                    'vendor_exists' => $batch->vendor ? true : false,
+                    'vendor_email' => $batch->vendor?->email,
+                    'wasApproved' => $wasApproved,
+                ]);
+                if (
+                    auth()->id() != $batch->vendor_id &&
+                    $batch->vendor &&
+                    !empty($batch->vendor->email)
+                ) {
+
+                    \Log::info('MAIL START', [
+                        'vendor_email' => $batch->vendor->email,
+                        'vendor_id' => $batch->vendor_id,
+                        'auth_id' => auth()->id(),
+                    ]);
+
+                    try {
+
+                        Mail::to($batch->vendor->email)
+                            ->send(
+                                new InventoryImportedMail(
+                                    $batch,
+                                    auth()->user()->name
+                                )
+                            );
+
+                        \Log::info('MAIL SENT SUCCESS');
+
+                    } catch (\Throwable $e) {
+
+                        \Log::error('MAIL FAILED', [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                    }
+                }
+
             }
 
             return [
@@ -178,12 +218,7 @@ class ImportApprovalService
         }
     }
 
-    /**
-     * Validate batch is in correct status for approval
-     *
-     * @param InventoryImportBatch $batch
-     * @throws Exception
-     */
+
     protected function validateBatchStatus(InventoryImportBatch $batch): void
     {
         if ($batch->status === 'approved') {
@@ -201,14 +236,8 @@ class ImportApprovalService
         }
     }
 
-    /**
-     * Process single staging row to create hoarding and related records
-     *
-     * @param InventoryImportBatch $batch
-     * @param InventoryImportStaging $stagingRow
-     * @throws Exception
-     */
-    protected function processRow(InventoryImportBatch $batch, InventoryImportStaging $stagingRow): Hoarding 
+
+    protected function processRow(InventoryImportBatch $batch, InventoryImportStaging $stagingRow): Hoarding
     {
         // \Log::info('Processing staging row', [
         //     'batch_id' => $batch->id,
@@ -217,41 +246,60 @@ class ImportApprovalService
         // ]);
         // dd($stagingRow->toArray());
 
-        // STEP 1: Create parent Hoarding record
-        // Use base_monthly_price if present, else fallback to d_c_p_m, else fallback to 0
-       $baseMonthlyPrice = $this->stagingValue($stagingRow, 'base_monthly_price', 0);
-        $monthlyPrice     = $this->stagingValue($stagingRow, 'monthly_price', null);
 
-        // If no discounted price supplied, fall back to the rack rate
+        $baseMonthlyPrice = $this->stagingValue($stagingRow, 'base_monthly_price', 0);
+        $monthlyPrice = $this->stagingValue($stagingRow, 'monthly_price', null);
+
         if ($monthlyPrice === null || $monthlyPrice === '' || $monthlyPrice == 0) {
             $monthlyPrice = $baseMonthlyPrice;
         }
         $autoApproval = \App\Models\Setting::get('auto_hoarding_approval', false);
         $hoardingStatus = $autoApproval ? 'active' : 'pending_approval';
+        $baseMonthlyPrice = $this->stagingValue($stagingRow, 'base_monthly_price', 0);
 
+        $exists = Hoarding::where('vendor_id', $batch->vendor_id)
+            ->where('city', $stagingRow->city)
+            ->where('base_monthly_price', $baseMonthlyPrice)
+            ->whereHas('oohHoarding', function ($query) use ($stagingRow) {
+                $query->where('width', $stagingRow->width)
+                    ->where('height', $stagingRow->height);
+            })
+            ->exists();
+
+        if ($exists) {
+
+            \Log::warning('Duplicate Hoarding Skipped', [
+                'vendor_id' => $batch->vendor_id,
+                'city' => $stagingRow->city,
+                'width' => $stagingRow->width,
+                'height' => $stagingRow->height,
+            ]);
+
+            throw new Exception('Duplicate Hoarding');
+        }
         $hoarding = Hoarding::create([
-            'vendor_id'          => $batch->vendor_id,
-            'title'              => $stagingRow->code,
-            'hoarding_type'      => $stagingRow->media_type,
-            'category'           => $this->stagingValue($stagingRow, 'category', null),
-            'address'            => $this->stagingValue($stagingRow, 'address', null),
-            'city'               => $stagingRow->city,
-            'state'              => $this->stagingValue($stagingRow, 'state', null),
-            'locality'           => $this->stagingValue($stagingRow, 'locality', null),
-            'landmark'           => $this->stagingValue($stagingRow, 'landmark', null),
-            'pincode'            => $this->stagingValue($stagingRow, 'pincode', null),
-            'latitude'           => $this->stagingValue($stagingRow, 'latitude', null),
-            'longitude'          => $this->stagingValue($stagingRow, 'longitude', null),
+            'vendor_id' => $batch->vendor_id,
+            'title' => $stagingRow->code,
+            'hoarding_type' => $stagingRow->media_type,
+            'category' => $this->stagingValue($stagingRow, 'category', null),
+            'address' => $this->stagingValue($stagingRow, 'address', null),
+            'city' => $stagingRow->city,
+            'state' => $this->stagingValue($stagingRow, 'state', null),
+            'locality' => $this->stagingValue($stagingRow, 'locality', null),
+            'landmark' => $this->stagingValue($stagingRow, 'landmark', null),
+            'pincode' => $this->stagingValue($stagingRow, 'pincode', null),
+            'latitude' => $this->stagingValue($stagingRow, 'latitude', null),
+            'longitude' => $this->stagingValue($stagingRow, 'longitude', null),
             'base_monthly_price' => $baseMonthlyPrice,   // D.C.P.M rack rate
-            'monthly_price'      => $monthlyPrice,        // sale price (or rack rate if no discount)
+            'monthly_price' => $monthlyPrice,        // sale price (or rack rate if no discount)
             'commission_percent' => (float) ($this->stagingValue($stagingRow, 'commission_percent', 0) ?? 0),
-            'graphics_charge'    => $this->stagingValue($stagingRow, 'graphics_charge', null),
-            'survey_charge'      => $this->stagingValue($stagingRow, 'survey_charge', null),
+            'graphics_charge' => $this->stagingValue($stagingRow, 'graphics_charge', null),
+            'survey_charge' => $this->stagingValue($stagingRow, 'survey_charge', null),
             'min_booking_duration' => $this->stagingValue($stagingRow, 'min_booking_duration', null),
-            'discount_type'      => $this->stagingValue($stagingRow, 'discount_type', null),
-            'discount_value'     => $this->stagingValue($stagingRow, 'discount_value', null),
-            'currency'           => $this->stagingValue($stagingRow, 'currency', 'INR'),
-            'status'             => $hoardingStatus,
+            'discount_type' => $this->stagingValue($stagingRow, 'discount_type', null),
+            'discount_value' => $this->stagingValue($stagingRow, 'discount_value', null),
+            'currency' => $this->stagingValue($stagingRow, 'currency', 'INR'),
+            'status' => $hoardingStatus,
         ]);
 
         if (!$hoarding) {
@@ -317,16 +365,16 @@ class ImportApprovalService
                 $paths = $this->processImportImage('hoardings/media', $hoarding->id, $originalPath);
                 $media = HoardingMedia::create([
                     'hoarding_id' => $hoarding->id,
-                    'file_path'   => $paths['path_1500'], // original / largest
-                    'path_100'    => $paths['path_100'],
-                    'path_300'    => $paths['path_300'],
-                    'path_600'    => $paths['path_600'],
-                    'path_1000'   => $paths['path_1000'],
-                    'path_1500'   => $paths['path_1500'],
-                    'mime_type'   => 'image/webp',
-                    'media_type'  => 'image',
-                    'is_primary'  => true,
-                    'sort_order'  => 0,
+                    'file_path' => $paths['path_1500'], // original / largest
+                    'path_100' => $paths['path_100'],
+                    'path_300' => $paths['path_300'],
+                    'path_600' => $paths['path_600'],
+                    'path_1000' => $paths['path_1000'],
+                    'path_1500' => $paths['path_1500'],
+                    'mime_type' => 'image/webp',
+                    'media_type' => 'image',
+                    'is_primary' => true,
+                    'sort_order' => 0,
                 ]);
                 if (!$media) {
                     throw new Exception('Failed to create hoarding media record');
@@ -387,16 +435,16 @@ class ImportApprovalService
                 $paths = $this->processImportImage('dooh/screens', $doohScreen->id, $originalPath);
                 $media = DOOHScreenMedia::create([
                     'dooh_screen_id' => $doohScreen->id,
-                    'file_path'   => $paths['path_1500'], // original / largest
-                    'path_100'    => $paths['path_100'],
-                    'path_300'    => $paths['path_300'],
-                    'path_600'    => $paths['path_600'],
-                    'path_1000'   => $paths['path_1000'],
-                    'path_1500'   => $paths['path_1500'],
-                    'mime_type'   => 'image/webp',
-                    'media_type'  => 'image',
-                    'is_primary'  => true,
-                    'sort_order'  => 0,
+                    'file_path' => $paths['path_1500'], // original / largest
+                    'path_100' => $paths['path_100'],
+                    'path_300' => $paths['path_300'],
+                    'path_600' => $paths['path_600'],
+                    'path_1000' => $paths['path_1000'],
+                    'path_1500' => $paths['path_1500'],
+                    'mime_type' => 'image/webp',
+                    'media_type' => 'image',
+                    'is_primary' => true,
+                    'sort_order' => 0,
                 ]);
                 if (!$media) {
                     throw new Exception('Failed to create DOOH screen media record');

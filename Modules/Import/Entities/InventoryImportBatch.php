@@ -32,126 +32,97 @@ class InventoryImportBatch extends Model
         'invalid_rows',
         'file_path',
         'ppt_path',
+        'uploaded_by_user_id'
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
+
     protected $casts = [
         'total_rows' => 'integer',
         'valid_rows' => 'integer',
         'invalid_rows' => 'integer',
     ];
 
-    /**
-     * Get the staging records for this batch.
-     */
+
     public function stagingRecords(): HasMany
     {
         return $this->hasMany(InventoryImportStaging::class, 'batch_id');
     }
 
-    /**
-     * Get vendor who initiated the import
-     */
     public function vendor()
     {
         return $this->belongsTo(\App\Models\User::class, 'vendor_id');
     }
 
-    /**
-     * Scope to filter by status: uploaded
-     */
+
     public function scopeUploaded(Builder $query): Builder
     {
         return $query->where('status', 'uploaded');
     }
 
-    /**
-     * Scope to filter by status: processing
-     */
     public function scopeProcessing(Builder $query): Builder
     {
         return $query->where('status', 'processing');
     }
 
-    /**
-     * Scope to filter by status: processed
-     */
+    public function uploadedBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'uploaded_by_user_id');
+    }
+
     public function scopeProcessed(Builder $query): Builder
     {
         return $query->where('status', 'processed');
     }
 
-    /**
-     * Scope to filter by status: approved
-     */
+
     public function scopeApproved(Builder $query): Builder
     {
         return $query->where('status', 'approved');
     }
 
-    /**
-     * Scope to filter by status: completed
-     */
+
     public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', 'completed');
     }
 
-    /**
-     * Scope to filter by status: failed
-     */
+
     public function scopeFailed(Builder $query): Builder
     {
         return $query->where('status', 'failed');
     }
 
-    /**
-     * Scope to filter by media type
-     */
+
     public function scopeByMediaType(Builder $query, string $mediaType): Builder
     {
         return $query->where('media_type', $mediaType);
     }
 
-    /**
-     * Scope to filter by vendor
-     */
+
     public function scopeByVendor(Builder $query, int $vendorId): Builder
     {
         return $query->where('vendor_id', $vendorId);
     }
 
-    /**
-     * Check if batch is being processed
-     */
+
     public function isProcessing(): bool
     {
         return $this->status === 'processing';
     }
 
-    /**
-     * Check if batch processing is completed
-     */
+
     public function isCompleted(): bool
     {
         return $this->status === 'completed';
     }
 
-    /**
-     * Check if batch processing failed
-     */
+
     public function isFailed(): bool
     {
         return $this->status === 'failed';
     }
 
-    /**
-     * Get error rate percentage
-     */
+
     public function getErrorRatePercentage(): float
     {
         if ($this->total_rows === 0) {
@@ -161,9 +132,7 @@ class InventoryImportBatch extends Model
         return round(($this->invalid_rows / $this->total_rows) * 100, 2);
     }
 
-    /**
-     * Get success rate percentage
-     */
+
     public function getSuccessRatePercentage(): float
     {
         if ($this->total_rows === 0) {
@@ -173,17 +142,13 @@ class InventoryImportBatch extends Model
         return round(($this->valid_rows / $this->total_rows) * 100, 2);
     }
 
-    /**
-     * Update batch status
-     */
+
     public function updateStatus(string $status): void
     {
         $this->update(['status' => $status]);
     }
 
-    /**
-     * Mark batch as processing
-     */
+
     public function markAsProcessing(): void
     {
         $this->update([
@@ -191,9 +156,6 @@ class InventoryImportBatch extends Model
         ]);
     }
 
-    /**
-     * Mark batch as processed
-     */
     public function markAsProcessed(): void
     {
         $this->update([
@@ -201,9 +163,6 @@ class InventoryImportBatch extends Model
         ]);
     }
 
-    /**
-     * Mark batch as completed
-     */
     public function markAsCompleted(): void
     {
         $this->update([
@@ -211,9 +170,6 @@ class InventoryImportBatch extends Model
         ]);
     }
 
-    /**
-     * Mark batch as failed
-     */
     public function markAsFailed(string $errorMessage = ''): void
     {
         $this->update([
@@ -221,9 +177,6 @@ class InventoryImportBatch extends Model
         ]);
     }
 
-    /**
-     * Update row counts
-     */
     public function updateRowCounts(int $totalRows, int $validRows, int $invalidRows): void
     {
         $this->update([
