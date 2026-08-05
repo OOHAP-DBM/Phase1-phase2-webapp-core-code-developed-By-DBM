@@ -237,7 +237,8 @@
                                     </svg>
                                     <span class="text-xs text-gray-500 text-center px-2">Select your file or drag &amp;
                                         drop</span>
-                                    <span class="text-[11px] text-gray-400 mt-0.5">Max 40 MB .pptx/.pdf</span>
+                                    {{-- <span class="text-[11px] text-gray-400 mt-0.5">Max 40 MB .pptx/.pdf</span> --}}
+                                    <span class="text-[11px] text-gray-400 mt-0.5">Max 200 MB .pptx/.pdf</span>
                                     <span
                                         class="mt-3 px-4 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg group-hover:bg-green-700 transition-colors">Browse</span>
                                 </label>
@@ -306,7 +307,8 @@
                 <p class="text-sm font-semibold text-blue-900 mb-2">Upload Guidance</p>
                 <ul class="text-xs text-blue-800 space-y-1 mb-4">
                     <li>✓ Excel file up to 20MB</li>
-                    <li>✓ PowerPoint file up to 40MB</li>
+                    {{-- <li>✓ PowerPoint file up to 40MB</li> --}}
+                    <li>✓ PowerPoint file up to 200MB</li>
                     <li>✓ Use sample template columns exactly for smooth import</li>
                     <li>✓ For DOOH, include additional pricing fields</li>
                 </ul>
@@ -1020,9 +1022,13 @@
                 return;
             }
 
-            if (pptFile && pptFile.size > 60 * 1024 * 1024) {
-                showError('PowerPoint file size must be 40MB or less.');
-                return;
+            // if (pptFile && pptFile.size > 60 * 1024 * 1024) {
+            //     showError('PowerPoint file size must be 40MB or less.');
+            //     return;
+            // }
+            if (pptFile && pptFile.size > 200 * 1024 * 1024) {
+                showError('PowerPoint file size must be 200MB or less.');
+                 return;
             }
 
             const mediaType = mediaTypeElement.value;
