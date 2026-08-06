@@ -16,15 +16,26 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\OfferVersionDiffService;
+use App\Services\OfferBookingService;
+
+
 use Carbon\Carbon;
 
 class CustomerOfferController extends Controller
 {
     protected HoardingAvailabilityService $availabilityService;
+    protected OfferVersionDiffService $diffService;
+    protected OfferBookingService $bookingService;
 
-    public function __construct(HoardingAvailabilityService $availabilityService)
+
+
+    // public function __construct(HoardingAvailabilityService $availabilityService, OfferVersionDiffService $diffService)
+    public function __construct(HoardingAvailabilityService $availabilityService, OfferVersionDiffService $diffService, OfferBookingService $bookingService)
     {
         $this->availabilityService = $availabilityService;
+        $this->diffService = $diffService;
+        $this->bookingService = $bookingService;
     }
 
     public function index(Request $request)
@@ -65,12 +76,26 @@ class CustomerOfferController extends Controller
         return view('customer.offers.index', compact('offers'));
     }
 
-    public function show(Offer $offer)
+    // public function show(Offer $offer)
+    // {
+    //     abort_unless($offer->customer_id === Auth::id(), 403);
+    //     $offer->load('currentVersion.items.hoarding.doohScreen', 'vendor', 'activityLogs');
+    //     return view('customer.offers.show', compact('offer'));
+    // }
+      public function show(Offer $offer)
     {
         abort_unless($offer->customer_id === Auth::id(), 403);
-        $offer->load('currentVersion.items.hoarding.doohScreen', 'vendor', 'activityLogs');
-        return view('customer.offers.show', compact('offer'));
-    }
+
+        $offer->load([
+            'currentVersion.items.hoarding.doohScreen',
+            'vendor',
+            'activityLogs.actor',
+        ]);
+
+       $versionDiffs = $this->diffService->build($offer);
+
+
+return view('customer.offers.show', compact('offer', 'versionDiffs') + ['isVendorView' => false]);    }
 
     public function accept(Offer $offer): JsonResponse
     {
@@ -242,121 +267,160 @@ class CustomerOfferController extends Controller
      * created_by_type = 'customer'. Offer stays 'sent'; wasLastModifiedByCustomer()
      * is what flips the vendor's Manage Offers action to "Accept Customer's Offer".
      */
-    public function storeModification(Request $request, Offer $offer): JsonResponse
-    {
-        abort_unless($offer->customer_id === Auth::id(), 403);
+    // public function storeModification(Request $request, Offer $offer): JsonResponse
+    // {
+    //     abort_unless($offer->customer_id === Auth::id(), 403);
 
-        if (!$offer->canAccept() || !$offer->wasLastModifiedByVendor()) {
-            return response()->json(['success' => false, 'message' => 'This offer is not currently open for modification.'], 422);
-        }
+    //     if (!$offer->canAccept() || !$offer->wasLastModifiedByVendor()) {
+    //         return response()->json(['success' => false, 'message' => 'This offer is not currently open for modification.'], 422);
+    //     }
 
-        $validated = $request->validate([
-            'items'                             => 'required|array|min:1',
-            'items.*.hoarding_id'               => 'required|integer|exists:hoardings,id',
-            'items.*.enquiry_item_id'           => 'nullable|integer|exists:enquiry_items,id',
-            'items.*.hoarding_type'             => 'required|in:ooh,dooh',
-            'items.*.start_date'                => 'required|date',
-            'items.*.end_date'                  => 'required|date|after_or_equal:items.*.start_date',
-            'items.*.unit_price'                => 'required|numeric|min:0',
-            'items.*.discount_amount'           => 'nullable|numeric|min:0',
-            'items.*.final_price'               => 'required|numeric|min:0',
-        ]);
+    //     $validated = $request->validate([
+    //         'items'                             => 'required|array|min:1',
+    //         'items.*.hoarding_id'               => 'required|integer|exists:hoardings,id',
+    //         'items.*.enquiry_item_id'           => 'nullable|integer|exists:enquiry_items,id',
+    //         'items.*.hoarding_type'             => 'required|in:ooh,dooh',
+    //         'items.*.start_date'                => 'required|date',
+    //         'items.*.end_date'                  => 'required|date|after_or_equal:items.*.start_date',
+    //         'items.*.unit_price'                => 'required|numeric|min:0',
+    //         'items.*.discount_amount'           => 'nullable|numeric|min:0',
+    //         'items.*.final_price'               => 'required|numeric|min:0',
+    //     ]);
 
-        $hoardingIds = collect($validated['items'])->pluck('hoarding_id')->unique()->values();
-        $ownedCount  = Hoarding::whereIn('id', $hoardingIds)->where('vendor_id', $offer->vendor_id)->count();
-        if ($ownedCount !== $hoardingIds->count()) {
-            return response()->json(['success' => false, 'message' => 'One or more hoardings do not belong to this vendor.'], 403);
-        }
+    //     $hoardingIds = collect($validated['items'])->pluck('hoarding_id')->unique()->values();
+    //     $ownedCount  = Hoarding::whereIn('id', $hoardingIds)->where('vendor_id', $offer->vendor_id)->count();
+    //     if ($ownedCount !== $hoardingIds->count()) {
+    //         return response()->json(['success' => false, 'message' => 'One or more hoardings do not belong to this vendor.'], 403);
+    //     }
 
-        $conflicts = [];
-        foreach ($validated['items'] as $item) {
-            $result = $this->availabilityService->checkMultipleDates($item['hoarding_id'], [$item['start_date'], $item['end_date']]);
-            $bad = collect($result)->pluck('status')->filter(fn ($s) => !in_array($s, ['available', 'blocked']))->unique();
-            if ($bad->isNotEmpty()) {
-                $h = Hoarding::find($item['hoarding_id']);
-                $conflicts[] = ['hoarding_id' => $item['hoarding_id'], 'hoarding_name' => $h->title ?? "Hoarding #{$item['hoarding_id']}", 'reasons' => $bad->values()];
-            }
-        }
-        if (!empty($conflicts)) {
-            return response()->json(['success' => false, 'message' => 'Some hoardings are no longer available for the selected dates.', 'unavailable_hoardings' => $conflicts], 422);
-        }
+    //     $conflicts = [];
+    //     foreach ($validated['items'] as $item) {
+    //         $result = $this->availabilityService->checkMultipleDates($item['hoarding_id'], [$item['start_date'], $item['end_date']]);
+    //         $bad = collect($result)->pluck('status')->filter(fn ($s) => !in_array($s, ['available', 'blocked']))->unique();
+    //         if ($bad->isNotEmpty()) {
+    //             $h = Hoarding::find($item['hoarding_id']);
+    //             $conflicts[] = ['hoarding_id' => $item['hoarding_id'], 'hoarding_name' => $h->title ?? "Hoarding #{$item['hoarding_id']}", 'reasons' => $bad->values()];
+    //         }
+    //     }
+    //     if (!empty($conflicts)) {
+    //         return response()->json(['success' => false, 'message' => 'Some hoardings are no longer available for the selected dates.', 'unavailable_hoardings' => $conflicts], 422);
+    //     }
 
-        $lock = Cache::lock("offer-modify:{$offer->id}", 15);
-        if (!$lock->get()) {
-            return response()->json(['success' => false, 'message' => 'This offer is already being updated. Please try again shortly.'], 409);
-        }
+    //     $lock = Cache::lock("offer-modify:{$offer->id}", 15);
+    //     if (!$lock->get()) {
+    //         return response()->json(['success' => false, 'message' => 'This offer is already being updated. Please try again shortly.'], 409);
+    //     }
 
-        try {
-            $customer = Auth::user();
+    //     try {
+    //         $customer = Auth::user();
 
-            $offer = DB::transaction(function () use ($validated, $customer, $offer) {
-                $subtotal = collect($validated['items'])->sum('unit_price');
-                $discount = collect($validated['items'])->sum(fn ($i) => $i['discount_amount'] ?? 0);
-                $total    = collect($validated['items'])->sum('final_price');
+    //         $offer = DB::transaction(function () use ($validated, $customer, $offer) {
+    //             $subtotal = collect($validated['items'])->sum('unit_price');
+    //             $discount = collect($validated['items'])->sum(fn ($i) => $i['discount_amount'] ?? 0);
+    //             $total    = collect($validated['items'])->sum('final_price');
 
-                $nextVersionNumber = ($offer->getLatestVersion()?->version_number ?? 0) + 1;
+    //             $nextVersionNumber = ($offer->getLatestVersion()?->version_number ?? 0) + 1;
 
-                $version = OfferVersion::create([
-                    'offer_id'        => $offer->id,
-                    'version_number'  => $nextVersionNumber,
-                    'created_by'      => $customer->id,
-                    'created_by_type' => 'customer',
-                    'status'          => 'sent',
-                    'subtotal'        => $subtotal,
-                    'discount_amount' => $discount,
-                    'tax_amount'      => 0,
-                    'total_amount'    => $total,
-                ]);
+    //             $version = OfferVersion::create([
+    //                 'offer_id'        => $offer->id,
+    //                 'version_number'  => $nextVersionNumber,
+    //                 'created_by'      => $customer->id,
+    //                 'created_by_type' => 'customer',
+    //                 'status'          => 'sent',
+    //                 'subtotal'        => $subtotal,
+    //                 'discount_amount' => $discount,
+    //                 'tax_amount'      => 0,
+    //                 'total_amount'    => $total,
+    //             ]);
 
-                $offer->update([
-                    'current_version_id' => $version->id,
-                    'price'               => $total,
-                    'price_snapshot'      => ['items' => $validated['items']],
-                    'version'             => $nextVersionNumber,
-                    // status stays STATUS_SENT — it's still an open offer, just the
-                    // vendor's turn to respond now instead of the customer's
-                ]);
+    //             $offer->update([
+    //                 'current_version_id' => $version->id,
+    //                 'price'               => $total,
+    //                 'price_snapshot'      => ['items' => $validated['items']],
+    //                 'version'             => $nextVersionNumber,
+    //                 // status stays STATUS_SENT — it's still an open offer, just the
+    //                 // vendor's turn to respond now instead of the customer's
+    //             ]);
 
-                foreach ($validated['items'] as $item) {
-                    $start = Carbon::parse($item['start_date']);
-                    $end   = Carbon::parse($item['end_date']);
+    //             foreach ($validated['items'] as $item) {
+    //                 $start = Carbon::parse($item['start_date']);
+    //                 $end   = Carbon::parse($item['end_date']);
 
-                    OfferVersionItem::create([
-                        'offer_version_id' => $version->id,
-                        'enquiry_item_id'  => $item['enquiry_item_id'] ?? null,
-                        'hoarding_id'      => $item['hoarding_id'],
-                        'hoarding_type'    => $item['hoarding_type'],
-                        'start_date'       => $start,
-                        'end_date'         => $end,
-                        'duration_months'  => max(1, (int) ceil(($end->diffInDays($start) + 1) / 30)),
-                        'unit_price'       => $item['unit_price'],
-                        'discount_amount'  => $item['discount_amount'] ?? 0,
-                        'tax_amount'       => 0,
-                        'final_price'      => $item['final_price'],
-                        'meta'             => ['source' => !empty($item['enquiry_item_id']) ? 'enquiry' : 'added'],
-                    ]);
-                }
+    //                 OfferVersionItem::create([
+    //                     'offer_version_id' => $version->id,
+    //                     'enquiry_item_id'  => $item['enquiry_item_id'] ?? null,
+    //                     'hoarding_id'      => $item['hoarding_id'],
+    //                     'hoarding_type'    => $item['hoarding_type'],
+    //                     'start_date'       => $start,
+    //                     'end_date'         => $end,
+    //                     'duration_months'  => max(1, (int) ceil(($end->diffInDays($start) + 1) / 30)),
+    //                     'unit_price'       => $item['unit_price'],
+    //                     'discount_amount'  => $item['discount_amount'] ?? 0,
+    //                     'tax_amount'       => 0,
+    //                     'final_price'      => $item['final_price'],
+    //                     'meta'             => ['source' => !empty($item['enquiry_item_id']) ? 'enquiry' : 'added'],
+    //                 ]);
+    //             }
 
-                OfferActivityLog::record($offer, 'customer_modified', "Customer modified the offer — version {$nextVersionNumber} created");
+    //             OfferActivityLog::record($offer, 'customer_modified', "Customer modified the offer — version {$nextVersionNumber} created");
 
-                return $offer;
-            });
+    //             return $offer;
+    //         });
 
-            try {
-                \Mail::to($offer->vendor->email)->queue(
-                    new \App\Mail\OfferModifiedByCustomerMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']))
-                );
-            } catch (\Exception $e) {
-                Log::warning('Customer-modification notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
-            }
+    //         try {
+    //             \Mail::to($offer->vendor->email)->queue(
+    //                 new \App\Mail\OfferModifiedByCustomerMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']))
+    //             );
+    //         } catch (\Exception $e) {
+    //             Log::warning('Customer-modification notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
+    //         }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Your changes have been sent to the vendor',
-                'data'    => ['redirect' => route('customer.offers.show', $offer->id)],
-            ], 201);
-        } finally {
-            $lock->release();
-        }
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Your changes have been sent to the vendor',
+    //             'data'    => ['redirect' => route('customer.offers.show', $offer->id)],
+    //         ], 201);
+    //     } finally {
+    //         $lock->release();
+    //     }
+    // }
+    // app/Http/Controllers/Customer/CustomerOfferController.php
+
+public function storeModification(Request $request, Offer $offer): JsonResponse
+{
+    abort_unless($offer->customer_id === Auth::id(), 403);
+
+    if (!$offer->canAccept() || !$offer->wasLastModifiedByVendor()) {
+        return response()->json(['success' => false, 'message' => 'This offer is not currently open for modification.'], 422);
     }
+
+    $validated = $request->validate([
+        'items'                             => 'required|array|min:1',
+        'items.*.hoarding_id'               => 'required|integer|exists:hoardings,id',
+        'items.*.enquiry_item_id'           => 'nullable|integer|exists:enquiry_items,id',
+        'items.*.hoarding_type'             => 'required|in:ooh,dooh',
+        'items.*.start_date'                => 'required|date',
+        'items.*.end_date'                  => 'required|date|after_or_equal:items.*.start_date',
+        'items.*.unit_price'                => 'required|numeric|min:0',
+        'items.*.discount_amount'           => 'nullable|numeric|min:0',
+        'items.*.final_price'               => 'required|numeric|min:0',
+    ]);
+
+    $failure = $this->bookingService->validateItems($validated['items'], $offer->vendor_id);
+    if ($failure) {
+        return response()->json(['success' => false, 'message' => $failure['message'], 'unavailable_hoardings' => $failure['unavailable_hoardings'] ?? null], $failure['status']);
+    }
+
+    try {
+        $offer = $this->bookingService->submitCustomerModification($offer, $validated, Auth::user());
+    } catch (\RuntimeException $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Your changes have been sent to the vendor',
+        'data'    => ['redirect' => route('customer.offers.show', $offer->id)],
+    ], 201);
+}
 }

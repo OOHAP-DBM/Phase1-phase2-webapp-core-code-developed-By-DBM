@@ -25,6 +25,9 @@
 <tr class="border-b hover:bg-gray-50">
     <td class="px-3 py-3 text-gray-500">{{ $offers->firstItem() + $index }}</td>
     <td class="px-3 py-3">
+        <a href="{{ route('customer.enquiries.show', $offer->enquiry->id) }}" class="font-bold text-gray-800 hover:underline">#{{ $offer->enquiry->id }}</a>
+        <p class="text-[10px] text-gray-400">{{ $offer->enquiry->created_at->format('d M, y') }}</p>
+    <td class="px-3 py-3">
         <a href="{{ route('customer.offers.show', $offer->id) }}" class="font-bold text-emerald-700 hover:underline">#{{ $offer->id }}</a>
         <p class="text-[10px] text-gray-400">{{ $offer->created_at->format('d M, y') }}</p>
         @if($offer->version > 1)

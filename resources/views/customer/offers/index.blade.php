@@ -47,6 +47,7 @@
                 <thead class="text-gray-500 border-b">
                     <tr>
                         <th class="px-3 py-3 font-semibold">Sn</th>
+                        <th class="px-3 py-3 font-semibold">Enquiry ID</th>
                         <th class="px-3 py-3 font-semibold">Offer ID</th>
                         <th class="px-3 py-3 font-semibold">Vendor Name</th>
                         <th class="px-3 py-3 font-semibold"># of Hoardings</th>

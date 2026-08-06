@@ -282,9 +282,11 @@ class Offer extends Model
         if ($daysRemaining < 7) {
             return "Expires in {$daysRemaining} days";
         }
+  $expiryDate = $this->expires_at ?? $this->valid_until;
 
-        return 'Expires on ' . $this->expires_at->format('M d, Y')
-            ?? $this->valid_until->format('M d, Y');
+    return $expiryDate ? 'Expires on ' . $expiryDate->format('M d, Y') : 'No expiry';
+        // return 'Expires on ' . $this->expires_at->format('M d, Y')
+        //     ?? $this->valid_until->format('M d, Y');
     }
 
     /**
@@ -318,6 +320,9 @@ class Offer extends Model
     {
         return $this->status === self::STATUS_REJECTED;
     }
+     public function isArchived(): bool { return !is_null($this->archived_at); }
+    public function archive(): void    { $this->update(['archived_at' => now()]); }
+    public function unarchive(): void  { $this->update(['archived_at' => null]); }
       public function getLatestVersion(): ?OfferVersion
     {
         return $this->versions()
