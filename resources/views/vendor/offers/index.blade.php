@@ -67,6 +67,7 @@
                     <tr>
                         <th class="px-3 py-3 font-semibold w-8"><input type="checkbox" id="select-all-offers"></th>
                         <th class="px-3 py-3 font-semibold">Sn</th>
+                        <th class="px-3 py-3 font-semibold">Enquiry ID</th>
                         <th class="px-3 py-3 font-semibold">Offer ID</th>
                         <th class="px-3 py-3 font-semibold">Customer Name</th>
                         <th class="px-3 py-3 font-semibold"># of Hoardings</th>

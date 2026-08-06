@@ -123,7 +123,7 @@
     </div>
 
     {{-- VERSION HISTORY — who added/removed what, at each step --}}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    {{-- <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="px-6 py-4 border-b">
             <h3 class="font-bold text-gray-800 text-sm">Negotiation History</h3>
             <p class="text-xs text-gray-400 mt-0.5">Every change, and who made it.</p>
@@ -216,7 +216,168 @@
             </div>
             @endforeach
         </div>
+    </div> --}}
+    {{-- VERSION HISTORY — who added/removed/changed what, at each step --}}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+        <div>
+            <h3 class="font-bold text-gray-800 text-sm">Negotiation History</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Every change, and who made it.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="expandAllVersions()" class="text-[11px] font-semibold text-gray-500 hover:text-gray-700">Expand All</button>
+            <span class="text-gray-300">|</span>
+            <button type="button" onclick="collapseAllVersions()" class="text-[11px] font-semibold text-gray-500 hover:text-gray-700">Collapse All</button>
+        </div>
     </div>
+
+    <div class="divide-y divide-gray-100">
+        @foreach($versionDiffs as $i => $diff)
+        @php
+            $isVendorRole = isset($isVendorView) && $isVendorView; // set this bool in each controller's show() view data — see below
+
+            $actorLabel = match($diff['actor_type']) {
+                'vendor'   => $isVendorRole ? 'You (Vendor)' : ($offer->vendor->name ?? 'Vendor'),
+                'customer' => $isVendorRole ? ($offer->customer->name ?? 'Customer') : 'You',
+                'admin'    => 'Admin',
+                default    => 'System',
+            };
+            $actorClass = match($diff['actor_type']) {
+                'vendor'   => $isVendorRole ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700',
+                'customer' => $isVendorRole ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700',
+                default    => 'bg-gray-100 text-gray-600',
+            };
+
+            $isLatest = $i === count($versionDiffs) - 1;
+        @endphp
+        <div class="version-block">
+            <button type="button"
+                class="version-toggle w-full flex items-center gap-2 px-6 py-4 text-left hover:bg-gray-50"
+                data-target="version-body-{{ $diff['version']->id }}">
+                <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform {{ $isLatest ? '' : '-rotate-90' }}" data-chevron
+                    fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $actorClass }}">{{ $actorLabel }}</span>
+                <span class="text-xs font-bold text-gray-700">Version {{ $diff['version']->version_number }}</span>
+                <span class="text-[10px] text-gray-400">{{ $diff['version']->created_at->format('d M Y, h:i A') }}</span>
+
+                @if(!$diff['is_initial'])
+                    @if($diff['has_any_change'])
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                            {{ count($diff['added']) }} added · {{ count($diff['removed']) }} removed · {{ count($diff['changed']) }} changed
+                        </span>
+                    @else
+                        <span class="text-[10px] text-gray-400 italic">No hoarding changes</span>
+                    @endif
+                @endif
+
+                <span class="ml-auto text-xs font-bold text-gray-700">₹{{ number_format((float) $diff['total_amount'], 2) }}</span>
+            </button>
+
+            <div id="version-body-{{ $diff['version']->id }}" class="version-body px-6 pb-5 {{ $isLatest ? '' : 'hidden' }}">
+                @if($diff['is_initial'])
+                    <p class="text-xs text-gray-500 mb-2">Initial offer created with {{ $diff['item_count'] }} hoarding(s):</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach($diff['added'] as $item)
+                            <span class="text-[10px] bg-gray-50 border border-gray-200 text-gray-700 px-2 py-1 rounded">
+                                {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
+                                <span class="text-gray-400">({{ optional($item->start_date)->format('d M') }} – {{ optional($item->end_date)->format('d M Y') }})</span>
+                            </span>
+                        @endforeach
+                    </div>
+                @else
+                    @if(!empty($diff['added']))
+                    <div class="mb-3">
+                        <p class="text-[10px] font-bold text-emerald-600 mb-1">＋ Added</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach($diff['added'] as $item)
+                                <span class="text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-1 rounded">
+                                    {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
+                                    <span class="text-emerald-500">({{ optional($item->start_date)->format('d M') }} – {{ optional($item->end_date)->format('d M Y') }} · ₹{{ number_format((float) $item->final_price, 2) }})</span>
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @if(!empty($diff['removed']))
+                    <div class="mb-3">
+                        <p class="text-[10px] font-bold text-red-600 mb-1">－ Removed</p>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach($diff['removed'] as $item)
+                                <span class="text-[10px] bg-red-50 border border-red-200 text-red-700 px-2 py-1 rounded line-through">
+                                    {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @if(!empty($diff['changed']))
+                    <div class="mb-3">
+                        <p class="text-[10px] font-bold text-amber-600 mb-1">↻ Changed</p>
+                        <div class="space-y-1">
+                            @foreach($diff['changed'] as $change)
+                                @php $cur = $change['current']; $prev = $change['previous']; @endphp
+                                <div class="text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-1.5 rounded">
+                                    <span class="font-bold">{{ $cur->hoarding->title ?? 'Hoarding #' . $cur->hoarding_id }}</span> —
+                                    @if(optional($prev->start_date)->format('Y-m-d') !== optional($cur->start_date)->format('Y-m-d') || optional($prev->end_date)->format('Y-m-d') !== optional($cur->end_date)->format('Y-m-d'))
+                                        dates {{ optional($prev->start_date)->format('d M') }}–{{ optional($prev->end_date)->format('d M Y') }} → {{ optional($cur->start_date)->format('d M') }}–{{ optional($cur->end_date)->format('d M Y') }}
+                                    @endif
+                                    @if(round((float) $prev->final_price, 2) !== round((float) $cur->final_price, 2))
+                                        · price ₹{{ number_format((float) $prev->final_price, 2) }} → ₹{{ number_format((float) $cur->final_price, 2) }}
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @if(!empty($diff['unchanged']))
+                    <details class="mt-1">
+                        <summary class="text-[10px] font-semibold text-gray-400 cursor-pointer select-none">
+                            {{ count($diff['unchanged']) }} hoarding(s) carried over unchanged
+                        </summary>
+                        <div class="flex flex-wrap gap-1.5 mt-2">
+                            @foreach($diff['unchanged'] as $item)
+                                <span class="text-[10px] bg-gray-50 border border-gray-200 text-gray-500 px-2 py-1 rounded">
+                                    {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </details>
+                    @endif
+
+                    @if(!$diff['has_any_change'] && empty($diff['unchanged']))
+                        <p class="text-[10px] text-gray-400 italic">No hoardings on this version.</p>
+                    @endif
+                @endif
+            </div>
+        </div>
+        @endforeach
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.version-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const body = document.getElementById(btn.dataset.target);
+        const chevron = btn.querySelector('[data-chevron]');
+        body.classList.toggle('hidden');
+        chevron.classList.toggle('-rotate-90');
+    });
+});
+
+function expandAllVersions() {
+    document.querySelectorAll('.version-body').forEach(el => el.classList.remove('hidden'));
+    document.querySelectorAll('[data-chevron]').forEach(el => el.classList.remove('-rotate-90'));
+}
+function collapseAllVersions() {
+    document.querySelectorAll('.version-body').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('[data-chevron]').forEach(el => el.classList.add('-rotate-90'));
+}
+</script>
 
 </div>
 

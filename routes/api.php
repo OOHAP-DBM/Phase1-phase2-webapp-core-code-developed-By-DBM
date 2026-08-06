@@ -3,7 +3,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\RazorpayWebhookController;
 use App\Http\Controllers\Api\Customer\ShortlistController;
-use App\Http\Controllers\Api\Vendor\DashboardController;  
+use App\Http\Controllers\Api\Vendor\DashboardController;
 use App\Http\Controllers\Api\Customer\CustomerHomeController;
 use Modules\Enquiries\Controllers\Api\DirectEnquiryApiController;
 use App\Http\Controllers\Api\AccountController;
@@ -12,7 +12,7 @@ use App\Http\Controllers\Api\ReviewController ;
 
 /**
  * OOHAPP API v1 Routes
- * 
+ *
  * All API v1 endpoints are prefixed with /api/v1
  * Module-specific routes are loaded from routes/api_v1/ directory
  * Rate limiting applied based on endpoint sensitivity
@@ -32,9 +32,9 @@ Route::get('v1/wishlist', [ShortlistController::class, 'index']);
 Route::middleware(['auth:sanctum'])
     ->prefix('v1/wishlist')
     ->group(function () {
-        Route::post('/{hoardingId}', [ShortlistController::class, 'store']);  
-        Route::delete('/{hoardingId}', [ShortlistController::class, 'destroy']);  
-        Route::delete('/', [ShortlistController::class, 'clear']);        
+        Route::post('/{hoardingId}', [ShortlistController::class, 'store']);
+        Route::delete('/{hoardingId}', [ShortlistController::class, 'destroy']);
+        Route::delete('/', [ShortlistController::class, 'clear']);
         Route::post('/toggle/{hoardingId}', [ShortlistController::class, 'toggle']);
         Route::get('/check/{hoardingId}', [ShortlistController::class, 'check']);
         Route::get('/count', [ShortlistController::class, 'count']);
@@ -43,13 +43,13 @@ Route::middleware(['auth:sanctum'])
 // Sanctum token based
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('/guest/merge', [
-        \App\Http\Controllers\Api\GuestMergeController::class, 
+        \App\Http\Controllers\Api\GuestMergeController::class,
         'merge'
     ]);
 });
 
 Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
-    
+
     // Health check
     Route::get('/health', function () {
         return response()->json([
@@ -105,28 +105,28 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
     });
     // Thread Communication System (PROMPT 28)
     require base_path('routes/api_v1/threads.php');
-    
+
     // Direct Booking Module (Customer direct bookings without quotation)
     require base_path('routes/api_v1/direct-bookings.php');
-    
+
     // Enquiry Workflow Module (Enquiry → Offer → Quotation with Thread Communication)
     require base_path('routes/api_v1/enquiry-workflow.php');
-    
+
     // Hoarding-First Booking Flow (PROMPT 43 - Customer direct booking from hoarding)
     require base_path('routes/api_v1/booking-flow.php');
-    
+
     // Vendor Quote & RFP System (PROMPT 44 & 45 - Quote generation and RFP workflow)
     require base_path('routes/api_v1/vendor-quotes.php');
-    
+
     // Milestone Payment System (PROMPT 70 - Vendor-controlled milestone payments)
     require base_path('routes/api_v1/milestone_payments.php');
-    
+
     // Booking Overlap Validation Engine (PROMPT 101 - Check date conflicts & availability)
     Route::prefix('booking-overlap')->group(base_path('routes/api_v1/booking_overlap.php'));
-    
+
     // Maintenance Blocks (PROMPT 102 - Admin/Vendor blocking periods for maintenance/repairs)
     Route::prefix('maintenance-blocks')->group(base_path('routes/api_v1/maintenance_blocks.php'));
-    
+
     // Hoarding Availability Calendar API (PROMPT 104 - Frontend calendar with availability status)
     require base_path('routes/api_v1/hoarding_availability.php');
 
@@ -136,7 +136,7 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
         Route::delete('reviews/bulk',      [ReviewController::class, 'bulkDelete']);
     });
 
-   
+
 });
 Route::middleware(['auth:sanctum', 'throttle:authenticated'])->prefix('account')->group(function () {
         Route::post('/delete/send-otp', [AccountController::class, 'sendDeleteOtp']);

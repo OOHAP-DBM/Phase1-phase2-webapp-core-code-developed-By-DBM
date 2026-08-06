@@ -50,12 +50,13 @@ return [
                  * Absolute paths to directory containing the swagger annotations are stored.
                  */
                 'annotations' => [
-                    base_path('app/Swagger'),      // If you have custom swagger annotations here        
+                    base_path('app/Swagger'),      // If you have custom swagger annotations here
 
                     base_path('app/Http/Controllers/Api/'), // If you have API controllers here
                     // base_path('app/Http/Controllers/Auth'),
                     // base_path('Modules'),           // Your modular APIs
                     base_path('Modules'),           // Your modular APIs
+                     base_path('app/Http/Resources/Swagger'),
                 ],
             ],
         ],

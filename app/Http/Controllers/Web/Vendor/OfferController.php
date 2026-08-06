@@ -18,14 +18,25 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Services\OfferVersionDiffService;
+use App\Services\OfferBookingService;
+
+
 
 class OfferController extends Controller
 {
     protected HoardingAvailabilityService $availabilityService;
+    protected OfferVersionDiffService $diffService;
+    protected OfferBookingService $bookingService;
 
-    public function __construct(HoardingAvailabilityService $availabilityService)
+
+    // public function __construct(HoardingAvailabilityService $availabilityService)
+        public function __construct(HoardingAvailabilityService $availabilityService, OfferVersionDiffService $diffService, OfferBookingService $bookingService)
+
     {
         $this->availabilityService = $availabilityService;
+        $this->diffService = $diffService;
+        $this->bookingService = $bookingService;
     }
 
     public function index(Request $request)
@@ -143,33 +154,78 @@ class OfferController extends Controller
         return view('vendor.offers.create', compact('enquiry', 'editingOffer', 'seedFromOffer'));
     }
 
-    // public function store(Request $request): JsonResponse
-    // {
-    //     $vendor = Auth::user();
 
-    //     $validated = $request->validate([
-    //         'enquiry_id'                => 'required|exists:enquiries,id',
-    //         'offer_id'                  => 'nullable|integer|exists:offers,id',
-    //         'price_type'                => 'nullable|in:total,monthly,weekly,daily',
-    //         'description'                => 'nullable|string|max:1000',
-    //         'valid_until'                => 'nullable|date|after_or_equal:today',
-    //         'send_email'                 => 'nullable|boolean',
-    //         'send_whatsapp'              => 'nullable|boolean',
-    //         'items'                             => 'required|array|min:1',
-    //         'items.*.hoarding_id'               => 'required|integer|exists:hoardings,id',
-    //         'items.*.enquiry_item_id'           => 'nullable|integer|exists:enquiry_items,id',
-    //         'items.*.hoarding_type'             => 'required|in:ooh,dooh',
-    //         'items.*.start_date'                => 'required|date',
-    //         'items.*.end_date'                  => 'required|date|after_or_equal:items.*.start_date',
-    //         'items.*.unit_price'                => 'required|numeric|min:0',
-    //         'items.*.discount_amount'           => 'nullable|numeric|min:0',
-    //         'items.*.final_price'               => 'required|numeric|min:0',
-    //     ]);
+    public function store(Request $request): JsonResponse
+{
+    $vendor = Auth::user();
 
-    //     if (!$request->boolean('send_email') && !$request->boolean('send_whatsapp')) {
-    //         return response()->json(['success' => false, 'message' => 'Please select at least one sending option (Email or WhatsApp).'], 422);
-    //     }
+    $validated = $request->validate([
+        'enquiry_id'                => 'required|exists:enquiries,id',
+        'offer_id'                  => 'nullable|integer|exists:offers,id',
+        'price_type'                => 'nullable|in:total,monthly,weekly,daily',
+        'description'                => 'nullable|string|max:1000',
+        'valid_until'                => 'nullable|date|after_or_equal:today',
+        'send_email'                 => 'nullable|boolean',
+        'send_whatsapp'              => 'nullable|boolean',
+        'items'                             => 'required|array|min:1',
+        'items.*.hoarding_id'               => 'required|integer|exists:hoardings,id',
+        'items.*.enquiry_item_id'           => 'nullable|integer|exists:enquiry_items,id',
+        'items.*.hoarding_type'             => 'required|in:ooh,dooh',
+        'items.*.start_date'                => 'required|date',
+        'items.*.end_date'                  => 'required|date|after_or_equal:items.*.start_date',
+        'items.*.unit_price'                => 'required|numeric|min:0',
+        'items.*.discount_amount'           => 'nullable|numeric|min:0',
+        'items.*.final_price'               => 'required|numeric|min:0',
+    ]);
+    if (!$request->boolean('send_email') && !$request->boolean('send_whatsapp')) {
+            return response()->json(['success' => false, 'message' => 'Please select at least one sending option (Email or WhatsApp).'], 422);
+        }
 
+        $failure = $this->bookingService->validateItems($validated['items'], $vendor->id);
+        if ($failure) {
+            return response()->json(['success' => false, 'message' => $failure['message'], 'unavailable_hoardings' => $failure['unavailable_hoardings'] ?? null], $failure['status']);
+        }
+
+        try {
+            $offer = $this->bookingService->createOrModifyByVendor($validated, $vendor);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 409);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $offer->wasRecentlyCreated ? 'Offer created and sent successfully' : 'Offer modified and sent successfully',
+            'data'    => [
+                'id'                => $offer->id,
+                'offer_number'      => $offer->offer_number,
+                'redirect'          => route('vendor.offers.show', $offer->id),
+                'manage_offers_url' => route('vendor.offers.index'),
+            ],
+        ], 201);
+    }
+
+
+    // if (!$request->boolean('send_email') && !$request->boolean('send_whatsapp')) {
+    //     return response()->json(['success' => false, 'message' => 'Please select at least one sending option (Email or WhatsApp).'], 422);
+    // }
+
+    // // ── Idempotency guard ──────────────────────────────────────────────
+    // // A double-click (or a JS bug that fires the submit handler twice) sends two
+    // // near-simultaneous POSTs for the same enquiry. Without this lock, request #2
+    // // can read the offer request #1 just created and treat it as a "modify",
+    // // spawning a spurious version 2 on what the vendor experiences as one click.
+    // // Serializing on vendor+enquiry makes that race structurally impossible.
+    // $lockKey = "offer-store:{$vendor->id}:{$validated['enquiry_id']}";
+    // $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 15);
+
+    // if (!$lock->get()) {
+    //     return response()->json([
+    //         'success' => false,
+    //         'message' => 'This offer is already being submitted. Please wait a moment and refresh Manage Offers.',
+    //     ], 409);
+    // }
+
+    // try {
     //     $enquiry = Enquiry::with('customer')->findOrFail($validated['enquiry_id']);
 
     //     $hoardingIds = collect($validated['items'])->pluck('hoarding_id')->unique()->values();
@@ -203,6 +259,7 @@ class OfferController extends Controller
     //             ->first();
     //     }
 
+    //     $version = null;
     //     $offer = DB::transaction(function () use ($validated, $vendor, $enquiry, $existingOffer, &$version) {
     //         $subtotal = collect($validated['items'])->sum('unit_price');
     //         $discount = collect($validated['items'])->sum(fn ($i) => $i['discount_amount'] ?? 0);
@@ -240,7 +297,6 @@ class OfferController extends Controller
 
     //             OfferActivityLog::record($offer, 'modified', "Offer modified — version {$nextVersionNumber} created");
     //         } else {
-
     //             $offer = Offer::create([
     //                 'offer_number'   => 'OFR-' . strtoupper(uniqid()),
     //                 'enquiry_id'     => $enquiry->id,
@@ -327,212 +383,10 @@ class OfferController extends Controller
     //             'manage_offers_url' => route('vendor.offers.index'),
     //         ],
     //     ], 201);
+    // } finally {
+    //     $lock->release();
     // }
-    public function store(Request $request): JsonResponse
-{
-    $vendor = Auth::user();
-
-    $validated = $request->validate([
-        'enquiry_id'                => 'required|exists:enquiries,id',
-        'offer_id'                  => 'nullable|integer|exists:offers,id',
-        'price_type'                => 'nullable|in:total,monthly,weekly,daily',
-        'description'                => 'nullable|string|max:1000',
-        'valid_until'                => 'nullable|date|after_or_equal:today',
-        'send_email'                 => 'nullable|boolean',
-        'send_whatsapp'              => 'nullable|boolean',
-        'items'                             => 'required|array|min:1',
-        'items.*.hoarding_id'               => 'required|integer|exists:hoardings,id',
-        'items.*.enquiry_item_id'           => 'nullable|integer|exists:enquiry_items,id',
-        'items.*.hoarding_type'             => 'required|in:ooh,dooh',
-        'items.*.start_date'                => 'required|date',
-        'items.*.end_date'                  => 'required|date|after_or_equal:items.*.start_date',
-        'items.*.unit_price'                => 'required|numeric|min:0',
-        'items.*.discount_amount'           => 'nullable|numeric|min:0',
-        'items.*.final_price'               => 'required|numeric|min:0',
-    ]);
-
-    if (!$request->boolean('send_email') && !$request->boolean('send_whatsapp')) {
-        return response()->json(['success' => false, 'message' => 'Please select at least one sending option (Email or WhatsApp).'], 422);
-    }
-
-    // ── Idempotency guard ──────────────────────────────────────────────
-    // A double-click (or a JS bug that fires the submit handler twice) sends two
-    // near-simultaneous POSTs for the same enquiry. Without this lock, request #2
-    // can read the offer request #1 just created and treat it as a "modify",
-    // spawning a spurious version 2 on what the vendor experiences as one click.
-    // Serializing on vendor+enquiry makes that race structurally impossible.
-    $lockKey = "offer-store:{$vendor->id}:{$validated['enquiry_id']}";
-    $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 15);
-
-    if (!$lock->get()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'This offer is already being submitted. Please wait a moment and refresh Manage Offers.',
-        ], 409);
-    }
-
-    try {
-        $enquiry = Enquiry::with('customer')->findOrFail($validated['enquiry_id']);
-
-        $hoardingIds = collect($validated['items'])->pluck('hoarding_id')->unique()->values();
-        $ownedCount  = Hoarding::whereIn('id', $hoardingIds)->where('vendor_id', $vendor->id)->count();
-        if ($ownedCount !== $hoardingIds->count()) {
-            return response()->json(['success' => false, 'message' => 'One or more selected hoardings do not belong to you.'], 403);
-        }
-
-        $conflicts = [];
-        foreach ($validated['items'] as $item) {
-            $result = $this->availabilityService->checkMultipleDates($item['hoarding_id'], [$item['start_date'], $item['end_date']]);
-            $bad = collect($result)->pluck('status')->filter(fn ($s) => !in_array($s, ['available', 'blocked']))->unique();
-            if ($bad->isNotEmpty()) {
-                $h = Hoarding::find($item['hoarding_id']);
-                $conflicts[] = ['hoarding_id' => $item['hoarding_id'], 'hoarding_name' => $h->title ?? "Hoarding #{$item['hoarding_id']}", 'reasons' => $bad->values()];
-            }
-        }
-        if (!empty($conflicts)) {
-            return response()->json(['success' => false, 'message' => 'Some hoardings are no longer available for the selected dates.', 'unavailable_hoardings' => $conflicts], 422);
-        }
-
-        $existingOffer = null;
-        if (!empty($validated['offer_id'])) {
-            $existingOffer = Offer::where('id', $validated['offer_id'])->where('vendor_id', $vendor->id)->first();
-        } else {
-            $existingOffer = Offer::where('enquiry_id', $enquiry->id)
-                ->where('vendor_id', $vendor->id)
-                ->whereNull('archived_at')
-                ->whereNotIn('status', [Offer::STATUS_CANCELLED])
-                ->latest('id')
-                ->first();
-        }
-
-        $version = null;
-        $offer = DB::transaction(function () use ($validated, $vendor, $enquiry, $existingOffer, &$version) {
-            $subtotal = collect($validated['items'])->sum('unit_price');
-            $discount = collect($validated['items'])->sum(fn ($i) => $i['discount_amount'] ?? 0);
-            $total    = collect($validated['items'])->sum('final_price');
-
-            if ($existingOffer) {
-                $offer = $existingOffer;
-                $nextVersionNumber = ($offer->getLatestVersion()?->version_number ?? 0) + 1;
-
-                $version = OfferVersion::create([
-                    'offer_id'        => $offer->id,
-                    'version_number'  => $nextVersionNumber,
-                    'created_by'      => $vendor->id,
-                    'created_by_type' => 'vendor',
-                    'status'          => 'draft',
-                    'subtotal'        => $subtotal,
-                    'discount_amount' => $discount,
-                    'tax_amount'      => 0,
-                    'total_amount'    => $total,
-                ]);
-
-                $offer->update([
-                    'current_version_id' => $version->id,
-                    'price'               => $total,
-                    'price_type'          => $validated['price_type'] ?? $offer->price_type,
-                    'price_snapshot'      => ['items' => $validated['items']],
-                    'description'         => $validated['description'] ?? $offer->description,
-                    'valid_until'         => $validated['valid_until'] ?? $offer->valid_until,
-                    'version'             => $nextVersionNumber,
-                    'status'              => Offer::STATUS_DRAFT,
-                    'accepted_at'         => null,
-                    'rejected_at'         => null,
-                    'modification_notes'  => null,
-                ]);
-
-                OfferActivityLog::record($offer, 'modified', "Offer modified — version {$nextVersionNumber} created");
-            } else {
-                $offer = Offer::create([
-                    'offer_number'   => 'OFR-' . strtoupper(uniqid()),
-                    'enquiry_id'     => $enquiry->id,
-                    'vendor_id'      => $vendor->id,
-                    'customer_id'    => $enquiry->customer_id,
-                    'price'          => $total,
-                    'price_type'     => $validated['price_type'] ?? 'total',
-                    'price_snapshot' => ['items' => $validated['items']],
-                    'description'    => $validated['description'] ?? null,
-                    'valid_until'    => $validated['valid_until'] ?? null,
-                    'status'         => Offer::STATUS_DRAFT,
-                    'version'        => 1,
-                ]);
-
-                $version = OfferVersion::create([
-                    'offer_id'        => $offer->id,
-                    'version_number'  => 1,
-                    'created_by'      => $vendor->id,
-                    'created_by_type' => 'vendor',
-                    'status'          => 'draft',
-                    'subtotal'        => $subtotal,
-                    'discount_amount' => $discount,
-                    'tax_amount'      => 0,
-                    'total_amount'    => $total,
-                ]);
-
-                $offer->update(['current_version_id' => $version->id]);
-                OfferActivityLog::record($offer, 'created', 'Offer created');
-            }
-
-            foreach ($validated['items'] as $item) {
-                $start = Carbon::parse($item['start_date']);
-                $end   = Carbon::parse($item['end_date']);
-
-                OfferVersionItem::create([
-                    'offer_version_id' => $version->id,
-                    'enquiry_item_id'  => $item['enquiry_item_id'] ?? null,
-                    'hoarding_id'      => $item['hoarding_id'],
-                    'hoarding_type'    => $item['hoarding_type'],
-                    'start_date'       => $start,
-                    'end_date'         => $end,
-                    'duration_months'  => max(1, (int) ceil(($end->diffInDays($start) + 1) / 30)),
-                    'unit_price'       => $item['unit_price'],
-                    'discount_amount'  => $item['discount_amount'] ?? 0,
-                    'tax_amount'       => 0,
-                    'final_price'      => $item['final_price'],
-                    'meta'             => ['source' => !empty($item['enquiry_item_id']) ? 'enquiry' : 'added'],
-                ]);
-            }
-
-            $enquiryItemIds = collect($validated['items'])->pluck('enquiry_item_id')->filter();
-            if ($enquiryItemIds->isNotEmpty()) {
-                EnquiryItem::whereIn('id', $enquiryItemIds)->update(['status' => 'offer_send']);
-            }
-
-            return $offer;
-        });
-
-        try {
-            if ($request->boolean('send_email') && $enquiry->customer?->email) {
-                \Mail::to($enquiry->customer->email)->queue(new \App\Mail\OfferSentMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor'])));
-            }
-            if ($request->boolean('send_whatsapp') && $enquiry->contact_number) {
-                $whatsapp = app(\App\Services\Whatsapp\TwilioWhatsappService::class);
-                $phone = preg_replace('/\D+/', '', $enquiry->contact_number);
-                if (!str_starts_with($phone, '91')) $phone = '91' . ltrim($phone, '0');
-                $whatsapp->send('+' . $phone, $this->buildOfferWhatsappMessage($offer, $enquiry));
-            }
-            $offer->update(['status' => Offer::STATUS_SENT, 'sent_at' => now()]);
-            OfferActivityLog::record($offer, 'sent', 'Offer sent to customer', [
-                'email' => $request->boolean('send_email'), 'whatsapp' => $request->boolean('send_whatsapp'),
-            ]);
-        } catch (\Exception $e) {
-            Log::warning('Offer send failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => $existingOffer ? 'Offer modified and sent successfully' : 'Offer created and sent successfully',
-            'data'    => [
-                'id'                => $offer->id,
-                'offer_number'      => $offer->offer_number,
-                'redirect'          => route('vendor.offers.show', $offer->id),
-                'manage_offers_url' => route('vendor.offers.index'),
-            ],
-        ], 201);
-    } finally {
-        $lock->release();
-    }
-}
+//}
 
     // public function show(Offer $offer): jsonResponse
     // {
@@ -543,20 +397,35 @@ class OfferController extends Controller
     // }
     // app/Http/Controllers/Web/Vendor/OfferController.php
 
-public function show(Offer $offer)
-{
-    abort_unless($offer->vendor_id === Auth::id(), 403);
+// public function show(Offer $offer)
+// {
+//     abort_unless($offer->vendor_id === Auth::id(), 403);
 
-    $offer->load([
-        'currentVersion.items.hoarding.doohScreen',
-        'customer',
-        'activityLogs.actor',
-    ]);
+//     $offer->load([
+//         'currentVersion.items.hoarding.doohScreen',
+//         'customer',
+//         'activityLogs.actor',
+//     ]);
 
-    $versionDiffs = $this->buildVersionDiffs($offer);
+//     $versionDiffs = $this->buildVersionDiffs($offer);
 
-    return view('vendor.offers.show', compact('offer', 'versionDiffs'));
-}
+//     return view('vendor.offers.show', compact('offer', 'versionDiffs'));
+// }
+  public function show(Offer $offer)
+    {
+        abort_unless($offer->vendor_id === Auth::id(), 403);
+
+        $offer->load([
+            'currentVersion.items.hoarding.doohScreen',
+            'customer',
+            'activityLogs.actor',
+        ]);
+
+        $versionDiffs = $this->diffService->build($offer);
+
+ return view('vendor.offers.show', compact('offer', 'versionDiffs') + ['isVendorView' => true]);
+    }
+
 
 /**
  * Walks every OfferVersion in order and diffs its hoarding set against the
