@@ -100,8 +100,8 @@
             <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-green-100 border border-green-300"></span>Available</span>
             <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-red-100 border border-red-300"></span>Booked</span>
             <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-gray-200 border border-gray-300"></span>Blocked</span>
-            <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300"></span>On Hold</span>
-            <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-orange-100 border border-orange-300"></span>Partial</span>
+            {{-- <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300"></span>On Hold</span>
+            <span class="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500"><span class="w-3 h-3 rounded-sm bg-orange-100 border border-orange-300"></span>Partial</span> --}}
         </div>
 
         <input id="date-picker-input" type="text" class="hidden">
