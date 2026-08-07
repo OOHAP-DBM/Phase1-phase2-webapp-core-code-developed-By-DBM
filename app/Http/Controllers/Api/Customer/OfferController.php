@@ -305,6 +305,7 @@ class OfferController extends Controller
                 return [
                     'id'                  => $hoarding->id,
                     'title'               => $hoarding->title,
+                    'hero_image'          => $hoarding->heroImage(),
                     'city'                => $hoarding->city,
                     'address'             => $hoarding->address,
                     'type'                => $hoarding->hoarding_type,

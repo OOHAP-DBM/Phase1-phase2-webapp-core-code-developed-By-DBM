@@ -1,3 +1,8 @@
+<style>
+button.offer-action-btn.px-3.py-2.rounded.text-white.text-\[11px\].font-semibold.bg-gray-700.hover\:bg-gray-800 {
+    background: black;
+}
+</style>
 @forelse($offers as $index => $offer)
 @php
     $hoardingCount = $offer->hoardingCount();
