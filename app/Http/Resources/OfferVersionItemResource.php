@@ -15,6 +15,7 @@ class OfferVersionItemResource extends JsonResource
             'enquiry_item_id' => $this->enquiry_item_id,
             'hoarding_type'   => $this->hoarding_type,
             'title'           => $this->hoarding?->title,
+            'hero_image'      => $this->hoarding?->heroImage(),
             'city'            => $this->hoarding?->city,
             'address'         => $this->hoarding?->address,
             'total_slots_per_day' => $this->hoarding?->doohScreen?->total_slots_per_day,
