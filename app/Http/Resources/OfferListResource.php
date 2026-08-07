@@ -13,6 +13,7 @@ class OfferListResource extends JsonResource
             'id'              => $this->id,
             'offer_number'    => $this->offer_number,
             'version'         => $this->version,
+            'enquiry_id'      => $this->enquiry_id,
             'status'          => $this->status,
             'price'           => (float) $this->price,
             'valid_until'     => optional($this->valid_until)->toIso8601String(),
