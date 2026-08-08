@@ -130,3 +130,4 @@ window.OFFERS_ACCEPT_CUSTOMER_MOD_URL_TEMPLATE = '{{ route('vendor.offers.accept
 </script>
 <script src="{{ asset('js/offers-index.js') }}"></script>
 @endsection
+
