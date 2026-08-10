@@ -291,6 +291,27 @@
                     Continue with Mobile
                 </a>
 
+                <div class="demo-credentials">
+                    <div class="demo-title">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <strong>Demo Credentials</strong>
+                    </div>
+
+                    <div class="demo-item">
+                        <strong>Customer</strong>
+                        <span>Email: saurabh@mailinator.com</span>
+                        <span>Password: Vikas@123</span>
+                    </div>
+
+                    <div class="demo-item">
+                        <strong>Vendor</strong>
+                        <span>Email: softwaretester.dbm3@gmail.com</span>
+                        <span>Password: 123456789</span>
+                    </div>
+                </div>
+
+
+
 
                 <!-- <button class="social-btn google-btn">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
@@ -405,3 +426,44 @@
     setTimeout(() => window.location.reload(), 25 * 60 * 1000);
 </script>
 @endpush
+<style>
+.demo-credentials {
+    margin-top: 20px;
+    padding: 12px 15px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    text-align: left;
+    font-size: 12px;
+}
+
+.demo-title {
+    color: #2bb57c;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.demo-title i {
+    margin-right: 5px;
+}
+
+.demo-item {
+    padding: 8px 10px;
+    margin-top: 7px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #f0f0f0;
+}
+
+.demo-item strong {
+    display: block;
+    color: #374151;
+    margin-bottom: 3px;
+}
+
+.demo-item span {
+    display: block;
+    color: #6b7280;
+    line-height: 1.5;
+}
+</style>
