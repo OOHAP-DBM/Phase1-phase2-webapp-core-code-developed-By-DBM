@@ -384,7 +384,7 @@
                 Offers Received ({{ $enquiry->offers->count() }})
             </h3>
 
-            @if($enquiry->offers->count() > 0)
+            {{-- @if($enquiry->offers->count() > 0)
                 <div class="overflow-x-auto border border-gray-200 rounded">
                     <table class="w-full min-w-[640px] text-xs sm:text-sm">
                         <thead class="bg-gray-50 border-b border-gray-200">
@@ -425,6 +425,72 @@
                                     <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
                                         {{ $offer->created_at->format('d M, y') }}
                                     </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-4 py-6 text-center text-gray-500">
+                                        No offers received yet
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="border border-gray-200 rounded p-6 text-center text-gray-500">
+                    <p>No offers received for this enquiry yet</p>
+                </div>
+            @endif --}}
+            @if($enquiry->offers->count() > 0)
+                <div class="overflow-x-auto border border-gray-200 rounded">
+                    <table class="w-full min-w-[640px] text-xs sm:text-sm">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Sn.</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Vendor</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Status</th>
+                                 <th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Date</th>
+                                <th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Action</th>
+
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($enquiry->offers as $index => $offer)
+                                <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-gray-600 font-medium whitespace-nowrap">{{ $index + 1 }}</td>
+                                    <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                                        {{ $offer->vendor->name ?? 'N/A' }}
+                                    </td>
+                                    <!-- <td class="px-4 py-3 text-center">
+
+                                        <span class="text-gray-900 font-semibold">0</span>
+                                    </td> -->
+
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <span class="inline-block px-2 py-1 rounded text-xs font-semibold
+                                            @if($offer->status === 'pending')
+                                                bg-blue-100 text-blue-700
+                                            @elseif($offer->status === 'accepted')
+                                                bg-green-100 text-green-700
+                                            @elseif($offer->status === 'rejected')
+                                                bg-red-100 text-red-700
+                                            @else
+                                                bg-gray-100 text-gray-700
+                                            @endif
+                                        ">
+                                            {{ ucfirst(str_replace('_', ' ', $offer->status)) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
+                                        {{ $offer->created_at->format('d M, y') }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <a href="{{ route('customer.offers.show', $offer->id) }}"
+                                        class="inline-block px-2.5 py-1.5 rounded text-gray-600 text-[11px] font-semibold border border-gray-300 hover:bg-gray-50">
+                                            View
+                                        </a>
+                                    </td>
+
                                 </tr>
                             @empty
                                 <tr>
