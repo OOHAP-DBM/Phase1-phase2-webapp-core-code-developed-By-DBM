@@ -16,7 +16,7 @@
 @section('title', 'Enquiry & Offers')
 
 @section('content')
-<div x-data="{ 
+<div x-data="{
             openFilter: false,
             dateFilter: '{{ request('date_filter', 'all') }}'
         }"
@@ -161,9 +161,44 @@
                         {{-- STATUS --}}
                         <td class="px-4 py-4 min-w-[220px]">
                             <div class="space-y-1">
+@php
+    $offer = $enquiry->offers
+        ->sortByDesc('created_at')
+        ->first();
 
+    if ($offer) {
+        $awaitingVendor = $offer->canAccept()
+            && $offer->wasLastModifiedByCustomer();
+
+        $statusMap = [
+            'draft'    => ['label' => 'Draft', 'class' => 'text-gray-500'],
+            'sent'     => [
+                'label' => $awaitingVendor
+                    ? 'Awaiting Vendor Response'
+                    : 'Awaiting Your Response',
+                'class' => 'text-blue-600'
+            ],
+            'accepted' => ['label' => 'Accepted', 'class' => 'text-emerald-600'],
+            'rejected' => ['label' => 'Rejected', 'class' => 'text-red-600'],
+            'expired'  => ['label' => 'Expired', 'class' => 'text-orange-500'],
+        ];
+
+        $statusInfo = $statusMap[$offer->status]
+            ?? ['label' => ucfirst($offer->status), 'class' => 'text-gray-500'];
+    }
+@endphp
+
+@if($offer)
+    <span class="{{ $statusInfo['class'] }}">
+        {{ $statusInfo['label'] }}
+    </span>
+@else
+    <span class="text-gray-500">
+        No Offer
+    </span>
+@endif
                                 {{-- STATUS TEXT --}}
-                                @if($enquiry->status === 'submitted')
+                               {{-- @if($enquiry->status === 'submitted')
 
                                     <div class="flex flex-wrap items-center gap-x-1">
                                         <span class="text-xs font-semibold text-gray-900 whitespace-nowrap">
@@ -176,7 +211,7 @@
 
                                 @else
 
-                                    {{-- OTHER STATUSES --}}
+
                                     <div class="text-xs font-semibold
                                         @if($enquiry->status === 'responded')
                                             text-orange-600
@@ -201,10 +236,10 @@
 
                                 @endif
 
-                                {{-- DATE --}}
+
                                 <div class="text-xs text-gray-500">
                                     {{ $enquiry->updated_at->format('d M, y | H:i') }}
-                                </div>
+                                </div> --}}
 
                             </div>
                         </td>
