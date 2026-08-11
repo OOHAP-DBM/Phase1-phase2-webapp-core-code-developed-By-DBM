@@ -25,7 +25,9 @@
                         // the most recent version was submitted by the vendor. If you
                         // already sent your own changes, it's now waiting on the
                         // vendor — no action buttons until they respond again.
-                        $customerTurn = $offer->canAccept() && $offer->wasLastModifiedByVendor();
+                        // $customerTurn = $offer->canAccept() && $offer->wasLastModifiedByVendor();
+                            $customerTurn = $offer->isNegotiable() && $offer->wasLastModifiedByVendor();
+
                         $awaitingVendor = $offer->canAccept() && $offer->wasLastModifiedByCustomer();
                     @endphp
                     <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $st['class'] }}">{{ $st['label'] }}</span>

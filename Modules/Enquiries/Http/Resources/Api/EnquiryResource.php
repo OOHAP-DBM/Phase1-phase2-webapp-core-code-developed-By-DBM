@@ -42,8 +42,13 @@ class EnquiryResource extends JsonResource
             'enquiry_no'      => $this->formatted_id, // 👈 from model accessor
             'requirement'     => $this->customer_note,
             'status'          => $this->status,
-            'status_label'    => $this->statusLabel(),
-            'customer_name'   => $this->customer?->name,
+            'status_label'    =>$this->offers->first()?->status,
+            'offer_id'         => $this->offers->first()?->id,
+  'wasLastModifiedByCustomer' => $this->offers->first()
+    ? $this->offers->first()->wasLastModifiedByCustomer()
+    : false,
+            //'offer_status'     => $this->offers->first()?->status,
+           'customer_name'   => $this->customer?->name,
             'customer_email'  => $this->customer?->email,
             'customer_phone'  => $this->customer?->phone,
             'vendor_count'    => $this->vendor_count ?? 0,

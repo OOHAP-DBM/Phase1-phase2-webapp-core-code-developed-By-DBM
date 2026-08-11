@@ -429,4 +429,8 @@ public function wasLastModifiedByCustomer(): bool
 {
     return $this->currentVersion?->created_by_type === 'customer';
 }
+public function isNegotiable(): bool
+{
+    return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_SENT], true);
+}
 }

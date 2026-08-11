@@ -96,64 +96,137 @@ class OfferController extends Controller
         return view('vendor.offers.index', compact('offers', 'archivedCount'));
     }
 
-    public function create(Request $request)
-    {
-        $enquiry = null;
-        $editingOffer = null;
-        $seedFromOffer = [];
+    // public function create(Request $request)
+    // {
+    //     $enquiry = null;
+    //     $editingOffer = null;
+    //     $seedFromOffer = [];
 
-        if ($request->filled('offer_id')) {
-            $editingOffer = Offer::with(['enquiry.customer', 'currentVersion.items.hoarding.doohScreen'])
-                ->where('vendor_id', Auth::id())
-                ->findOrFail($request->input('offer_id'));
+    //     if ($request->filled('offer_id')) {
+    //         $editingOffer = Offer::with(['enquiry.customer', 'currentVersion.items.hoarding.doohScreen'])
+    //             ->where('vendor_id', Auth::id())
+    //             ->findOrFail($request->input('offer_id'));
 
-            $enquiry = $editingOffer->enquiry()->with([
-                'customer', 'items', 'items.hoarding', 'items.hoarding.vendor',
-                'items.hoarding.doohScreen', 'items.package',
-            ])->first();
-            $enquiry->getEnquiryDetails();
+    //         $enquiry = $editingOffer->enquiry()->with([
+    //             'customer', 'items', 'items.hoarding', 'items.hoarding.vendor',
+    //             'items.hoarding.doohScreen', 'items.package',
+    //         ])->first();
+    //         $enquiry->getEnquiryDetails();
 
-            foreach ($editingOffer->currentVersion->items as $vi) {
-                $h = $vi->hoarding;
-                if (!$h) continue;
-                $seedFromOffer[] = [
-                    'hoarding_id'         => $h->id,
-                    'enquiry_item_id'     => $vi->enquiry_item_id,
-                    'title'               => $h->title ?? $h->address,
-                    'city'                => $h->city,
-                    'location'            => $h->address,
-                    'hoarding_type'       => $vi->hoarding_type,
-                    'price_per_month'     => (float) ($vi->unit_price / max(1, $vi->duration_months)),
-                    'image_url'           => null,
-                    'startDate'           => optional($vi->start_date)->format('Y-m-d'),
-                    'endDate'             => optional($vi->end_date)->format('Y-m-d'),
-                    'total_slots_per_day' => $h->doohScreen->total_slots_per_day ?? 300,
-                    'source'              => $vi->enquiry_item_id ? 'enquiry' : 'added',
-                ];
-            }
-        } elseif ($request->filled('enquiry_id')) {
-            $enquiry = Enquiry::with([
-                'customer', 'items', 'items.hoarding', 'items.hoarding.vendor',
-                'items.hoarding.doohScreen', 'items.package',
-            ])->findOrFail($request->input('enquiry_id'));
+    //         foreach ($editingOffer->currentVersion->items as $vi) {
+    //             $h = $vi->hoarding;
+    //             if (!$h) continue;
+    //             $seedFromOffer[] = [
+    //                 'hoarding_id'         => $h->id,
+    //                 'enquiry_item_id'     => $vi->enquiry_item_id,
+    //                 'title'               => $h->title ?? $h->address,
+    //                 'city'                => $h->city,
+    //                 'location'            => $h->address,
+    //                 'hoarding_type'       => $vi->hoarding_type,
+    //                 'price_per_month'     => (float) ($vi->unit_price / max(1, $vi->duration_months)),
+    //                 'image_url'           => null,
+    //                 'startDate'           => optional($vi->start_date)->format('Y-m-d'),
+    //                 'endDate'             => optional($vi->end_date)->format('Y-m-d'),
+    //                 'total_slots_per_day' => $h->doohScreen->total_slots_per_day ?? 300,
+    //                 'source'              => $vi->enquiry_item_id ? 'enquiry' : 'added',
+    //             ];
+    //         }
+    //     } elseif ($request->filled('enquiry_id')) {
+    //         $enquiry = Enquiry::with([
+    //             'customer', 'items', 'items.hoarding', 'items.hoarding.vendor',
+    //             'items.hoarding.doohScreen', 'items.package',
+    //         ])->findOrFail($request->input('enquiry_id'));
 
-            $enquiry->getEnquiryDetails();
+    //         $enquiry->getEnquiryDetails();
 
-            $existing = Offer::where('enquiry_id', $enquiry->id)
-                ->where('vendor_id', Auth::id())
-                ->whereNull('archived_at')
-                ->whereNotIn('status', [Offer::STATUS_CANCELLED])
-                ->latest('id')
-                ->first();
+    //         $existing = Offer::where('enquiry_id', $enquiry->id)
+    //             ->where('vendor_id', Auth::id())
+    //             ->whereNull('archived_at')
+    //             ->whereNotIn('status', [Offer::STATUS_CANCELLED])
+    //             ->latest('id')
+    //             ->first();
 
-            if ($existing) {
-                return redirect()->route('vendor.offers.create', ['offer_id' => $existing->id]);
-            }
+    //         if ($existing) {
+    //             return redirect()->route('vendor.offers.create', ['offer_id' => $existing->id]);
+    //         }
+    //     }
+
+    //     return view('vendor.offers.create', compact('enquiry', 'editingOffer', 'seedFromOffer'));
+    // }
+// app/Http/Controllers/Web/Vendor/OfferController.php — create()
+
+public function create(Request $request)
+{
+    $enquiry = null;
+    $editingOffer = null;
+    $seedFromOffer = [];
+
+    if ($request->filled('offer_id')) {
+        $editingOffer = Offer::with(['enquiry.customer', 'currentVersion.items.hoarding.doohScreen'])
+            ->where('vendor_id', Auth::id())
+            ->findOrFail($request->input('offer_id'));
+
+        // FIX: previously nothing stopped a vendor from opening the modify
+        // screen for an already-accepted/rejected offer via a stale link —
+        // the page rendered fine and, on submit, store() would silently spin
+        // up a brand-new version on a "closed" offer.
+        if (!$editingOffer->isNegotiable()) {
+            return redirect()->route('vendor.offers.show', $editingOffer->id)
+                ->with('error', 'This offer has already been ' . $editingOffer->status . ' and can no longer be modified.');
         }
 
-        return view('vendor.offers.create', compact('enquiry', 'editingOffer', 'seedFromOffer'));
+        $enquiry = $editingOffer->enquiry()->with([
+            'customer', 'items', 'items.hoarding', 'items.hoarding.vendor',
+            'items.hoarding.doohScreen', 'items.package',
+        ])->first();
+        $enquiry->getEnquiryDetails();
+
+        foreach ($editingOffer->currentVersion->items as $vi) {
+            $h = $vi->hoarding;
+            if (!$h) continue;
+            $seedFromOffer[] = [
+                'hoarding_id'         => $h->id,
+                'enquiry_item_id'     => $vi->enquiry_item_id,
+                'title'               => $h->title ?? $h->address,
+                'city'                => $h->city,
+                'location'            => $h->address,
+                'hoarding_type'       => $vi->hoarding_type,
+                'price_per_month'     => (float) ($vi->unit_price / max(1, $vi->duration_months)),
+                'image_url'           => null,
+                'startDate'           => optional($vi->start_date)->format('Y-m-d'),
+                'endDate'             => optional($vi->end_date)->format('Y-m-d'),
+                'total_slots_per_day' => $h->doohScreen->total_slots_per_day ?? 300,
+                'source'              => $vi->enquiry_item_id ? 'enquiry' : 'added',
+            ];
+        }
+    } elseif ($request->filled('enquiry_id')) {
+        $enquiry = Enquiry::with([
+            'customer', 'items', 'items.hoarding', 'items.hoarding.vendor',
+            'items.hoarding.doohScreen', 'items.package',
+        ])->findOrFail($request->input('enquiry_id'));
+
+        $enquiry->getEnquiryDetails();
+
+        $existing = Offer::where('enquiry_id', $enquiry->id)
+            ->where('vendor_id', Auth::id())
+            ->whereNull('archived_at')
+            ->whereNotIn('status', [Offer::STATUS_CANCELLED])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            // FIX: same guard on the auto-redirect path — don't bounce into
+            // a modify screen for an offer that's already closed.
+            if (!$existing->isNegotiable()) {
+                return redirect()->route('vendor.offers.show', $existing->id)
+                    ->with('error', 'This offer has already been ' . $existing->status . '. Create a new offer if you want to make a fresh proposal.');
+            }
+            return redirect()->route('vendor.offers.create', ['offer_id' => $existing->id]);
+        }
     }
 
+    return view('vendor.offers.create', compact('enquiry', 'editingOffer', 'seedFromOffer'));
+}
 
     public function store(Request $request): JsonResponse
 {
@@ -179,6 +252,23 @@ class OfferController extends Controller
     ]);
     if (!$request->boolean('send_email') && !$request->boolean('send_whatsapp')) {
             return response()->json(['success' => false, 'message' => 'Please select at least one sending option (Email or WhatsApp).'], 422);
+        }
+        $existingOffer = null;
+        if (!empty($validated['offer_id'])) {
+            $existingOffer = Offer::where('id', $validated['offer_id'])->where('vendor_id', $vendor->id)->first();
+
+            // FIX: if a modify-URL was hit right as the customer accepted/rejected,
+            // this stops the vendor's submit from reopening a closed offer.
+            if ($existingOffer && !$existingOffer->isNegotiable()) {
+                return response()->json(['success' => false, 'message' => 'This offer has already been ' . $existingOffer->status . ' and can no longer be modified.'], 422);
+            }
+        } else {
+            $existingOffer = Offer::where('enquiry_id', $validated['enquiry_id'])
+                ->where('vendor_id', $vendor->id)
+                ->whereNull('archived_at')
+                ->whereNotIn('status', [Offer::STATUS_CANCELLED])
+                ->latest('id')
+                ->first();
         }
 
         $failure = $this->bookingService->validateItems($validated['items'], $vendor->id);
