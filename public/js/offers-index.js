@@ -326,6 +326,18 @@ async function sendReminder(id, btn) {
 /* ---------- row "..." menu ---------- */
 let activeRowMenuOffer = null;
 
+// function openRowMenu(trigger) {
+//     const menu = document.getElementById('row-menu');
+//     const rect = trigger.getBoundingClientRect();
+//     menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+//     menu.style.left = `${rect.right - 176 + window.scrollX}px`;
+//     menu.classList.remove('hidden');
+//     activeRowMenuOffer = {
+//         id: trigger.dataset.offerId,
+//         viewUrl: trigger.dataset.viewUrl,
+//         modifyUrl: trigger.dataset.modifyUrl,
+//     };
+// }
 function openRowMenu(trigger) {
     const menu = document.getElementById('row-menu');
     const rect = trigger.getBoundingClientRect();
@@ -336,14 +348,40 @@ function openRowMenu(trigger) {
         id: trigger.dataset.offerId,
         viewUrl: trigger.dataset.viewUrl,
         modifyUrl: trigger.dataset.modifyUrl,
+        negotiable: trigger.dataset.negotiable,
     };
+
+    // Hide "Modify Offer" entirely when the offer isn't negotiable, instead
+    // of leaving it clickable and only failing after the click.
+    const modifyBtn = menu.querySelector('button[onclick="rowMenuAction(\'modify\')"]');
+    if (modifyBtn) modifyBtn.style.display = trigger.dataset.negotiable === 'true' ? '' : 'none';
 }
 function closeRowMenu() { document.getElementById('row-menu').classList.add('hidden'); activeRowMenuOffer = null; }
 
+// function rowMenuAction(action) {
+//     if (!activeRowMenuOffer) return;
+//     if (action === 'view') window.location.href = activeRowMenuOffer.viewUrl;
+//     if (action === 'modify') window.location.href = activeRowMenuOffer.modifyUrl;
+//     if (action === 'archive') {
+//         document.getElementById('archiveConfirmModal').classList.remove('hidden');
+//         document.getElementById('archiveConfirmModal').dataset.offerId = activeRowMenuOffer.id;
+//     }
+//     closeRowMenu();
+// }
 function rowMenuAction(action) {
     if (!activeRowMenuOffer) return;
     if (action === 'view') window.location.href = activeRowMenuOffer.viewUrl;
-    if (action === 'modify') window.location.href = activeRowMenuOffer.modifyUrl;
+    if (action === 'modify') {
+        // FIX: the "..." menu ignored offer status entirely before — an
+        // accepted/rejected offer's modifyUrl is now empty string server-side,
+        // so guard against navigating to it.
+        if (activeRowMenuOffer.negotiable !== 'true' || !activeRowMenuOffer.modifyUrl) {
+            alert('This offer can no longer be modified.');
+            closeRowMenu();
+            return;
+        }
+        window.location.href = activeRowMenuOffer.modifyUrl;
+    }
     if (action === 'archive') {
         document.getElementById('archiveConfirmModal').classList.remove('hidden');
         document.getElementById('archiveConfirmModal').dataset.offerId = activeRowMenuOffer.id;

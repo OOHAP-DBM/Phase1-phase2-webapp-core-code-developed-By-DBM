@@ -31,10 +31,12 @@
 
             <div class="flex items-center gap-2">
                 @if(in_array($offer->status, ['draft', 'sent']))
+                @if($offer->isNegotiable())
                     <button type="button" id="vendor-reject-btn"
                         class="px-4 py-2 text-xs font-bold text-red-600 border border-red-200 bg-red-50 rounded hover:bg-red-100">
                         Reject Offer
                     </button>
+                    @endif
                 @endif
                 <a href="{{ route('vendor.offers.index') }}" class="px-4 py-2 text-xs font-semibold text-gray-600 border border-gray-300 rounded hover:bg-gray-50">
                     Back to Manage Offers

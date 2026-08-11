@@ -146,40 +146,78 @@ return view('customer.offers.show', compact('offer', 'versionDiffs') + ['isVendo
      * Show the builder — same shape as the vendor's create/edit screen, but
      * scoped to this specific offer's vendor and seeded from the current version.
      */
-    public function modify(Offer $offer)
-    {
-        abort_unless($offer->customer_id === Auth::id(), 403);
+    // public function modify(Offer $offer)
+    // {
+    //     abort_unless($offer->customer_id === Auth::id(), 403);
 
-        if (!$offer->canAccept() || !$offer->wasLastModifiedByVendor()) {
-            return redirect()->route('customer.offers.show', $offer->id)
-                ->with('error', 'This offer is not currently open for modification.');
-        }
+    //     if (!$offer->canAccept() || !$offer->wasLastModifiedByVendor()) {
+    //         return redirect()->route('customer.offers.show', $offer->id)
+    //             ->with('error', 'This offer is not currently open for modification.');
+    //     }
 
-        $offer->load('currentVersion.items.hoarding.doohScreen', 'vendor');
+    //     $offer->load('currentVersion.items.hoarding.doohScreen', 'vendor');
 
-        $seed = [];
-        foreach ($offer->currentVersion->items as $vi) {
-            $h = $vi->hoarding;
-            if (!$h) continue;
-            $seed[] = [
-                'hoarding_id'         => $h->id,
-                'enquiry_item_id'     => $vi->enquiry_item_id,
-                'title'               => $h->title ?? $h->address,
-                'city'                => $h->city,
-                'location'            => $h->address,
-                'hoarding_type'       => $vi->hoarding_type,
-                'price_per_month'     => (float) ($vi->unit_price / max(1, $vi->duration_months)),
-                'image_url'           => null,
-                'startDate'           => optional($vi->start_date)->format('Y-m-d'),
-                'endDate'             => optional($vi->end_date)->format('Y-m-d'),
-                'total_slots_per_day' => $h->doohScreen->total_slots_per_day ?? 300,
-                'source'              => $vi->enquiry_item_id ? 'enquiry' : 'added',
-            ];
-        }
+    //     $seed = [];
+    //     foreach ($offer->currentVersion->items as $vi) {
+    //         $h = $vi->hoarding;
+    //         if (!$h) continue;
+    //         $seed[] = [
+    //             'hoarding_id'         => $h->id,
+    //             'enquiry_item_id'     => $vi->enquiry_item_id,
+    //             'title'               => $h->title ?? $h->address,
+    //             'city'                => $h->city,
+    //             'location'            => $h->address,
+    //             'hoarding_type'       => $vi->hoarding_type,
+    //             'price_per_month'     => (float) ($vi->unit_price / max(1, $vi->duration_months)),
+    //             'image_url'           => null,
+    //             'startDate'           => optional($vi->start_date)->format('Y-m-d'),
+    //             'endDate'             => optional($vi->end_date)->format('Y-m-d'),
+    //             'total_slots_per_day' => $h->doohScreen->total_slots_per_day ?? 300,
+    //             'source'              => $vi->enquiry_item_id ? 'enquiry' : 'added',
+    //         ];
+    //     }
 
-        return view('customer.offers.modify', compact('offer', 'seed'));
+    //     return view('customer.offers.modify', compact('offer', 'seed'));
+    // }
+// app/Http/Controllers/Customer/CustomerOfferController.php — modify()
+
+public function modify(Offer $offer)
+{
+    abort_unless($offer->customer_id === Auth::id(), 403);
+
+    // FIX: was checking canAccept() + wasLastModifiedByVendor() only —
+    // canAccept() already implies isNegotiable() internally, so this was
+    // technically already correct, but making it explicit here so the same
+    // guard reads identically to the vendor side above.
+    if (!$offer->isNegotiable() || !$offer->wasLastModifiedByVendor()) {
+        return redirect()->route('customer.offers.show', $offer->id)
+            ->with('error', 'This offer is not currently open for modification.');
     }
 
+    $offer->load('currentVersion.items.hoarding.doohScreen', 'vendor');
+
+    $seed = [];
+    foreach ($offer->currentVersion->items as $vi) {
+        $h = $vi->hoarding;
+        if (!$h) continue;
+        $seed[] = [
+            'hoarding_id'         => $h->id,
+            'enquiry_item_id'     => $vi->enquiry_item_id,
+            'title'               => $h->title ?? $h->address,
+            'city'                => $h->city,
+            'location'            => $h->address,
+            'hoarding_type'       => $vi->hoarding_type,
+            'price_per_month'     => (float) ($vi->unit_price / max(1, $vi->duration_months)),
+            'image_url'           => null,
+            'startDate'           => optional($vi->start_date)->format('Y-m-d'),
+            'endDate'             => optional($vi->end_date)->format('Y-m-d'),
+            'total_slots_per_day' => $h->doohScreen->total_slots_per_day ?? 300,
+            'source'              => $vi->enquiry_item_id ? 'enquiry' : 'added',
+        ];
+    }
+
+    return view('customer.offers.modify', compact('offer', 'seed'));
+}
     /**
      * Vendor's hoarding inventory, scoped by the offer's vendor_id — NOT the
      * currently authenticated user, since the customer is browsing the vendor's
@@ -390,6 +428,9 @@ public function storeModification(Request $request, Offer $offer): JsonResponse
 {
     abort_unless($offer->customer_id === Auth::id(), 403);
 
+    if (!$offer->isNegotiable() || !$offer->wasLastModifiedByVendor()) {
+        return response()->json(['success' => false, 'message' => 'This offer is not currently open for modification.'], 422);
+    }
     if (!$offer->canAccept() || !$offer->wasLastModifiedByVendor()) {
         return response()->json(['success' => false, 'message' => 'This offer is not currently open for modification.'], 422);
     }

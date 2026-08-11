@@ -440,8 +440,11 @@ class EnquiryController extends Controller
 
         // ── Build query (mirrors web controller exactly) ───────────────────
         $query = Enquiry::where('customer_id', Auth::id())
-            ->with(['items.hoarding']);
-
+    ->with([
+        'items.hoarding',
+        'offers.currentVersion',
+        'offers',
+    ]);
         // Filter: status
         if ($request->filled('status')) {
             $query->where('status', $request->status);
