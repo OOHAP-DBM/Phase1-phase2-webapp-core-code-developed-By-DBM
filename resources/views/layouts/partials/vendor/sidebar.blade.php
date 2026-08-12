@@ -43,7 +43,7 @@
             <x-optimized-image
                 :src="route('brand.oohapp-logo')"
                 alt="OOHApp company logo"
-            
+
                 width="150"
                 height="48"
                 style="max-height:48px;object-fit:contain;"
@@ -227,6 +227,37 @@
                         class="block px-6 py-1 text-sm rounded-md transition
                         {{ request()->routeIs('vendor.direct-enquiries.*') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                         - Direct Enquiries
+                    </a>
+                </div>
+            </div>
+
+            {{-- Offer Dropdown --}}
+            <div
+                x-data="{ open: @if(request()->routeIs('vendor.offers.*')) true @else false @endif }"
+                class="space-y-1"
+            >
+                <button
+                    type="button"
+                    @click="open = !open"
+                    class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg {{ request()->routeIs('vendor.offers.*') ? 'bg-[#00995c] text-white' : 'text-gray-700 hover:bg-gray-50' }}"
+                >
+                    <div class="flex items-center gap-3 {{ request()->routeIs('vendor.offers.*') ? 'text-white' : 'text-gray-700' }}">
+                        <span class="sidebar-icon flex items-center justify-center min-w-[24px]">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" fill="currentColor"/>
+                            </svg>
+                        </span>
+                        <span class="sb-nav-text">Offer</span>
+                    </div>
+                    <svg class="sb-nav-arrow w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                <div x-show="open" x-collapse x-cloak class="space-y-1 pl-3 mt-1">
+                    <a href="{{ route('vendor.offers.index') }}"
+                        class="block px-6 py-1 text-sm rounded-md transition {{ request()->routeIs('vendor.offers.*') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                        - Manage Offer
                     </a>
                 </div>
             </div>

@@ -50,7 +50,8 @@ class UploadInventoryImportRequest extends FormRequest
                 'required',
                 'file',
                 'mimes:ppt,pptx,pdf',
-                'max:40960',
+               // 'max:40960',
+               'max:204800', // 200MB in KB
             ],
             'media_type' => [
                 'required',

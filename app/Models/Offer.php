@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Quotation;
-use App\Models\Enquiry;
+// use App\Models\Enquiry;
+use Modules\Enquiries\Models\Enquiry;
+
 use App\Models\User;
 
 
@@ -19,6 +21,9 @@ class Offer extends Model
         'enquiry_id',
         'vendor_id',
         'price',
+        'offer_number',
+        'current_version_id',
+        'customer_id',
         'price_type',
         'price_snapshot',
         'description',
@@ -28,7 +33,11 @@ class Offer extends Model
         'expiry_days',        // PROMPT 105: Auto-expiry configuration
         'expires_at',         // PROMPT 105: Calculated expiry timestamp
         'sent_at',            // PROMPT 105: When offer was sent
-        'expired_at',         // PROMPT 105: When marked as expired
+        'expired_at',
+        'accepted_at',
+        'rejected_at',
+        'cancelled_at',
+         'archived_at',      // PROMPT 105: When marked as expired
     ];
 
     protected $casts = [
@@ -38,7 +47,11 @@ class Offer extends Model
         'expires_at' => 'datetime',   // PROMPT 105
         'sent_at' => 'datetime',       // PROMPT 105
         'expired_at' => 'datetime',    // PROMPT 105
-    ];
+        'archived_at'    => 'datetime',
+        'accepted_at'    => 'datetime',
+        'rejected_at'    => 'datetime',
+        'cancelled_at'   => 'datetime',
+        ];
 
     /**
      * Status constants
@@ -48,6 +61,8 @@ class Offer extends Model
     const STATUS_ACCEPTED = 'accepted';
     const STATUS_REJECTED = 'rejected';
     const STATUS_EXPIRED = 'expired';
+    const STATUS_CANCELLED = 'cancelled';
+
 
     /**
      * Price type constants
@@ -103,6 +118,34 @@ class Offer extends Model
     public function scopeAccepted($query)
     {
         return $query->where('status', self::STATUS_ACCEPTED);
+    }
+      public function customer(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'customer_id'
+        );
+    }
+      public function versions(): HasMany
+    {
+        return $this->hasMany(
+            OfferVersion::class,
+            'offer_id'
+        );
+    }
+        public function currentVersion(): BelongsTo
+    {
+        return $this->belongsTo(
+            OfferVersion::class,
+            'current_version_id'
+        );
+    }
+     public function activityLogs(): HasMany
+    {
+        return $this->hasMany(
+            OfferActivityLog::class,
+            'offer_id'
+        );
     }
 
     /**
@@ -184,7 +227,7 @@ class Offer extends Model
     /**
      * Get days remaining until expiry
      * PROMPT 105: New method
-     * 
+     *
      * @return int|null Null if no expiry, 0 if expired
      */
     public function getDaysRemaining(): ?int
@@ -209,7 +252,7 @@ class Offer extends Model
     /**
      * Get formatted expiry information
      * PROMPT 105: New method
-     * 
+     *
      * @return string
      */
     public function getExpiryLabel(): string
@@ -239,9 +282,11 @@ class Offer extends Model
         if ($daysRemaining < 7) {
             return "Expires in {$daysRemaining} days";
         }
+  $expiryDate = $this->expires_at ?? $this->valid_until;
 
-        return 'Expires on ' . $this->expires_at->format('M d, Y')
-            ?? $this->valid_until->format('M d, Y');
+    return $expiryDate ? 'Expires on ' . $expiryDate->format('M d, Y') : 'No expiry';
+        // return 'Expires on ' . $this->expires_at->format('M d, Y')
+        //     ?? $this->valid_until->format('M d, Y');
     }
 
     /**
@@ -274,6 +319,15 @@ class Offer extends Model
     public function isRejected(): bool
     {
         return $this->status === self::STATUS_REJECTED;
+    }
+     public function isArchived(): bool { return !is_null($this->archived_at); }
+    public function archive(): void    { $this->update(['archived_at' => now()]); }
+    public function unarchive(): void  { $this->update(['archived_at' => null]); }
+      public function getLatestVersion(): ?OfferVersion
+    {
+        return $this->versions()
+            ->latest('version_number')
+            ->first();
     }
 
     /**
@@ -347,4 +401,36 @@ class Offer extends Model
 
         return max(0, now()->diffInDays($this->valid_until, false));
     }
+     public function hoardingCount(): int
+    {
+        return $this->currentVersion?->items?->count() ?? 0;
+    }
+
+    public function locationCount(): int
+    {
+        return $this->currentVersion?->items?->pluck('hoarding.city')->filter()->unique()->count() ?? 0;
+    }
+
+    public function locationCities(): array
+    {
+        return $this->currentVersion?->items?->pluck('hoarding.city')->filter()->unique()->values()->toArray() ?? [];
+    }
+// app/Models/Offer.php — add this method
+public function hasPendingModificationRequest(): bool
+{
+    return $this->status === self::STATUS_SENT && !empty($this->modification_notes);
+}
+public function wasLastModifiedByVendor(): bool
+{
+    return $this->currentVersion?->created_by_type === 'vendor';
+}
+
+public function wasLastModifiedByCustomer(): bool
+{
+    return $this->currentVersion?->created_by_type === 'customer';
+}
+public function isNegotiable(): bool
+{
+    return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_SENT], true);
+}
 }

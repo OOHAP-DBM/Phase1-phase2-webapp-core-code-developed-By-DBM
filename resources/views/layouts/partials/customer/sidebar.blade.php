@@ -12,7 +12,7 @@
             <x-optimized-image
                 :src="route('brand.oohapp-logo')"
                 alt="OOHApp company logo"
-            
+
                 width="150"
                 height="48"
                 style="max-height:48px;object-fit:contain;"
@@ -127,7 +127,7 @@
                         class="w-4 h-4 transition-transform flex-shrink-0"
                         :class="{ 'rotate-180': open }"
                         fill="none"
-                        stroke="currentColor"   
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                     >
                         <path
@@ -180,6 +180,58 @@
                 </svg>
                 Enquiries
             </a>
+
+         <!-- Offers -->
+<div
+    x-data="{ open: {{ request()->routeIs('customer.offers.*') ? 'true' : 'false' }} }"
+    class="space-y-1"
+>
+    <button
+        type="button"
+        @click="open = !open"
+        class="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg
+        {{ request()->routeIs('customer.offers.*') ? 'bg-green-600 text-white' : 'text-gray-700 hover:bg-gray-50' }}"
+    >
+        <div class="flex items-center gap-3">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L15 8L22 9L17 14L18 21L12 18L6 21L7 14L2 9L9 8L12 2Z" fill="currentColor"/>
+            </svg>
+            Offer
+        </div>
+
+        <svg
+            class="w-4 h-4 transition-transform flex-shrink-0"
+            :class="{ 'rotate-180': open }"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+            />
+        </svg>
+    </button>
+
+    <div
+        x-show="open"
+        x-collapse
+        x-cloak
+        class="space-y-1 pl-3 mt-1"
+    >
+        <a
+            href="{{ route('customer.offers.index') }}"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('customer.offers.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Manage Offer
+        </a>
+    </div>
+</div>
             <!-- POS Booking -->
             <a
                 href="{{ route('customer.pos.booking') }}"
@@ -203,7 +255,7 @@
                 <path d="M12 22C6.477 22 2 17.523 2 12C2 6.477 6.477 2 12 2C13.5527 1.99884 15.0842 2.35978 16.4729 3.05414C17.8617 3.74851 19.0693 4.75718 20 6H17.29C16.1352 4.98176 14.7112 4.31836 13.1887 4.0894C11.6663 3.86044 10.1101 4.07566 8.70689 4.70922C7.30371 5.34277 6.11315 6.36776 5.27807 7.66119C4.44299 8.95462 3.99887 10.4615 3.999 12.0011C3.99913 13.5407 4.4435 15.0475 5.27879 16.3408C6.11409 17.6341 7.30482 18.6589 8.7081 19.2922C10.1114 19.9255 11.6676 20.1405 13.19 19.9113C14.7125 19.6821 16.1364 19.0184 17.291 18H20.001C19.0702 19.243 17.8624 20.2517 16.4735 20.9461C15.0846 21.6405 13.5528 22.0013 12 22ZM19 16V13H11V11H19V8L24 12L19 16Z" fill="currentColor"/>
                 </svg>
                 LogOut
-            </button>       
+            </button>
         </div>
     </nav>
 </aside>
