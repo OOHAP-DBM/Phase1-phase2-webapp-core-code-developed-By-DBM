@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Services\OfferVersionDiffService;
 use App\Services\OfferBookingService;
+use App\Notifications\Offers\OfferAcceptedByVendorNotification;
+use App\Notifications\Offers\OfferRejectedByVendorNotification;
+use App\Notifications\Offers\OfferReminderNotification;
 
 
 
@@ -599,6 +602,9 @@ public function vendorReject(Request $request, Offer $offer): JsonResponse
     } catch (\Exception $e) {
         Log::warning('Vendor-reject notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
     }
+       if ($offer->customer) {
+        $offer->customer->notify(new OfferRejectedByVendorNotification($offer->fresh(['customer', 'vendor']), $validated['reason'] ?? null));
+    }
 
     return response()->json(['success' => true, 'message' => 'Offer rejected']);
 }
@@ -627,6 +633,10 @@ public function vendorReject(Request $request, Offer $offer): JsonResponse
                 \Mail::to($offer->customer->email)->queue(new \App\Mail\OfferSentMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor'])));
             }
             OfferActivityLog::record($offer, 'reminder_sent', 'Reminder sent to customer');
+             if ($offer->customer) {
+            $offer->customer->notify(new OfferReminderNotification($fresh));
+        }
+
             return response()->json(['success' => true, 'message' => 'Reminder sent successfully']);
         } catch (\Exception $e) {
             Log::warning('Offer reminder failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
@@ -680,6 +690,9 @@ public function acceptCustomerModification(Offer $offer): JsonResponse
         }
     } catch (\Exception $e) {
         Log::warning('Vendor-accept notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
+    }
+     if ($offer->customer) {
+        $offer->customer->notify(new OfferAcceptedByVendorNotification($fresh));
     }
 
     return response()->json(['success' => true, 'message' => 'Offer accepted successfully']);

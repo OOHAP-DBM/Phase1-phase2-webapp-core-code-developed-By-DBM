@@ -61,7 +61,11 @@ class EnquiryItemResource extends JsonResource
             'id'              => $this->id,
             'enquiry_no'      => $this->formatted_id,
             'status'          => $this->status,
-            'status_label'    => $this->statusLabel(),
+           // 'status_label'    => $this->statusLabel(),
+            'status_label'    => $this->offers->first()?->status,
+            'wasLastModifiedByCustomer' => $this->offers->first()
+            ? $this->offers->first()->wasLastModifiedByCustomer()
+            : false,
             'requirement'     => $this->customer_note,
             'submitted_on'    => optional($this->created_at)->format('d M Y'),
             'preferred_campaign_start' => $this->enquiryCampaignStartDate(),

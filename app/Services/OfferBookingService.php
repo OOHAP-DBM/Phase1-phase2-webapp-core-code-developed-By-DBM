@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Notifications\Offers\OfferCreatedNotification;
+use App\Notifications\Offers\OfferModifiedByVendorNotification;
+use App\Notifications\Offers\OfferModifiedByCustomerNotification;
 
 class OfferBookingService
 {
@@ -228,7 +231,10 @@ class OfferBookingService
             } catch (\Exception $e) {
                 Log::warning('Customer-modification notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
             }
-
+  // In-app notification for the vendor
+        if ($offer->vendor) {
+            $offer->vendor->notify(new OfferModifiedByCustomerNotification($offer));
+        }
             return $offer;
         } finally {
             $lock->release();
@@ -276,6 +282,14 @@ class OfferBookingService
             OfferActivityLog::record($offer, 'sent', 'Offer sent to customer', [
                 'email' => !empty($validated['send_email']), 'whatsapp' => !empty($validated['send_whatsapp']),
             ]);
+            if ($enquiry->customer) {
+            $freshOffer = $offer->fresh(['currentVersion.items', 'customer', 'vendor']);
+            $enquiry->customer->notify(
+                $offer->wasRecentlyCreated
+                    ? new OfferCreatedNotification($freshOffer)
+                    : new OfferModifiedByVendorNotification($freshOffer)
+            );
+        }
         } catch (\Exception $e) {
             Log::warning('Offer send failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
         }

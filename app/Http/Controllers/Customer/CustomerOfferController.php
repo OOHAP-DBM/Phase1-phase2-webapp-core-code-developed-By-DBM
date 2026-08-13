@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\OfferVersionDiffService;
 use App\Services\OfferBookingService;
+use App\Notifications\Offers\OfferAcceptedByCustomerNotification;
+use App\Notifications\Offers\OfferRejectedByCustomerNotification;
 
 
 use Carbon\Carbon;
@@ -121,6 +123,9 @@ return view('customer.offers.show', compact('offer', 'versionDiffs') + ['isVendo
         } catch (\Exception $e) {
             Log::warning('Offer-accepted notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
         }
+           if ($offer->vendor) {
+        $offer->vendor->notify(new OfferAcceptedByCustomerNotification($offer->fresh(['customer', 'vendor'])));
+    }
 
         return response()->json(['success' => true, 'message' => 'Offer accepted successfully']);
     }
@@ -138,6 +143,9 @@ return view('customer.offers.show', compact('offer', 'versionDiffs') + ['isVendo
         } catch (\Exception $e) {
             Log::warning('Offer-rejected notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
         }
+         if ($offer->vendor) {
+        $offer->vendor->notify(new OfferRejectedByCustomerNotification($offer->fresh(['customer', 'vendor']), $request->get('reason')));
+    }
 
         return response()->json(['success' => true, 'message' => 'Offer rejected']);
     }
