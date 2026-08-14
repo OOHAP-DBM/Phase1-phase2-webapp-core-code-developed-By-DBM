@@ -29,7 +29,7 @@ use App\Http\Controllers\Customer\CustomerOfferController;
 
 Route::get('/api/geocode', [GeocodeController::class, 'search']);
 Route::get('/api/pincode', [GeocodeController::class, 'pincode']);
-Route::get('/api/reverse-geocode', [GeocodeController::class, 'reverse']); 
+Route::get('/api/reverse-geocode', [GeocodeController::class, 'reverse']);
 $seoSearchPattern = config('seo_search_routes.pattern', '/billboard-advertising/{city}/{area?}');
 Route::get($seoSearchPattern, [SearchController::class, 'seoSearch'])->name('search.seo');
 Route::middleware(['auth'])->get('/notification/{notification}', [App\Http\Controllers\NotificationRedirectController::class, 'open'])->name('notifications.open');
@@ -49,39 +49,39 @@ Route::get('/brand/oohapp-logo', function () {
         'Cache-Control' => 'public, max-age=31536000, immutable',
         'ETag' => '"' . md5_file($path) . '"',
     ]);
-})->name('brand.oohapp-logo'); 
+})->name('brand.oohapp-logo');
 
 Route::get('/ajax/hoardings', [\App\Http\Controllers\Web\HomeController::class, 'index'])->name('ajax.hoardings');
- 
+
 Route::prefix('admin-login-9f3b2x')->name('admin.')->middleware('guest')->group(function () {
     Route::get('/login', [Modules\Auth\Http\Controllers\LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [Modules\Auth\Http\Controllers\LoginController::class, 'login'])->name('login.submit');
 });
- 
+
 Route::prefix('enquiry')->name('direct.enquiry.')->group(function () {
 
-  
+
     Route::get('/captcha', [DirectEnquiryController::class, 'regenerateCaptcha'])
         ->name('captcha');
- 
+
     Route::post('/otp/send', [DirectEnquiryController::class, 'sendOtp'])
         ->name('otp.send')
-        ->middleware('throttle:50,1');  
+        ->middleware('throttle:50,1');
 
     Route::post('/otp/verify', [DirectEnquiryController::class, 'verifyOtp'])
         ->name('otp.verify')
-        ->middleware('throttle:100,1');  
+        ->middleware('throttle:100,1');
 
-     
+
     Route::post('/submit', [DirectEnquiryController::class, 'store'])
         ->name('submit')
-        ->middleware('throttle:30,5');  
+        ->middleware('throttle:30,5');
 
-    
+
     Route::get('/track', [DirectEnquiryController::class, 'track'])
         ->name('track');
 });
- 
+
 Route::prefix('admin/direct-enquiries')->name('admin.direct-enquiries.')->middleware(['auth', 'role:admin|superadmin'])->group(function () {
 
     Route::get('/', [DirectEnquiryController::class, 'index'])
@@ -106,7 +106,7 @@ Route::prefix('admin/direct-enquiries')->name('admin.direct-enquiries.')->middle
         ->name('export.csv');
 });
 
- 
+
 Route::prefix('direct-enquiries')
     ->name('direct.enquiries.')
     ->middleware(['auth', 'role:vendor|admin'])
@@ -732,7 +732,7 @@ Route::middleware(['auth', 'role:vendor'])->prefix('vendor')->name('vendor.')->g
             ->name('offers.remind');
         Route::post('/offers/{offer}/accept-customer-modification', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'acceptCustomerModification'])
             ->name('offers.accept-customer-modification');
-        Route::post('/offers/{offer}/vendor-reject', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'vendorReject'])->name('vendor-reject');
+        Route::post('/offers/{offer}/vendor-reject', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'vendorReject'])->name('offers.vendor-reject');
 
 
 
