@@ -88,6 +88,31 @@
                     @php $h = $item->hoarding; @endphp
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3">
+
+<div class="w-14 h-14 bg-gray-200 rounded overflow-hidden flex-shrink-0">
+                                                @php
+
+                                                    $mediaItem = null;
+                                                    if (($h->hoarding_type ?? '') === 'ooh') {
+                                                        $mediaItem = \Modules\Hoardings\Models\HoardingMedia::where('hoarding_id', $h->id)
+                                                            ->orderByDesc('is_primary')
+                                                            ->orderBy('sort_order')
+                                                            ->first();
+                                                    } elseif (($h->hoarding_type ?? '') === 'dooh') {
+                                                        $screen = \Modules\DOOH\Models\DOOHScreen::where('hoarding_id', $item->id)->first();
+                                                        if ($screen) {
+                                                            $mediaItem = \Modules\DOOH\Models\DOOHScreenMedia::where('dooh_screen_id', $screen->id)
+                                                                ->orderBy('sort_order')
+                                                                ->first();
+                                                        }
+                                                    }
+                                                @endphp
+                                                @if($mediaItem)
+                                                    <x-media-preview :media="$mediaItem" :alt="$item->hoarding->title ?? 'Hoarding'" />
+                                                @else
+                                                    <div class="w-full h-full bg-gray-300 flex items-center justify-center text-[9px] text-gray-500">No Image</div>
+                                                @endif
+                                            </div>
                             <p class="font-semibold text-gray-800">{{ $h->title ?? 'Hoarding #' . $item->hoarding_id }}</p>
                             <p class="text-[10px] text-gray-400">{{ $h->city ?? '' }}</p>
                         </td>
@@ -124,101 +149,7 @@
         </div>
     </div>
 
-    {{-- VERSION HISTORY — who added/removed what, at each step --}}
-    {{-- <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="px-6 py-4 border-b">
-            <h3 class="font-bold text-gray-800 text-sm">Negotiation History</h3>
-            <p class="text-xs text-gray-400 mt-0.5">Every change, and who made it.</p>
-        </div>
 
-        <div class="divide-y divide-gray-100">
-            @foreach($versionDiffs as $diff)
-            @php
-                $actorLabel = match($diff['actor_type']) {
-                    'vendor'   => 'You (Vendor)',
-                    'customer' => $offer->customer->name ?? 'Customer',
-                    'admin'    => 'Admin',
-                    default    => 'System',
-                };
-                $actorClass = match($diff['actor_type']) {
-                    'vendor'   => 'bg-emerald-50 text-emerald-700',
-                    'customer' => 'bg-blue-50 text-blue-700',
-                    default    => 'bg-gray-100 text-gray-600',
-                };
-            @endphp
-            <div class="px-6 py-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ $actorClass }}">{{ $actorLabel }}</span>
-                    <span class="text-xs font-bold text-gray-700">Version {{ $diff['version']->version_number }}</span>
-                    <span class="text-[10px] text-gray-400">{{ $diff['version']->created_at->format('d M Y, h:i A') }}</span>
-                    <span class="ml-auto text-xs font-bold text-gray-700">₹{{ number_format((float) $diff['total_amount'], 2) }}</span>
-                </div>
-
-                @if($diff['is_initial'])
-                    <p class="text-xs text-gray-500 mb-2">Initial offer created with {{ $diff['added']->count() }} hoarding(s):</p>
-                    <div class="flex flex-wrap gap-1.5">
-                        @foreach($diff['added'] as $item)
-                            <span class="text-[10px] bg-gray-50 border border-gray-200 text-gray-700 px-2 py-1 rounded">
-                                {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
-                            </span>
-                        @endforeach
-                    </div>
-                @else
-                    @if($diff['added']->isNotEmpty())
-                    <div class="mb-2">
-                        <p class="text-[10px] font-bold text-emerald-600 mb-1">＋ Added</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            @foreach($diff['added'] as $item)
-                                <span class="text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-1 rounded">
-                                    {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
-                                    <span class="text-emerald-500">({{ optional($item->start_date)->format('d M') }} – {{ optional($item->end_date)->format('d M Y') }})</span>
-                                </span>
-                            @endforeach
-                        </div>
-                    </div>
-                    @endif
-
-                    @if($diff['removed']->isNotEmpty())
-                    <div class="mb-2">
-                        <p class="text-[10px] font-bold text-red-600 mb-1">－ Removed</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            @foreach($diff['removed'] as $item)
-                                <span class="text-[10px] bg-red-50 border border-red-200 text-red-700 px-2 py-1 rounded line-through">
-                                    {{ $item->hoarding->title ?? 'Hoarding #' . $item->hoarding_id }}
-                                </span>
-                            @endforeach
-                        </div>
-                    </div>
-                    @endif
-
-                    @if($diff['changed']->isNotEmpty())
-                    <div class="mb-2">
-                        <p class="text-[10px] font-bold text-amber-600 mb-1">↻ Changed</p>
-                        <div class="space-y-1">
-                            @foreach($diff['changed'] as $change)
-                                @php $cur = $change['current']; $prev = $change['previous']; @endphp
-                                <div class="text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-1.5 rounded">
-                                    <span class="font-bold">{{ $cur->hoarding->title ?? 'Hoarding #' . $cur->hoarding_id }}</span> —
-                                    @if(optional($prev->start_date)->format('Y-m-d') !== optional($cur->start_date)->format('Y-m-d') || optional($prev->end_date)->format('Y-m-d') !== optional($cur->end_date)->format('Y-m-d'))
-                                        dates {{ optional($prev->start_date)->format('d M') }}–{{ optional($prev->end_date)->format('d M Y') }} → {{ optional($cur->start_date)->format('d M') }}–{{ optional($cur->end_date)->format('d M Y') }}
-                                    @endif
-                                    @if((float) $prev->final_price !== (float) $cur->final_price)
-                                        · price ₹{{ number_format((float) $prev->final_price, 2) }} → ₹{{ number_format((float) $cur->final_price, 2) }}
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                    @endif
-
-                    @if($diff['added']->isEmpty() && $diff['removed']->isEmpty() && $diff['changed']->isEmpty())
-                        <p class="text-[10px] text-gray-400 italic">No hoarding changes in this version.</p>
-                    @endif
-                @endif
-            </div>
-            @endforeach
-        </div>
-    </div> --}}
     {{-- VERSION HISTORY — who added/removed/changed what, at each step --}}
 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
     <div class="px-6 py-4 border-b flex items-center justify-between">
@@ -399,7 +330,7 @@ function collapseAllVersions() {
     </div>
 </div>
 
-{{-- <script>
+<script>
 window.CSRF_TOKEN = '{{ csrf_token() }}';
 window.VENDOR_REJECT_URL = '{{ route('vendor.offers.vendor-reject', $offer->id) }}';
 window.OFFERS_INDEX_URL = '{{ route('vendor.offers.index') }}';
@@ -432,5 +363,5 @@ document.getElementById('vendor-reject-confirm-btn')?.addEventListener('click', 
         isRejecting = false;
     }
 });
-</script> --}}
+</script>
 @endsection

@@ -433,4 +433,7 @@ public function isNegotiable(): bool
 {
     return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_SENT], true);
 }
+// app/Models/Offer.php — already present, no change needed
+public function scopeArchived($query)    { return $query->whereNotNull('archived_at'); }
+public function scopeNotArchived($query) { return $query->whereNull('archived_at'); }
 }
