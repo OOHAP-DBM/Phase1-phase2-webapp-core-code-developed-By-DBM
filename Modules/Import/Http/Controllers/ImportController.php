@@ -653,7 +653,7 @@ class ImportController extends Controller
     public function getImportStatus(InventoryImportBatch $batch): JsonResponse
     {
         try {
-            // Authorize user
+
             $this->authorize('view', $batch);
 
             return response()->json([
@@ -683,7 +683,7 @@ class ImportController extends Controller
     public function getImportDetails(InventoryImportBatch $batch): JsonResponse
     {
         try {
-            // Authorize user
+            
             $this->authorize('view', $batch);
 
             $invalidRecords = $batch->stagingRecords()

@@ -29,7 +29,7 @@ class ProcessInventoryImportJob implements ShouldQueue
     protected string $excelPath;
     protected string $pptPath;
     public $tries = 3;
-    public $timeout = 900;  
+    public $timeout = 900;
 
     public $uniqueFor = 3600;
 
@@ -206,7 +206,11 @@ class ProcessInventoryImportJob implements ShouldQueue
                 'transformed_status' => $transformed['status'],
                 'error' => $transformed['error_message'] ?? null,
             ]);
-
+            \Log::info('Row Status Check', [
+                'status' => $transformed['status'],
+                'error' => $transformed['error_message'] ?? null,
+            ]);
+            
             if ($transformed['status'] === 'valid') {
                 $validCount++;
             } else {

@@ -163,7 +163,8 @@ Route::prefix('vendor/pos')->middleware(['auth', 'role:vendor'])->name('vendor.p
     Route::get('/bookings/{id}', [\Modules\POS\Controllers\Web\VendorPosController::class, 'show'])->name('show');
     Route::get('/customers', [\Modules\POS\Controllers\Web\VendorPosController::class, 'customers'])->name('customers');
     Route::get('/customers/{id}', [\Modules\POS\Controllers\Web\VendorPosController::class, 'showCustomer'])->name('customers.show');
-
+Route::get('/my-customers', [\Modules\POS\Controllers\Web\VendorPosController::class, 'myCustomers'])
+    ->name('my-customers');
 
     Route::prefix('api')->group(function () {
         Route::get('/settings', [\Modules\POS\Controllers\Web\VendorPosController::class, 'getSettings'])->name('settings');
@@ -940,6 +941,8 @@ Route::middleware(['auth', 'role:admin|superadmin'])->prefix('admin')->name('adm
     Route::get('/customers/{id}/edit', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'edit'])->name('customers.edit');
     Route::put('/customers/{id}', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{id}', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'destroy'])->name('customers.destroy');
+
+    
 
 
     // KYC Verification

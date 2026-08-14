@@ -38,6 +38,26 @@ class VendorPosController extends Controller
         $this->availabilityService = $availabilityService;
     }
 
+    public function myCustomers()
+    {
+        $vendorId = Auth::id();
+
+        $posCustomerUserIds = PosCustomer::where('vendor_id', $vendorId)
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->unique();
+
+        $customers = User::whereIn('id', $posCustomerUserIds)
+            ->with('posProfile')
+            ->latest()
+            ->get();
+
+        return view('vendor.pos.customers.index', [
+            'customers' => $customers,
+            'totalCustomers' => $customers->count(),
+        ]);
+    }
+
     private function resolveEffectiveVendorId(?Request $request = null): int
     {
         $request = $request ?? request();
@@ -220,9 +240,11 @@ class VendorPosController extends Controller
         $search = trim($request->input('search', ''));
         $status = (array) $request->input('status', []);
         $usersQuery = User::whereIn('id', $allUserIds)
-            ->with(['posProfile' => function ($query) use ($vendorId) {
-                $query->where('vendor_id', $vendorId);
-            }]);
+            ->with([
+                'posProfile' => function ($query) use ($vendorId) {
+                    $query->where('vendor_id', $vendorId);
+                }
+            ]);
         if ($search !== '') {
             $usersQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%$search%")
@@ -571,8 +593,8 @@ class VendorPosController extends Controller
             if ($request->filled('search')) {
                 $search = $request->get('search');
                 $query->where(function ($q) use ($search) {
-                    $q->where('title',   'like', "%{$search}%")
-                        ->orWhere('city',    'like', "%{$search}%")
+                    $q->where('title', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%")
                         ->orWhere('address', 'like', "%{$search}%");
                 });
             }
@@ -600,14 +622,14 @@ class VendorPosController extends Controller
                         // Hoardings with NO active booking today
                         $query->whereDoesntHave('bookings', function ($q) use ($today) {
                             $q->where('start_date', '<=', $today)
-                                ->where('end_date',   '>=', $today)
+                                ->where('end_date', '>=', $today)
                                 ->whereIn('status', ['confirmed', 'active', 'payment_hold']);
                         });
                     } elseif (in_array('booked', $availabilityValues)) {
                         // Hoardings WITH an active booking today
                         $query->whereHas('bookings', function ($q) use ($today) {
                             $q->where('start_date', '<=', $today)
-                                ->where('end_date',   '>=', $today)
+                                ->where('end_date', '>=', $today)
                                 ->whereIn('status', ['confirmed', 'active', 'payment_hold']);
                         });
                     }
@@ -686,7 +708,7 @@ class VendorPosController extends Controller
             // ── 9. Date availability filter ────────────────────────────────
             if ($request->filled('start_date') && $request->filled('end_date')) {
                 $startDate = $request->get('start_date');
-                $endDate   = $request->get('end_date');
+                $endDate = $request->get('end_date');
 
                 $query->where('base_monthly_price', '>', 0)
                     ->whereDoesntHave('bookings', function ($q) use ($startDate, $endDate) {
@@ -730,20 +752,20 @@ class VendorPosController extends Controller
                     }
 
                     return [
-                        'id'                  => $hoarding->id,
-                        'title'               => $hoarding->title,
-                        'location_address'    => $hoarding->address,
-                        'location_city'       => $hoarding->city,
-                        'location_state'      => $hoarding->state,
-                        'display_location'    => $hoarding->display_location,
-                        'type'                => $hoarding->hoarding_type,
-                        'category'            => $hoarding->category,
-                        'price_per_month'     => $pricePerMonth,
-                        'image_url'           => $imageUrl,
+                        'id' => $hoarding->id,
+                        'title' => $hoarding->title,
+                        'location_address' => $hoarding->address,
+                        'location_city' => $hoarding->city,
+                        'location_state' => $hoarding->state,
+                        'display_location' => $hoarding->display_location,
+                        'type' => $hoarding->hoarding_type,
+                        'category' => $hoarding->category,
+                        'price_per_month' => $pricePerMonth,
+                        'image_url' => $imageUrl,
                         'total_slots_per_day' => $hoarding->doohScreen->total_slots_per_day ?? 300,
                         'is_currently_booked' => $hoarding->bookings()
                             ->where('start_date', '<=', now())
-                            ->where('end_date',   '>=', now())
+                            ->where('end_date', '>=', now())
                             ->whereIn('status', ['confirmed', 'active'])
                             ->exists(),
                     ];
@@ -751,8 +773,8 @@ class VendorPosController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => $hoardings,
-                'count'   => $hoardings->count(),
+                'data' => $hoardings,
+                'count' => $hoardings->count(),
                 'filters_applied' => $request->only([
                     'type',
                     'category',
@@ -770,7 +792,7 @@ class VendorPosController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch hoardings',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -921,7 +943,7 @@ class VendorPosController extends Controller
                         ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhereHas('posProfile', function ($q2) use ($search, $vendorId) {
                             $q2->where('vendor_id', $vendorId)
-                            ->where('business_name', 'like', "%{$search}%");
+                                ->where('business_name', 'like', "%{$search}%");
                         });
                 })
                 ->orderBy('name')
@@ -1359,37 +1381,37 @@ class VendorPosController extends Controller
             ]);
 
             $validated = $request->validate([
-                'hoarding_ids'                          => 'nullable',
-                'hoarding_items'                        => 'nullable|array',
-                'hoarding_items.*.hoarding_id'          => 'required_with:hoarding_items|integer',
-                'hoarding_items.*.start_date'           => 'required_with:hoarding_items|date',
-                'hoarding_items.*.end_date'             => 'required_with:hoarding_items|date|after_or_equal:hoarding_items.*.start_date',
-                'hoarding_items.*.price_per_month'      => 'nullable|numeric',
-                'hoarding_items.*.type'                 => 'nullable|string',
-                'hoarding_items.*.total_slots_per_day'  => 'nullable|integer',
-                'customer_id'                           => 'nullable|exists:users,id',
-                'customer_name'                         => 'nullable|string|max:255',
-                'customer_phone'                        => 'nullable|string|max:20',
-                'customer_email'                        => 'nullable|email|max:255',
-                'customer_address'                      => 'nullable|string|max:500',
-                'customer_gstin'                        => 'nullable|string|max:15',
-                'booking_type'                          => 'nullable|in:ooh,dooh',
-                'start_date'                            => 'required|date',
-                'end_date'                              => 'required|date|after_or_equal:start_date',
-                'base_amount'                           => 'required|numeric|min:0',
-                'discount_amount'                       => 'nullable|numeric|min:0',
-                'payment_mode'                          => 'required|in:cash,credit_note,bank_transfer,cheque,online',
-                'payment_reference'                     => 'nullable|string|max:255',
-                'payment_notes'                         => 'nullable|string|max:500',
-                'notes'                                 => 'nullable|string|max:1000',
-                'hold_minutes'                          => 'nullable|integer|min:0',
-                'payment_details_type'                  => 'nullable|string|in:bank_transfer,online,credit_note',
-                'is_milestone'   => 'nullable|boolean',
+                'hoarding_ids' => 'nullable',
+                'hoarding_items' => 'nullable|array',
+                'hoarding_items.*.hoarding_id' => 'required_with:hoarding_items|integer',
+                'hoarding_items.*.start_date' => 'required_with:hoarding_items|date',
+                'hoarding_items.*.end_date' => 'required_with:hoarding_items|date|after_or_equal:hoarding_items.*.start_date',
+                'hoarding_items.*.price_per_month' => 'nullable|numeric',
+                'hoarding_items.*.type' => 'nullable|string',
+                'hoarding_items.*.total_slots_per_day' => 'nullable|integer',
+                'customer_id' => 'nullable|exists:users,id',
+                'customer_name' => 'nullable|string|max:255',
+                'customer_phone' => 'nullable|string|max:20',
+                'customer_email' => 'nullable|email|max:255',
+                'customer_address' => 'nullable|string|max:500',
+                'customer_gstin' => 'nullable|string|max:15',
+                'booking_type' => 'nullable|in:ooh,dooh',
+                'start_date' => 'required|date',
+                'end_date' => 'required|date|after_or_equal:start_date',
+                'base_amount' => 'required|numeric|min:0',
+                'discount_amount' => 'nullable|numeric|min:0',
+                'payment_mode' => 'required|in:cash,credit_note,bank_transfer,cheque,online',
+                'payment_reference' => 'nullable|string|max:255',
+                'payment_notes' => 'nullable|string|max:500',
+                'notes' => 'nullable|string|max:1000',
+                'hold_minutes' => 'nullable|integer|min:0',
+                'payment_details_type' => 'nullable|string|in:bank_transfer,online,credit_note',
+                'is_milestone' => 'nullable|boolean',
                 'milestone_data' => 'required_if:is_milestone,true|array|min:1',
-                'milestone_data.*.title'       => 'required_if:is_milestone,true|string|max:100',
+                'milestone_data.*.title' => 'required_if:is_milestone,true|string|max:100',
                 'milestone_data.*.amount_type' => 'required_if:is_milestone,true|in:percentage,fixed',
-                'milestone_data.*.amount'      => 'required_if:is_milestone,true|numeric|min:0.01',
-                'milestone_data.*.due_date'    => 'nullable|date',
+                'milestone_data.*.amount' => 'required_if:is_milestone,true|numeric|min:0.01',
+                'milestone_data.*.due_date' => 'nullable|date',
                 'milestone_data.*.vendor_notes' => 'nullable|string|max:500',
                 'po_file' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240'
             ]);
@@ -1407,7 +1429,7 @@ class VendorPosController extends Controller
             // ── Build per-hoarding metadata map ─────────────────────────
             $hoardingItemsMap = [];
             foreach ($validated['hoarding_items'] ?? [] as $item) {
-                $hoardingItemsMap[(int)$item['hoarding_id']] = $item;
+                $hoardingItemsMap[(int) $item['hoarding_id']] = $item;
             }
 
             // ── Verify hoardings belong to vendor ────────────────────────
@@ -1423,9 +1445,9 @@ class VendorPosController extends Controller
             $unavailableHoardings = [];
 
             foreach ($hoardings as $hoarding) {
-                $item      = $hoardingItemsMap[$hoarding->id] ?? null;
+                $item = $hoardingItemsMap[$hoarding->id] ?? null;
                 $itemStart = $item ? Carbon::parse($item['start_date']) : Carbon::parse($validated['start_date']);
-                $itemEnd   = $item ? Carbon::parse($item['end_date'])   : Carbon::parse($validated['end_date']);
+                $itemEnd = $item ? Carbon::parse($item['end_date']) : Carbon::parse($validated['end_date']);
 
                 $availability = $this->availabilityService->checkMultipleDates(
                     $hoarding->id,
@@ -1435,7 +1457,7 @@ class VendorPosController extends Controller
                 if (!empty($availability)) {
                     $unavailableReasons = [];
                     $skipStatuses = ['available', 'blocked']; // blocked is allowed to proceed
-                  foreach ($availability as $dateCheck) {
+                    foreach ($availability as $dateCheck) {
                         if (
                             !in_array($dateCheck['status'], $skipStatuses) &&
                             !in_array($dateCheck['status'], $unavailableReasons)
@@ -1445,9 +1467,9 @@ class VendorPosController extends Controller
                     }
                     if (!empty($unavailableReasons)) {
                         $unavailableHoardings[] = [
-                            'hoarding_id'   => $hoarding->id,
+                            'hoarding_id' => $hoarding->id,
                             'hoarding_name' => $hoarding->address ?? $hoarding->title,
-                            'reasons'       => $unavailableReasons,
+                            'reasons' => $unavailableReasons,
                         ];
                     }
                 }
@@ -1455,10 +1477,10 @@ class VendorPosController extends Controller
 
             if (!empty($unavailableHoardings)) {
                 return response()->json([
-                    'success'               => false,
-                    'message'               => 'One or more selected hoardings are not available for the specified dates',
+                    'success' => false,
+                    'message' => 'One or more selected hoardings are not available for the specified dates',
                     'unavailable_hoardings' => $unavailableHoardings,
-                    'details'               => $this->formatUnavailabilityDetails($unavailableHoardings),
+                    'details' => $this->formatUnavailabilityDetails($unavailableHoardings),
                 ], 422);
             }
 
@@ -1466,12 +1488,12 @@ class VendorPosController extends Controller
             $milestoneData = $isMilestone ? ($validated['milestone_data'] ?? []) : [];
 
             // ── Pricing ──────────────────────────────────────────────────
-            $gstRate            = $this->posBookingService->getGSTRate();
-            $baseAmount         = (float) $validated['base_amount'];
-            $discountAmount     = (float) ($validated['discount_amount'] ?? 0);
+            $gstRate = $this->posBookingService->getGSTRate();
+            $baseAmount = (float) $validated['base_amount'];
+            $discountAmount = (float) ($validated['discount_amount'] ?? 0);
             $amountAfterDiscount = max(0, $baseAmount - $discountAmount);
-            $taxAmount          = ($amountAfterDiscount * $gstRate) / 100;
-            $totalAmount        = $amountAfterDiscount + $taxAmount;
+            $taxAmount = ($amountAfterDiscount * $gstRate) / 100;
+            $totalAmount = $amountAfterDiscount + $taxAmount;
 
             // ── Hold expiry ──────────────────────────────────────────────
             $holdMinutes = (int) ($validated['hold_minutes'] ?? 30);
@@ -1479,34 +1501,34 @@ class VendorPosController extends Controller
 
             // ── Booking data ─────────────────────────────────────────────
             $bookingData = [
-                'vendor_id'        => $vendorId,
-                'hoarding_ids'     => $hoardingIds,
-                'hoarding_items'   => $validated['hoarding_items'] ?? [],
-                'customer_id'      => $validated['customer_id'] ?? null,
-                'customer_name'    => $validated['customer_name']    ?? 'Walk-in Customer',
-                'customer_email'   => $validated['customer_email']   ?? null,
-                'customer_phone'   => $validated['customer_phone']   ?? 'N/A',
+                'vendor_id' => $vendorId,
+                'hoarding_ids' => $hoardingIds,
+                'hoarding_items' => $validated['hoarding_items'] ?? [],
+                'customer_id' => $validated['customer_id'] ?? null,
+                'customer_name' => $validated['customer_name'] ?? 'Walk-in Customer',
+                'customer_email' => $validated['customer_email'] ?? null,
+                'customer_phone' => $validated['customer_phone'] ?? 'N/A',
                 'customer_address' => $validated['customer_address'] ?? null,
-                'customer_gstin'   => $validated['customer_gstin']   ?? null,
-                'booking_type'     => $validated['booking_type']     ?? 'ooh',
-                'start_date'       => $validated['start_date'],
-                'end_date'         => $validated['end_date'],
-                'duration_days'    => Carbon::parse($validated['end_date'])
+                'customer_gstin' => $validated['customer_gstin'] ?? null,
+                'booking_type' => $validated['booking_type'] ?? 'ooh',
+                'start_date' => $validated['start_date'],
+                'end_date' => $validated['end_date'],
+                'duration_days' => Carbon::parse($validated['end_date'])
                     ->diffInDays(Carbon::parse($validated['start_date'])) + 1,
-                'base_amount'      => $baseAmount,
-                'discount_amount'  => $discountAmount,
-                'tax_amount'       => round($taxAmount, 2),
-                'total_amount'     => round($totalAmount, 2),
-                'payment_mode'     => $validated['payment_mode'],
+                'base_amount' => $baseAmount,
+                'discount_amount' => $discountAmount,
+                'tax_amount' => round($taxAmount, 2),
+                'total_amount' => round($totalAmount, 2),
+                'payment_mode' => $validated['payment_mode'],
                 'payment_reference' => $validated['payment_reference'] ?? null,
-                'payment_notes'    => $validated['payment_notes']     ?? null,
-                'notes'            => $validated['notes']             ?? null,
-                'status'           => 'draft',
-                'payment_status'   => 'unpaid',
-                'hold_minutes'     => $holdMinutes,
-                'hold_expiry_at'   => $holdExpiryAt,
-                'is_milestone'     => $isMilestone,
-                'milestone_data'   => $milestoneData,
+                'payment_notes' => $validated['payment_notes'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'status' => 'draft',
+                'payment_status' => 'unpaid',
+                'hold_minutes' => $holdMinutes,
+                'hold_expiry_at' => $holdExpiryAt,
+                'is_milestone' => $isMilestone,
+                'milestone_data' => $milestoneData,
             ];
 
             $booking = $this->posBookingService->createBooking($bookingData);
@@ -1659,13 +1681,13 @@ class VendorPosController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Booking created successfully',
-                'data'    => [
-                    'id'             => $booking->id,
+                'data' => [
+                    'id' => $booking->id,
                     'invoice_number' => $booking->invoice_number,
-                    'total_amount'   => round($totalAmount, 2),
+                    'total_amount' => round($totalAmount, 2),
                     'hoarding_count' => count($hoardingIds),
                     'hold_expiry_at' => $holdExpiryAt?->toISOString(),
-                    'hold_minutes'   => $holdMinutes,
+                    'hold_minutes' => $holdMinutes,
                 ],
             ], 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1688,10 +1710,10 @@ class VendorPosController extends Controller
             $booking->load('bookingHoardings.hoarding');
         }
 
-        $vendor       = \App\Models\User::find($booking->vendor_id);
-        $totalAmount  = number_format((float) $booking->total_amount, 2);
-        $holdMins     = $booking->hold_minutes ?? 0;
-        $holdText     = $holdMins > 0
+        $vendor = \App\Models\User::find($booking->vendor_id);
+        $totalAmount = number_format((float) $booking->total_amount, 2);
+        $holdMins = $booking->hold_minutes ?? 0;
+        $holdText = $holdMins > 0
             ? "⏳ *Payment Due Within:* " . ($holdMins >= 1440 ? round($holdMins / 1440) . ' day(s)' : ($holdMins >= 60 ? round($holdMins / 60) . ' hour(s)' : "{$holdMins} minutes"))
             : "ℹ️ No payment time limit.";
 
@@ -1803,8 +1825,8 @@ class VendorPosController extends Controller
 
             Log::info('POS WhatsApp notification dispatched', [
                 'booking_id' => $booking->id,
-                'phone'      => $normalizedPhone,
-                'sent'       => $sent,
+                'phone' => $normalizedPhone,
+                'sent' => $sent,
                 'message_preview' => substr($message, 0, 100),
             ]);
         } catch (\Throwable $e) {
@@ -1872,7 +1894,7 @@ class VendorPosController extends Controller
                     'total_revenue' => (float) $totalRevenue,
                     'pending_payments' => (float) $pendingPayments,
                     'active_credit_notes' => $activeCreditNotes,
-                    'total_customers'  => ($regCount + $guestCount + $naCount), // The combined total
+                    'total_customers' => ($regCount + $guestCount + $naCount), // The combined total
                 ],
             ]);
         } catch (\Exception $e) {
@@ -1939,13 +1961,13 @@ class VendorPosController extends Controller
             if ($request->filled('period')) {
                 $period = strtolower(trim((string) $request->get('period')));
                 $from = match ($period) {
-                    'today'              => now()->startOfDay(),
-                    'week', 'this_week'  => now()->startOfWeek(),
+                    'today' => now()->startOfDay(),
+                    'week', 'this_week' => now()->startOfWeek(),
                     'month', 'this_month' => now()->startOfMonth(),
-                    '1m'                 => now()->subMonth()->startOfDay(),
-                    '6m'                 => now()->subMonths(6)->startOfDay(),
-                    '1y', 'year'         => now()->subYear()->startOfDay(),
-                    default              => null,
+                    '1m' => now()->subMonth()->startOfDay(),
+                    '6m' => now()->subMonths(6)->startOfDay(),
+                    '1y', 'year' => now()->subYear()->startOfDay(),
+                    default => null,
                 };
                 if ($from) {
                     $query->where('created_at', '>=', $from);
