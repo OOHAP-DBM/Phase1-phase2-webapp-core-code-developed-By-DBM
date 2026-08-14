@@ -634,6 +634,7 @@ public function vendorReject(Request $request, Offer $offer): JsonResponse
             }
             OfferActivityLog::record($offer, 'reminder_sent', 'Reminder sent to customer');
              if ($offer->customer) {
+               $fresh = $offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']);
             $offer->customer->notify(new OfferReminderNotification($fresh));
         }
 
@@ -692,6 +693,7 @@ public function acceptCustomerModification(Offer $offer): JsonResponse
         Log::warning('Vendor-accept notification failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
     }
      if ($offer->customer) {
+        $fresh = $offer->fresh(['currentVersion.items.hoarding', 'customer', 'vendor']);
         $offer->customer->notify(new OfferAcceptedByVendorNotification($fresh));
     }
 
