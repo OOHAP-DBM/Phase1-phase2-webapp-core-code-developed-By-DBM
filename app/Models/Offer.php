@@ -37,7 +37,7 @@ class Offer extends Model
         'accepted_at',
         'rejected_at',
         'cancelled_at',
-         'archived_at',      // PROMPT 105: When marked as expired
+        'archived_at',      // PROMPT 105: When marked as expired
     ];
 
     protected $casts = [
@@ -47,11 +47,11 @@ class Offer extends Model
         'expires_at' => 'datetime',   // PROMPT 105
         'sent_at' => 'datetime',       // PROMPT 105
         'expired_at' => 'datetime',    // PROMPT 105
-        'archived_at'    => 'datetime',
-        'accepted_at'    => 'datetime',
-        'rejected_at'    => 'datetime',
-        'cancelled_at'   => 'datetime',
-        ];
+        'archived_at' => 'datetime',
+        'accepted_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+    ];
 
     /**
      * Status constants
@@ -119,28 +119,28 @@ class Offer extends Model
     {
         return $query->where('status', self::STATUS_ACCEPTED);
     }
-      public function customer(): BelongsTo
+    public function customer(): BelongsTo
     {
         return $this->belongsTo(
             User::class,
             'customer_id'
         );
     }
-      public function versions(): HasMany
+    public function versions(): HasMany
     {
         return $this->hasMany(
             OfferVersion::class,
             'offer_id'
         );
     }
-        public function currentVersion(): BelongsTo
+    public function currentVersion(): BelongsTo
     {
         return $this->belongsTo(
             OfferVersion::class,
             'current_version_id'
         );
     }
-     public function activityLogs(): HasMany
+    public function activityLogs(): HasMany
     {
         return $this->hasMany(
             OfferActivityLog::class,
@@ -216,6 +216,18 @@ class Offer extends Model
         return false;
     }
 
+    public function items()
+    {
+        return $this->hasManyThrough(
+            OfferVersionItem::class,
+            OfferVersion::class,
+            'offer_id',          // Foreign key on OfferVersion table
+            'offer_version_id',  // Foreign key on OfferItem table
+            'id',                // Local key on Offer table
+            'id'                 // Local key on OfferVersion table
+        );
+    }
+
     /**
      * Check if offer can be accepted
      */
@@ -282,9 +294,9 @@ class Offer extends Model
         if ($daysRemaining < 7) {
             return "Expires in {$daysRemaining} days";
         }
-  $expiryDate = $this->expires_at ?? $this->valid_until;
+        $expiryDate = $this->expires_at ?? $this->valid_until;
 
-    return $expiryDate ? 'Expires on ' . $expiryDate->format('M d, Y') : 'No expiry';
+        return $expiryDate ? 'Expires on ' . $expiryDate->format('M d, Y') : 'No expiry';
         // return 'Expires on ' . $this->expires_at->format('M d, Y')
         //     ?? $this->valid_until->format('M d, Y');
     }
@@ -320,10 +332,19 @@ class Offer extends Model
     {
         return $this->status === self::STATUS_REJECTED;
     }
-     public function isArchived(): bool { return !is_null($this->archived_at); }
-    public function archive(): void    { $this->update(['archived_at' => now()]); }
-    public function unarchive(): void  { $this->update(['archived_at' => null]); }
-      public function getLatestVersion(): ?OfferVersion
+    public function isArchived(): bool
+    {
+        return !is_null($this->archived_at);
+    }
+    public function archive(): void
+    {
+        $this->update(['archived_at' => now()]);
+    }
+    public function unarchive(): void
+    {
+        $this->update(['archived_at' => null]);
+    }
+    public function getLatestVersion(): ?OfferVersion
     {
         return $this->versions()
             ->latest('version_number')
@@ -401,7 +422,7 @@ class Offer extends Model
 
         return max(0, now()->diffInDays($this->valid_until, false));
     }
-     public function hoardingCount(): int
+    public function hoardingCount(): int
     {
         return $this->currentVersion?->items?->count() ?? 0;
     }
@@ -415,25 +436,31 @@ class Offer extends Model
     {
         return $this->currentVersion?->items?->pluck('hoarding.city')->filter()->unique()->values()->toArray() ?? [];
     }
-// app/Models/Offer.php — add this method
-public function hasPendingModificationRequest(): bool
-{
-    return $this->status === self::STATUS_SENT && !empty($this->modification_notes);
-}
-public function wasLastModifiedByVendor(): bool
-{
-    return $this->currentVersion?->created_by_type === 'vendor';
-}
+    // app/Models/Offer.php — add this method
+    public function hasPendingModificationRequest(): bool
+    {
+        return $this->status === self::STATUS_SENT && !empty($this->modification_notes);
+    }
+    public function wasLastModifiedByVendor(): bool
+    {
+        return $this->currentVersion?->created_by_type === 'vendor';
+    }
 
-public function wasLastModifiedByCustomer(): bool
-{
-    return $this->currentVersion?->created_by_type === 'customer';
-}
-public function isNegotiable(): bool
-{
-    return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_SENT], true);
-}
-// app/Models/Offer.php — already present, no change needed
-public function scopeArchived($query)    { return $query->whereNotNull('archived_at'); }
-public function scopeNotArchived($query) { return $query->whereNull('archived_at'); }
+    public function wasLastModifiedByCustomer(): bool
+    {
+        return $this->currentVersion?->created_by_type === 'customer';
+    }
+    public function isNegotiable(): bool
+    {
+        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_SENT], true);
+    }
+    // app/Models/Offer.php — already present, no change needed
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
+    public function scopeNotArchived($query)
+    {
+        return $query->whereNull('archived_at');
+    }
 }
