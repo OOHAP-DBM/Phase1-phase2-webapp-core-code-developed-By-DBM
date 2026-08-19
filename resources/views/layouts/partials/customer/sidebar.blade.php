@@ -89,6 +89,37 @@
         <hr class="mt-5 border-gray-200">
     </div>
 
+    @php
+        $customerSidebarUser = auth()->user();
+        $customerSidebarFields = [
+            $customerSidebarUser?->name,
+            $customerSidebarUser?->email,
+            $customerSidebarUser?->phone,
+            $customerSidebarUser?->avatar,
+            $customerSidebarUser?->company_name,
+            $customerSidebarUser?->gstin,
+        ];
+        $customerSidebarProfileCompletion = count($customerSidebarFields) > 0
+            ? round((count(array_filter($customerSidebarFields, fn ($value) => !is_null($value) && $value !== '')) / count($customerSidebarFields)) * 100)
+            : 0;
+        $customerSidebarProfileBarColor = $customerSidebarProfileCompletion >= 100
+            ? 'bg-green-500'
+            : ($customerSidebarProfileCompletion >= 50 ? 'bg-yellow-400' : 'bg-red-400');
+    @endphp
+
+    <div class="px-4 pt-2 pb-3">
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <div class="mb-2 flex items-center justify-between">
+                <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Profile Completed</span>
+                <span class="text-xs font-semibold text-gray-800">{{ $customerSidebarProfileCompletion }}%</span>
+            </div>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                <div class="{{ $customerSidebarProfileBarColor }} h-full rounded-full transition-all duration-300"
+                    style="width: {{ $customerSidebarProfileCompletion }}%"></div>
+            </div>
+        </div>
+    </div>
+
     <nav class="px-4 pb-4">
         <div class="space-y-1">
             <!-- Dashboard -->
