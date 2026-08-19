@@ -23,6 +23,8 @@ use App\Services\OfferBookingService;
 use App\Notifications\Offers\OfferAcceptedByVendorNotification;
 use App\Notifications\Offers\OfferRejectedByVendorNotification;
 use App\Notifications\Offers\OfferReminderNotification;
+use App\Mail\OfferModifiedMail; // add import
+
 
 
 
@@ -48,7 +50,7 @@ class OfferController extends Controller
 
         $query = Offer::with(['customer', 'currentVersion.items.hoarding'])
             ->where('vendor_id', $vendor->id);
-            // ->notArchived();
+           //  ->notArchived();
 
         if ($request->filled('search')) {
             $search = trim($request->get('search'));
@@ -87,14 +89,33 @@ class OfferController extends Controller
                 $archivedCount = Offer::where('vendor_id', $vendor->id)->count();
 
 
-        if ($request->wantsJson() || $request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'html'    => view('vendor.offers.partials.table', compact('offers'))->render(),
-                'pagination_html' => view('vendor.offers.partials.pagination', compact('offers'))->render(),
-                'archived_count' => $archivedCount,
-            ]);
-        }
+        // if ($request->wantsJson() || $request->ajax()) {
+
+        //     return response()->json([
+        //         'success' => true,
+        //         'html'    => view('vendor.offers.partials.table', compact('offers'))->render(),
+        //         'pagination_html' => view('vendor.offers.partials.pagination', compact('offers'))->render(),
+        //         'archived_count' => $archivedCount,
+        //     ]);
+        // }
+
+if ($request->wantsJson() || $request->ajax()) {
+    $partial = $request->boolean('archived') ? 'vendor.offers.partials.archived-table' : 'vendor.offers.partials.table';
+
+    return response()->json([
+        'success' => true,
+        'html'    => view($partial, compact('offers'))->render(),
+        'pagination' => [
+            'current_page' => $offers->currentPage(),
+            'last_page'    => $offers->lastPage(),
+            'per_page'     => $offers->perPage(),
+            'total'        => $offers->total(),
+            'from'         => $offers->firstItem(),
+            'to'           => $offers->lastItem(),
+        ],
+        'archived_count' => $archivedCount,
+    ]);
+}
 
         return view('vendor.offers.index', compact('offers', 'archivedCount'));
     }
@@ -625,25 +646,49 @@ public function vendorReject(Request $request, Offer $offer): JsonResponse
         return response()->json(['success' => true]);
     }
 
+    // public function sendReminder(Offer $offer): JsonResponse
+    // {
+    //     abort_unless($offer->vendor_id === Auth::id(), 403);
+    //     try {
+    //         if ($offer->customer?->email) {
+    //             \Mail::to($offer->customer->email)->queue(new \App\Mail\OfferSentMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor'])));
+    //         }
+    //         OfferActivityLog::record($offer, 'reminder_sent', 'Reminder sent to customer');
+    //          if ($offer->customer) {
+    //            $fresh = $offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']);
+    //         $offer->customer->notify(new OfferReminderNotification($fresh));
+    //     }
+
+    //         return response()->json(['success' => true, 'message' => 'Reminder sent successfully']);
+    //     } catch (\Exception $e) {
+    //         Log::warning('Offer reminder failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
+    //         return response()->json(['success' => false, 'message' => 'Failed to send reminder'], 500);
+    //     }
+    // }
     public function sendReminder(Offer $offer): JsonResponse
-    {
-        abort_unless($offer->vendor_id === Auth::id(), 403);
-        try {
-            if ($offer->customer?->email) {
-                \Mail::to($offer->customer->email)->queue(new \App\Mail\OfferSentMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor'])));
-            }
-            OfferActivityLog::record($offer, 'reminder_sent', 'Reminder sent to customer');
-             if ($offer->customer) {
-               $fresh = $offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']);
-            $offer->customer->notify(new OfferReminderNotification($fresh));
+{
+    abort_unless($offer->vendor_id === Auth::id(), 403);
+    try {
+        $fresh = $offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']);
+
+        if ($offer->customer?->email) {
+            // A reminder is neither a fresh "New Offer" nor really a
+            // "modification" — reuse OfferSentMail's layout since nothing
+            // actually changed, it's just being resurfaced.
+            \Mail::to($offer->customer->email)->queue(new \App\Mail\OfferSentMail($fresh));
+        }
+        OfferActivityLog::record($offer, 'reminder_sent', 'Reminder sent to customer');
+
+        if ($offer->customer) {
+            $offer->customer->notify(new \App\Notifications\Offers\OfferReminderNotification($fresh));
         }
 
-            return response()->json(['success' => true, 'message' => 'Reminder sent successfully']);
-        } catch (\Exception $e) {
-            Log::warning('Offer reminder failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => 'Failed to send reminder'], 500);
-        }
+        return response()->json(['success' => true, 'message' => 'Reminder sent successfully']);
+    } catch (\Exception $e) {
+        Log::warning('Offer reminder failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
+        return response()->json(['success' => false, 'message' => 'Failed to send reminder'], 500);
     }
+}
 
     protected function buildOfferWhatsappMessage(Offer $offer, $enquiry): string
     {

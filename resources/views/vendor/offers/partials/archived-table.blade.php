@@ -10,7 +10,7 @@
 <tr class="border-b hover:bg-gray-50">
     <td class="px-3 py-3 text-gray-500">{{ $offers->firstItem() + $index }}</td>
     <td class="px-3 py-3">
-        <a href="{{ route('offers.show', $offer->id) }}" class="font-bold text-gray-600 hover:underline">#{{ $offer->id }}</a>
+        <a href="{{ route('vendor.offers.show', $offer->id) }}" class="font-bold text-gray-600 hover:underline">#{{ $offer->id }}</a>
     </td>
     <td class="px-3 py-3">{{ $offer->customer->name ?? 'N/A' }}</td>
     <td class="px-3 py-3">{{ $hoardingCount }}</td>
