@@ -407,9 +407,80 @@ async function confirmArchive() {
     }
 }
 
+// function toggleArchivedSection() {
+//     const section = document.getElementById('archived-section');
+//     const chevron = document.getElementById('archived-chevron');
+//     section.classList.toggle('hidden');
+//     chevron.classList.toggle('rotate-180');
+// }
+/* ---------- archived offers section ---------- */
+let archivedSectionOpen = false;
+let archivedCurrentPage = 1;
+let archivedLoadedOnce = false;
+
 function toggleArchivedSection() {
     const section = document.getElementById('archived-section');
     const chevron = document.getElementById('archived-chevron');
-    section.classList.toggle('hidden');
-    chevron.classList.toggle('rotate-180');
+    archivedSectionOpen = !archivedSectionOpen;
+    section.classList.toggle('hidden', !archivedSectionOpen);
+    chevron.classList.toggle('rotate-180', archivedSectionOpen);
+
+    if (archivedSectionOpen && !archivedLoadedOnce) {
+        loadArchivedOffers(1);
+    }
+}
+
+async function loadArchivedOffers(page = 1) {
+    archivedCurrentPage = page;
+    archivedLoadedOnce = true;
+
+    const section = document.getElementById('archived-section');
+    section.innerHTML = '<p class="text-xs text-gray-400 py-4 text-center">Loading archived offers…</p>';
+
+    const params = new URLSearchParams({ page, per_page: 5, archived: '1' });
+    const res = await fetch(`${window.OFFERS_INDEX_URL}?${params.toString()}`, {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(r => r.json());
+
+    section.innerHTML = `
+        <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+            <table class="min-w-[1000px] w-full text-xs text-left">
+                <thead class="text-gray-500 border-b bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-3 font-semibold">Sn</th>
+                        <th class="px-3 py-3 font-semibold">Offer ID</th>
+                        <th class="px-3 py-3 font-semibold">Customer Name</th>
+                        <th class="px-3 py-3 font-semibold"># of Hoardings</th>
+                        <th class="px-3 py-3 font-semibold">Offer Status</th>
+                        <th class="px-3 py-3 font-semibold">Archived</th>
+                        <th class="px-3 py-3 font-semibold text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="archived-table-body"></tbody>
+            </table>
+        </div>
+        <div id="archived-pagination" class="pt-3"></div>
+    `;
+
+    document.getElementById('archived-table-body').innerHTML = res.html;
+//    renderArchivedPagination(res.pagination);
+}
+
+function renderArchivedPagination(meta) {
+    const el = document.getElementById('archived-pagination');
+    if (!el || meta.last_page <= 1) { if (el) el.innerHTML = ''; return; }
+
+    const mkBtn = (label, page, disabled, active) => `
+        <button type="button" onclick="loadArchivedOffers(${page})" ${disabled ? 'disabled' : ''}
+            class="px-2.5 py-1 border rounded text-xs font-medium
+                ${active ? 'bg-gray-700 text-white border-gray-700' :
+                  disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white hover:bg-gray-50'}">
+            ${label}
+        </button>`;
+
+    let buttons = mkBtn('‹ Prev', meta.current_page - 1, meta.current_page === 1, false);
+    for (let i = 1; i <= meta.last_page; i++) buttons += mkBtn(i, i, false, i === meta.current_page);
+    buttons += mkBtn('Next ›', meta.current_page + 1, meta.current_page === meta.last_page, false);
+
+    el.innerHTML = `<div class="flex items-center gap-1.5 flex-wrap">${buttons}</div>`;
 }

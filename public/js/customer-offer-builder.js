@@ -8,7 +8,23 @@ let isSubmittingModification = false;
 
 const fmt = v => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(v||0);
 const toYMD = d => { d=new Date(d); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-const monthsBetween = (s,e) => Math.max(1, Math.ceil((Math.ceil((new Date(e)-new Date(s))/86400000)+1)/30));
+// const monthsBetween = (s,e) => Math.max(1, Math.ceil((Math.ceil((new Date(e)-new Date(s))/86400000)+1)/30));
+const monthsBetween = (s, e) => {
+    if (!s || !e) return 1;
+
+    const start = new Date(s);
+    const end = new Date(e);
+
+    let months =
+        (end.getFullYear() - start.getFullYear()) * 12 +
+        (end.getMonth() - start.getMonth());
+
+    if (end.getDate() > start.getDate()) {
+        months += 1;
+    }
+
+    return Math.max(1, months);
+};
 const fetchJSON = (url,opts={}) => fetch(url,{
     headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':window.CSRF_TOKEN,'X-Requested-With':'XMLHttpRequest'},
     ...opts,
@@ -106,22 +122,41 @@ function toggleHoarding(id) {
     setTimeout(() => openDatePickerFor(id), 100);
 }
 
+// function getDurationMonths(startISO, endISO) {
+//     if (!startISO || !endISO) return 1;
+//     const diffDays = Math.ceil((new Date(endISO) - new Date(startISO)) / 86400000) + 1;
+//     return Math.max(1, Math.ceil(diffDays / 30));
+// }
 function getDurationMonths(startISO, endISO) {
-    if (!startISO || !endISO) return 1;
-    const diffDays = Math.ceil((new Date(endISO) - new Date(startISO)) / 86400000) + 1;
-    return Math.max(1, Math.ceil(diffDays / 30));
+    return monthsBetween(startISO, endISO);
 }
+// function snapToMonths(startISO, rawEndISO) {
+//     const monthsN = getDurationMonths(startISO, rawEndISO);
+//     const snapped = new Date(startISO);
+//     snapped.setDate(snapped.getDate() + monthsN * 30 - 1);
+//     return { endISO: toYMD(snapped), months: monthsN };
+// }
 function snapToMonths(startISO, rawEndISO) {
     const monthsN = getDurationMonths(startISO, rawEndISO);
+
     const snapped = new Date(startISO);
-    snapped.setDate(snapped.getDate() + monthsN * 30 - 1);
-    return { endISO: toYMD(snapped), months: monthsN };
+    snapped.setMonth(snapped.getMonth() + monthsN);
+
+    return {
+        endISO: toYMD(snapped),
+        months: monthsN
+    };
 }
 function endForMonths(startISO, n) {
     const d = new Date(startISO);
-    d.setDate(d.getDate() + n * 30 - 1);
+    d.setMonth(d.getMonth() + n);
     return toYMD(d);
 }
+// function endForMonths(startISO, n) {
+//     const d = new Date(startISO);
+//     d.setDate(d.getDate() + n * 30 - 1);
+//     return toYMD(d);
+// }
 function friendlyRange(startISO, endISO) {
     const opts = { day:'2-digit', month:'short', year:'numeric' };
     const s = new Date(startISO).toLocaleDateString('en-IN', opts);

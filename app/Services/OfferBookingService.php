@@ -17,6 +17,10 @@ use Carbon\Carbon;
 use App\Notifications\Offers\OfferCreatedNotification;
 use App\Notifications\Offers\OfferModifiedByVendorNotification;
 use App\Notifications\Offers\OfferModifiedByCustomerNotification;
+use App\Mail\OfferSentMail;
+use App\Mail\OfferModifiedMail;
+
+
 
 class OfferBookingService
 {
@@ -264,54 +268,117 @@ class OfferBookingService
         }
     }
 
+    // protected function dispatchVendorSendNotifications(Offer $offer, Enquiry $enquiry, array $validated): void
+    // {
+    //     try {
+    //         if (!empty($validated['send_email']) && $enquiry->customer?->email) {
+    //             \Mail::to($enquiry->customer->email)->queue(
+    //                 new \App\Mail\OfferSentMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']))
+    //             );
+    //         }
+    //         if (!empty($validated['send_whatsapp']) && $enquiry->contact_number) {
+    //             $whatsapp = app(\App\Services\Whatsapp\TwilioWhatsappService::class);
+    //             $phone = preg_replace('/\D+/', '', $enquiry->contact_number);
+    //             if (!str_starts_with($phone, '91')) $phone = '91' . ltrim($phone, '0');
+    //             $whatsapp->send('+' . $phone, $this->buildOfferWhatsappMessage($offer, $enquiry));
+    //         }
+    //         $offer->update(['status' => Offer::STATUS_SENT, 'sent_at' => now()]);
+    //         OfferActivityLog::record($offer, 'sent', 'Offer sent to customer', [
+    //             'email' => !empty($validated['send_email']), 'whatsapp' => !empty($validated['send_whatsapp']),
+    //         ]);
+    //         if ($enquiry->customer) {
+    //         $freshOffer = $offer->fresh(['currentVersion.items', 'customer', 'vendor']);
+    //         $enquiry->customer->notify(
+    //             $offer->wasRecentlyCreated
+    //                 ? new OfferCreatedNotification($freshOffer)
+    //                 : new OfferModifiedByVendorNotification($freshOffer)
+    //         );
+    //     }
+    //     } catch (\Exception $e) {
+    //         Log::warning('Offer send failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
+    //     }
+    // }
     protected function dispatchVendorSendNotifications(Offer $offer, Enquiry $enquiry, array $validated): void
-    {
-        try {
-            if (!empty($validated['send_email']) && $enquiry->customer?->email) {
-                \Mail::to($enquiry->customer->email)->queue(
-                    new \App\Mail\OfferSentMail($offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']))
-                );
-            }
-            if (!empty($validated['send_whatsapp']) && $enquiry->contact_number) {
-                $whatsapp = app(\App\Services\Whatsapp\TwilioWhatsappService::class);
-                $phone = preg_replace('/\D+/', '', $enquiry->contact_number);
-                if (!str_starts_with($phone, '91')) $phone = '91' . ltrim($phone, '0');
-                $whatsapp->send('+' . $phone, $this->buildOfferWhatsappMessage($offer, $enquiry));
-            }
-            $offer->update(['status' => Offer::STATUS_SENT, 'sent_at' => now()]);
-            OfferActivityLog::record($offer, 'sent', 'Offer sent to customer', [
-                'email' => !empty($validated['send_email']), 'whatsapp' => !empty($validated['send_whatsapp']),
-            ]);
-            if ($enquiry->customer) {
-            $freshOffer = $offer->fresh(['currentVersion.items', 'customer', 'vendor']);
-            $enquiry->customer->notify(
+{
+    try {
+        $fresh = $offer->fresh(['currentVersion.items.hoarding.doohScreen', 'customer', 'vendor']);
+
+        if (!empty($validated['send_email']) && $enquiry->customer?->email) {
+            // FIX: was always sending OfferSentMail ("New Offer") regardless of
+            // whether this was a first-time create or a modification. Branch on
+            // wasRecentlyCreated — the same flag already used for the in-app
+            // notification below — so the email subject/body match the real event.
+            \Mail::to($enquiry->customer->email)->queue(
                 $offer->wasRecentlyCreated
-                    ? new OfferCreatedNotification($freshOffer)
-                    : new OfferModifiedByVendorNotification($freshOffer)
+                    ? new OfferSentMail($fresh)
+                    : new OfferModifiedMail($fresh)
             );
         }
-        } catch (\Exception $e) {
-            Log::warning('Offer send failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
+        if (!empty($validated['send_whatsapp']) && $enquiry->contact_number) {
+            $whatsapp = app(\App\Services\Whatsapp\TwilioWhatsappService::class);
+            $phone = preg_replace('/\D+/', '', $enquiry->contact_number);
+            if (!str_starts_with($phone, '91')) $phone = '91' . ltrim($phone, '0');
+            $whatsapp->send('+' . $phone, $this->buildOfferWhatsappMessage($offer, $enquiry, $offer->wasRecentlyCreated));
         }
+        $offer->update(['status' => Offer::STATUS_SENT, 'sent_at' => now()]);
+        OfferActivityLog::record($offer, 'sent', $offer->wasRecentlyCreated ? 'Offer sent to customer' : 'Modified offer sent to customer', [
+            'email' => !empty($validated['send_email']), 'whatsapp' => !empty($validated['send_whatsapp']),
+        ]);
+
+        if ($enquiry->customer) {
+            $enquiry->customer->notify(
+                $offer->wasRecentlyCreated
+                    ? new OfferCreatedNotification($fresh)
+                    : new OfferModifiedByVendorNotification($fresh)
+            );
+        }
+    } catch (\Exception $e) {
+        Log::warning('Offer send failed', ['offer_id' => $offer->id, 'error' => $e->getMessage()]);
     }
+}
 
 
-    protected function buildOfferWhatsappMessage(Offer $offer, Enquiry $enquiry): string
-    {
-        $total = number_format((float) $offer->price, 2);
-        $items = $offer->currentVersion?->items ?? collect();
-        $lines = $items->map(function ($i) {
-            $h = $i->hoarding;
-            return "• " . ($h->title ?? "Hoarding #{$i->hoarding_id}") . " (" . strtoupper($i->hoarding_type) . ") — "
-                . optional($i->start_date)->format('d M') . " to " . optional($i->end_date)->format('d M Y')
-                . " — ₹" . number_format((float) $i->final_price, 2);
-        })->implode("\n");
+    // protected function buildOfferWhatsappMessage(Offer $offer, Enquiry $enquiry): string
+    // {
+    //     $total = number_format((float) $offer->price, 2);
+    //     $items = $offer->currentVersion?->items ?? collect();
+    //     $lines = $items->map(function ($i) {
+    //         $h = $i->hoarding;
+    //         return "• " . ($h->title ?? "Hoarding #{$i->hoarding_id}") . " (" . strtoupper($i->hoarding_type) . ") — "
+    //             . optional($i->start_date)->format('d M') . " to " . optional($i->end_date)->format('d M Y')
+    //             . " — ₹" . number_format((float) $i->final_price, 2);
+    //     })->implode("\n");
 
-        return "🎯 *New Offer Received!*\n\n"
-            . "Hello *{$enquiry->customer->name}*,\n\n"
-            . "You've received an offer *#{$offer->offer_number}* for {$items->count()} hoarding(s).\n\n"
-            . "{$lines}\n\n"
-            . "*Total: ₹{$total}*\n\n"
-            . "Please log in to review and respond to the offer.";
-    }
+    //     return "🎯 *New Offer Received!*\n\n"
+    //         . "Hello *{$enquiry->customer->name}*,\n\n"
+    //         . "You've received an offer *#{$offer->offer_number}* for {$items->count()} hoarding(s).\n\n"
+    //         . "{$lines}\n\n"
+    //         . "*Total: ₹{$total}*\n\n"
+    //         . "Please log in to review and respond to the offer.";
+    // }
+    // app/Services/OfferBookingService.php
+
+protected function buildOfferWhatsappMessage(Offer $offer, Enquiry $enquiry, bool $isNewOffer = true): string
+{
+    $total = number_format((float) $offer->price, 2);
+    $items = $offer->currentVersion?->items ?? collect();
+    $lines = $items->map(function ($i) {
+        $h = $i->hoarding;
+        return "• " . ($h->title ?? "Hoarding #{$i->hoarding_id}") . " (" . strtoupper($i->hoarding_type) . ") — "
+            . optional($i->start_date)->format('d M') . " to " . optional($i->end_date)->format('d M Y')
+            . " — ₹" . number_format((float) $i->final_price, 2);
+    })->implode("\n");
+
+    $heading = $isNewOffer ? "🎯 *New Offer Received!*" : "↻ *Offer Updated!*";
+    $intro = $isNewOffer
+        ? "You've received an offer *#{$offer->offer_number}* for {$items->count()} hoarding(s)."
+        : "Offer *#{$offer->offer_number}* has been updated (version {$offer->version}).";
+
+    return "{$heading}\n\n"
+        . "Hello *{$enquiry->customer->name}*,\n\n"
+        . "{$intro}\n\n"
+        . "{$lines}\n\n"
+        . "*Total: ₹{$total}*\n\n"
+        . "Please log in to review and respond to the offer.";
+}
 }
