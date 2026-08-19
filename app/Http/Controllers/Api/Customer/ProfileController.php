@@ -30,6 +30,64 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/profile/customer/completion",
+     *     tags={"Customer Profile"},
+     *     summary="Get customer profile completion percentage",
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Customer profile completion status",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="type", type="string", example="customer"),
+     *                 @OA\Property(property="percentage", type="integer", example=67),
+     *                 @OA\Property(property="filled", type="integer", example=4),
+     *                 @OA\Property(property="total", type="integer", example=6),
+     *                 @OA\Property(property="is_complete", type="boolean", example=false)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Unauthenticated")
+     * )
+     */
+    public function completion(Request $request)
+    {
+
+        $user = $request->user();
+        if ($user->active_role === 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+            $fields = [
+            $user->name,
+            $user->email,
+            $user->phone,
+            $user->avatar,
+            $user->company_name,
+            $user->gstin,
+        ];
+
+        $filled = count(array_filter($fields, fn ($value) => !is_null($value) && $value !== ''));
+        $total = count($fields);
+        $percentage = $total > 0 ? round(($filled / $total) * 100) : 0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'type' => 'customer',
+                'percentage' => $percentage,
+                'filled' => $filled,
+                'total' => $total,
+                'is_complete' => $percentage >= 100,
+            ],
+        ]);
+    }
+
     public function update(Request $request, ProfileService $service)
     {
         $user = $request->user();

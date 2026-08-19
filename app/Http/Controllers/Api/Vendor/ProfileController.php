@@ -50,6 +50,75 @@ class ProfileController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/profile/vendor/completion",
+     *     tags={"Vendor Profile"},
+     *     summary="Get vendor profile completion percentage",
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Vendor profile completion status",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="type", type="string", example="vendor"),
+     *                 @OA\Property(property="percentage", type="integer", example=80),
+     *                 @OA\Property(property="filled", type="integer", example=12),
+     *                 @OA\Property(property="total", type="integer", example=15),
+     *                 @OA\Property(property="is_complete", type="boolean", example=false)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Unauthenticated")
+     * )
+     */
+    public function completion(Request $request)
+    {
+        $user = $request->user();
+        if ($user->active_role !== 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+        $vendor = $user->vendorProfile;
+
+        $fields = [
+            $user->name,
+            $user->email,
+            $user->phone,
+            $user->avatar,
+            $vendor?->gstin,
+            $vendor?->company_name,
+            $vendor?->company_type,
+            $vendor?->pan,
+            $vendor?->bank_name,
+            $vendor?->account_holder_name,
+            $vendor?->account_number,
+            $vendor?->ifsc_code,
+            $vendor?->registered_address,
+            $vendor?->pincode,
+            $vendor?->city,
+            $vendor?->state,
+        ];
+
+        $filled = count(array_filter($fields, fn ($value) => !is_null($value) && $value !== ''));
+        $total = count($fields);
+        $percentage = $total > 0 ? round(($filled / $total) * 100) : 0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'type' => 'vendor',
+                'percentage' => $percentage,
+                'filled' => $filled,
+                'total' => $total,
+                'is_complete' => $percentage >= 100,
+            ],
+        ]);
+    }
+
 
     /**
      * @OA\Post(

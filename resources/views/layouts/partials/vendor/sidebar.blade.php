@@ -107,6 +107,48 @@
         <div class="pb-2 mt-2 border-b border-gray-100"></div>
     </div>
 
+    @php
+        $sidebarUser = auth()->user();
+        $sidebarVendor = $sidebarUser?->vendorProfile;
+        $sidebarProfileFields = [
+            $sidebarUser?->name,
+            $sidebarUser?->email,
+            $sidebarUser?->phone,
+            $sidebarUser?->avatar,
+            $sidebarVendor?->gstin,
+            $sidebarVendor?->company_name,
+            $sidebarVendor?->company_type,
+            $sidebarVendor?->pan,
+            $sidebarVendor?->bank_name,
+            $sidebarVendor?->account_holder_name,
+            $sidebarVendor?->account_number,
+            $sidebarVendor?->ifsc_code,
+            $sidebarVendor?->registered_address,
+            $sidebarVendor?->pincode,
+            $sidebarVendor?->city,
+            $sidebarVendor?->state,
+        ];
+        $sidebarProfileCompletion = count($sidebarProfileFields) > 0
+            ? round((count(array_filter($sidebarProfileFields, fn ($value) => !is_null($value) && $value !== '')) / count($sidebarProfileFields)) * 100)
+            : 0;
+        $sidebarProfileBarColor = $sidebarProfileCompletion >= 100
+            ? 'bg-green-500'
+            : ($sidebarProfileCompletion >= 50 ? 'bg-yellow-400' : 'bg-red-400');
+    @endphp
+
+    <div class="px-4 pt-2 pb-3 sidebar-hide-when-collapsed">
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <div class="mb-2 flex items-center justify-between">
+                <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Profile Completed</span>
+                <span class="text-xs font-semibold text-gray-800">{{ $sidebarProfileCompletion }}%</span>
+            </div>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                <div class="{{ $sidebarProfileBarColor }} h-full rounded-full transition-all duration-300"
+                    style="width: {{ $sidebarProfileCompletion }}%"></div>
+            </div>
+        </div>
+    </div>
+
     <nav class="px-4 pb-4 flex-1 overflow-y-auto">
         <div class="space-y-1">
 
