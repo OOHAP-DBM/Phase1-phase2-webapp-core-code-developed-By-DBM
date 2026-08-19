@@ -87,21 +87,37 @@ class ImportApprovalService
                         $hoarding = $this->processRow($batch, $stagingRow);
                         $createdHoardingIds[] = $hoarding->id;
                         $createdCount++;
-
                     } catch (Exception $e) {
-                        $failedCount++;
-                        \Log::error('Failed to process staging row', [
-                            'batch_id' => $batch->id,
-                            'row_id' => $stagingRow->id,
-                            'code' => $stagingRow->code,
-                            'error' => $e->getMessage(),
+
+                        dd([
+                            'message' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
                         ]);
 
-                        // Mark row as failed
-                        $stagingRow->markAsInvalid('Processing error: ' . $e->getMessage());
+                        \Log::error('Batch approval failed', [
+                            'batch_id' => $batch->id,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
 
-                        // Don't throw - continue processing other rows
+                        throw $e;
                     }
+
+                    // } catch (Exception $e) {
+                    //     $failedCount++;
+                    //     \Log::error('Failed to process staging row', [
+                    //         'batch_id' => $batch->id,
+                    //         'row_id' => $stagingRow->id,
+                    //         'code' => $stagingRow->code,
+                    //         'error' => $e->getMessage(),
+                    //     ]);
+
+                    //     // Mark row as failed
+                    //     $stagingRow->markAsInvalid('Processing error: ' . $e->getMessage());
+
+                    //     // Don't throw - continue processing other rows
+                    // }
                 }
 
                 // Recalculate row counts after any row-level invalidation during approval
@@ -290,7 +306,7 @@ class ImportApprovalService
             'pincode' => $this->stagingValue($stagingRow, 'pincode', null),
             'latitude' => $this->stagingValue($stagingRow, 'latitude', null),
             'longitude' => $this->stagingValue($stagingRow, 'longitude', null),
-            'base_monthly_price' => $baseMonthlyPrice,   // D.C.P.M rack rate
+            'base_monthly_price' => $baseMonthlyPrice,
             'monthly_price' => $monthlyPrice,        // sale price (or rack rate if no discount)
             'commission_percent' => (float) ($this->stagingValue($stagingRow, 'commission_percent', 0) ?? 0),
             'graphics_charge' => $this->stagingValue($stagingRow, 'graphics_charge', null),

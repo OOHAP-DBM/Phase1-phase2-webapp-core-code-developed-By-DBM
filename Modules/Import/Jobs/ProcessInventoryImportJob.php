@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Modules\Import\Entities\InventoryImportBatch;
+use Modules\Import\Entities\InventoryImportStaging;
 use Modules\Import\Services\PythonImportService;
 use Modules\Import\Exceptions\ImportApiException;
 use Exception;
@@ -119,13 +120,22 @@ class ProcessInventoryImportJob implements ShouldQueue
 
                 \Log::info('Sending inventory imported mail');
 
+                $inventories = InventoryImportStaging::where('vendor_id', $this->batch->vendor_id)
+                    ->latest()
+                    ->take(10)
+                    ->get();
+
+
                 Mail::to($this->batch->vendor->email)
                     ->send(new InventoryImportedMail(
                         $this->batch,
-                        auth()->user()->name ?? 'Admin'
+                        auth()->user()->name ?? 'Admin',
+                        $inventories
                     ));
 
-                \Log::info('Inventory imported mail sent successfully');
+                \Log::info('Inventory imported mail sent successfully', [
+                    'inventory_count' => $inventories->count(),
+                ]);
 
             } else {
 
@@ -204,6 +214,10 @@ class ProcessInventoryImportJob implements ShouldQueue
                 'row' => $index,
                 'python_status' => $row['status'] ?? null,
                 'transformed_status' => $transformed['status'],
+                'error' => $transformed['error_message'] ?? null,
+            ]);
+            \Log::info('Row Status Check', [
+                'status' => $transformed['status'],
                 'error' => $transformed['error_message'] ?? null,
             ]);
 

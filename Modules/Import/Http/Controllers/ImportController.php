@@ -578,19 +578,16 @@ class ImportController extends Controller
                 'media_type' => $request->input('media_type'),
             ]);
 
-            // ==========================
-            // Storage Path
-            // ==========================
+
             $batchPath = self::IMPORT_STORAGE_PATH . '/' . $batch->id;
 
-            // Store Excel
+
             $excelPath = $this->storeFile(
                 $request->file('excel'),
                 $batchPath,
                 'inventory'
             );
 
-            // Store PPT / PDF
             $pptPath = $this->storeFile(
                 $request->file('ppt'),
                 $batchPath,
@@ -603,9 +600,7 @@ class ImportController extends Controller
                 'ppt_path' => $pptPath,
             ]);
 
-            // ==========================
-            // Dispatch Queue
-            // ==========================
+
             ProcessInventoryImportJob::dispatch(
                 $batch,
                 Storage::disk(self::IMPORT_DISK)->path($excelPath),
@@ -616,9 +611,7 @@ class ImportController extends Controller
                 'batch_id' => $batch->id,
             ]);
 
-            // ==========================
-            // Save File Paths
-            // ==========================
+
             $batch->update([
                 'file_path' => $excelPath,
                 'ppt_path' => $pptPath,
@@ -660,7 +653,7 @@ class ImportController extends Controller
     public function getImportStatus(InventoryImportBatch $batch): JsonResponse
     {
         try {
-            // Authorize user
+
             $this->authorize('view', $batch);
 
             return response()->json([
@@ -690,7 +683,7 @@ class ImportController extends Controller
     public function getImportDetails(InventoryImportBatch $batch): JsonResponse
     {
         try {
-            // Authorize user
+            
             $this->authorize('view', $batch);
 
             $invalidRecords = $batch->stagingRecords()

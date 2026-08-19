@@ -107,6 +107,77 @@
                         </td>
                     </tr>
 
+                    <tr>
+                        <td style="padding:20px 40px;">
+
+                            <h3 style="margin-bottom:15px;">
+                                Imported Inventory Preview
+                            </h3>
+
+                            <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;">
+
+                                <tr style="background:#f3f4f6;">
+                                    <th style="border:1px solid #e5e7eb;">Image</th>
+                                    <th style="border:1px solid #e5e7eb;">Inventory Code</th>
+                                    <th style="border:1px solid #e5e7eb;">City</th>
+                                    <th style="border:1px solid #e5e7eb;">Type</th>
+                                </tr>
+
+                                @foreach($inventories as $inventory)
+
+                                    @php
+                                        $extra = is_array($inventory->extra_attributes)
+                                            ? $inventory->extra_attributes
+                                            : json_decode($inventory->extra_attributes, true);
+
+                                        $imageUrl = $extra['image_public_url'] ?? null;
+                                    @endphp
+
+                                    <tr>
+
+                                        <td style="border:1px solid #e5e7eb; text-align:center;">
+
+                                            @if($imageUrl)
+                                                <img src="{{ $imageUrl }}" width="80" height="50"
+                                                    style="border-radius:4px; object-fit:cover;">
+                                            @else
+                                                No Image
+                                            @endif
+
+                                        </td>
+
+                                        <td style="border:1px solid #e5e7eb;">
+                                            {{ $inventory->code }}
+                                        </td>
+
+                                        <td style="border:1px solid #e5e7eb;">
+                                            {{ $inventory->city ?? 'N/A' }}
+                                        </td>
+
+                                        <td style="border:1px solid #e5e7eb;">
+                                            {{ strtoupper($inventory->media_type) }}
+                                        </td>
+
+                                    </tr>
+
+                                @endforeach
+
+                            </table>
+
+                            @if($batch->valid_rows > 10)
+                                <p style="margin-top:15px; text-align:center;">
+
+                                    Showing first 10 inventories out of
+                                    <strong>{{ $batch->valid_rows }}</strong>
+
+                                </p>
+                            @endif
+
+                        </td>
+                    </tr>
+
+                   
+
                     <!-- Button -->
                     <tr>
                         <td align="center" style="padding:25px 40px;">
