@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 use App\Services\ProfileService;
 
@@ -33,21 +34,39 @@ class ProfileController extends Controller
         $user = Auth::user();
         $vendor = $user->vendorProfile;
 
-        // Convert document paths to URLs
         if ($vendor) {
-            $vendor->pan_card_document = $vendor->pan_card_document
-                ? asset('storage/' . $vendor->pan_card_document)
-                : null;
-
-            $vendor->aadhaar_card_document = $vendor->aadhaar_card_document
-                ? asset('storage/' . $vendor->aadhaar_card_document)
-                : null;
+            $vendor->pan_card_document = $this->toPublicUrl($vendor->pan_card_document);
+            $vendor->aadhaar_card_document = $this->toPublicUrl($vendor->aadhaar_card_document);
         }
 
         return response()->json([
             'user' => $profileService->response($user),
             'vendor' => $vendor,
         ]);
+    }
+
+    protected function toPublicUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        $publicDisk = Storage::disk('public');
+        if ($publicDisk->exists($path)) {
+            return $publicDisk->url($path);
+        }
+
+        $privateDisk = Storage::disk('private');
+        if ($privateDisk->exists($path)) {
+            $publicDisk->put($path, $privateDisk->get($path));
+            return $publicDisk->url($path);
+        }
+
+        return null;
     }
 
     /**
@@ -200,7 +219,7 @@ class ProfileController extends Controller
                 $vendor->fill(array_filter($data));
                 if ($request->hasFile('pan_file')) {
                     $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
-                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
+                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'public');
                 }
                 $vendor->save();
                 break;
@@ -208,7 +227,7 @@ class ProfileController extends Controller
                 $data = $request->only(['pan', 'pan_file']);
                 if ($request->hasFile('pan_file')) {
                     $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
-                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
+                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'public');
                 }
                 $vendor->fill(array_filter($data));
                 $vendor->save();
@@ -262,14 +281,14 @@ class ProfileController extends Controller
         ]);
 
         if ($request->hasFile('avatar')) {
-            if ($user->avatar && Storage::disk('private')->exists($user->avatar)) {
-                Storage::disk('private')->delete($user->avatar);
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
             }
 
             $bucket = str_pad((int)($user->id / 100), 2, '0', STR_PAD_LEFT);
             $avatarPath = "media/users/avatars/{$bucket}/{$user->id}";
             $fileName = time() . '.' . $request->file('avatar')->getClientOriginalExtension();
-            $storedPath = Storage::disk('private')->putFileAs($avatarPath, $request->file('avatar'), $fileName);
+            $storedPath = Storage::disk('public')->putFileAs($avatarPath, $request->file('avatar'), $fileName);
 
             if ($storedPath) {
                 $data['avatar'] = $storedPath;
@@ -281,8 +300,8 @@ class ProfileController extends Controller
 
     protected function removeAvatar(User $user)
     {
-        if ($user->avatar && Storage::disk('private')->exists($user->avatar)) {
-            Storage::disk('private')->delete($user->avatar);
+        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+            Storage::disk('public')->delete($user->avatar);
         }
         $user->update(['avatar' => null]);
     }
@@ -304,12 +323,12 @@ class ProfileController extends Controller
 
         if ($request->hasFile('pan_file')) {
             if ($vendor->pan_card_document) {
-                Storage::disk('private')->delete($vendor->pan_card_document);
+                Storage::disk('public')->delete($vendor->pan_card_document);
             }
 
             $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
             $vendor->pan_card_document = $request->file('pan_file')
-                ->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
+                ->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'public');
         }
 
         $vendor->update([
@@ -327,13 +346,13 @@ class ProfileController extends Controller
         ]);
 
         if ($vendor->pan_card_document) {
-            Storage::disk('private')->delete($vendor->pan_card_document);
+            Storage::disk('public')->delete($vendor->pan_card_document);
         }
 
         $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
         $path = $request->file('pan_file')->store(
             "media/vendors/documents/{$bucket}/{$vendor->id}",
-            'private'
+            'public'
         );
 
         $vendor->update([

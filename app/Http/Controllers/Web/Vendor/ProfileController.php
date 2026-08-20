@@ -108,11 +108,11 @@ class ProfileController extends Controller
                 // Create bucket directory (00, 01, 02... based on user ID)
                 $bucket = str_pad((int)($user->id / 100), 2, '0', STR_PAD_LEFT);
                 $avatarPath = "media/users/avatars/{$bucket}/{$user->id}";
-                
+
                 // Store the file
                 $fileName = time() . '.' . $request->file('avatar')->getClientOriginalExtension();
                 $storedPath = Storage::disk('private')->putFileAs($avatarPath, $request->file('avatar'), $fileName);
-                
+
                 if ($storedPath) {
                     $data['avatar'] = $storedPath;
                 }
@@ -137,7 +137,7 @@ class ProfileController extends Controller
             } catch (\Exception $e) {
                 // Continue even if file deletion fails
             }
-            
+
             $user->update(['avatar' => null]);
         }
     }
