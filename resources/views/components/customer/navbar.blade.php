@@ -471,6 +471,30 @@
 
                             OOH
                         </a>
+                        {{-- ENQUIRY --}}
+
+                        <button
+                        type="button"
+                        onclick="openEnquiryPopup()"
+                        class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 hover:text-blue-600 transition">
+
+                        <svg width="32" height="30" viewBox="0 0 24 24" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path
+                        d="M4 5.5C4 4.67 4.67 4 5.5 4H18.5C19.33 4 20 4.67 20 5.5V14.5C20 15.33 19.33 16 18.5 16H9L5 20V16H5.5C4.67 16 4 15.33 4 14.5V5.5Z"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"/>
+                        <path
+                        d="M8 8H16M8 11H14"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"/>
+                    </svg>
+
+                    ENQUIRY
+                </button>
                          <form method="POST" action="{{ route('logout') }}">
                             @csrf
 
@@ -612,4 +636,21 @@ window.addEventListener('scroll', () => {
         header.classList.remove('md:h-43');
     }
 });
+</script>
+<script>
+function openEnquiryPopup() {
+    const modal = document.getElementById('directEnquiryModal');
+
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeEnquiryPopup() {
+    const modal = document.getElementById('directEnquiryModal');
+
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
 </script>
