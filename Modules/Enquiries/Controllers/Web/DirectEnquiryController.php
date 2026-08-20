@@ -19,6 +19,7 @@ use App\Notifications\AdminDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\VendorDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification;
 use App\Models\User;
+use App\Mail\CustomerWelcomeMail;
 use App\Models\Hoarding; // Adjust namespace based on your structure
 use Carbon\Carbon;
 
@@ -274,172 +275,438 @@ class DirectEnquiryController extends Controller
         }
 
         try {
+
             DB::beginTransaction();
 
-            // Prepare data
+            // =====================================================
+            // PREPARE DATA
+            // =====================================================
+
             $data = $validator->validated();
 
-            // Normalize city name (handle spelling mistakes)
-            $normalizedCity = $this->normalizeCityName($data['location_city']);
+            // Normalize city name
+            $normalizedCity = $this->normalizeCityName(
+                $data['location_city']
+            );
 
             // Filter and clean preferred locations
             $preferredLocations = !empty($data['preferred_locations'])
-                ? array_values(array_filter(
-                    array_map('trim', $data['preferred_locations']),
-                    fn($loc) => !empty($loc)
-                ))
+                ? array_values(
+                    array_filter(
+                        array_map('trim', $data['preferred_locations']),
+                        fn($loc) => !empty($loc)
+                    )
+                )
                 : ['To be discussed'];
 
             // Normalize locality names
             $normalizedLocalities = array_map(
-                fn($loc) => $this->normalizeLocalityName($loc, $normalizedCity),
+                fn($loc) => $this->normalizeLocalityName(
+                    $loc,
+                    $normalizedCity
+                ),
                 $preferredLocations
             );
 
-            // Create enquiry
+
+            // =====================================================
+            // FIND OR CREATE CUSTOMER
+            // =====================================================
+
+            $user = User::where(function ($query) use ($data) {
+                $query->where('email', $data['email'])
+                    ->orWhere('phone', $data['phone']);
+            })->first();
+
+            $password = null;
+            $isNewCustomer = false;
+
+
+            // =====================================================
+            // CREATE CUSTOMER IF NOT EXISTS
+            // =====================================================
+
+            if (!$user) {
+
+                $password = \Illuminate\Support\Str::random(10);
+
+                $user = User::create([
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'phone' => $data['phone'],
+                    'password' => $password,
+                    'status' => 'active',
+                    'active_role' => 'customer',
+                ]);
+
+                // Assign customer role
+                $user->assignRole('customer');
+
+                $isNewCustomer = true;
+
+                \Log::info(
+                    'Customer automatically created from direct enquiry',
+                    [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                    ]
+                );
+            } else {
+
+                \Log::info(
+                    'Existing customer/user found for direct enquiry',
+                    [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                    ]
+                );
+            }
+
+
+            // =====================================================
+            // CREATE DIRECT ENQUIRY
+            // =====================================================
+
             $enquiry = DirectEnquiry::create([
+                'user_id' => $user->id,
+
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'],
-                'hoarding_type' => implode(',', $data['hoarding_type']),
+
+                'hoarding_type' => implode(
+                    ',',
+                    $data['hoarding_type']
+                ),
+
                 'location_city' => $normalizedCity,
+
                 'preferred_locations' => $normalizedLocalities,
+
                 'remarks' => $data['remarks'],
-                'preferred_modes' => $data['preferred_modes'] ?? ['Call', 'Email'],
+
+                'preferred_modes' => $data['preferred_modes']
+                    ?? ['Call', 'Email'],
+
                 'is_phone_verified' => true,
+
                 'status' => 'new',
-                'source' => 'website'
+
+                'source' => 'website',
             ]);
 
-            // Find relevant vendors based on hoardings
+
+            \Log::info(
+                'Direct enquiry created and linked with user',
+                [
+                    'enquiry_id' => $enquiry->id,
+                    'user_id' => $user->id,
+                    'is_new_customer' => $isNewCustomer,
+                ]
+            );
+
+
+            // =====================================================
+            // FIND RELEVANT VENDORS
+            // =====================================================
+
             $vendors = $this->findRelevantVendors(
                 $normalizedCity,
                 $normalizedLocalities,
                 $data['hoarding_type']
             );
 
-            if ($vendors->isNotEmpty()) {
-                // Attach vendors to enquiry
-                $enquiry->assignedVendors()->attach($vendors->pluck('id'));
 
-                // Send notifications to vendors (queued)
+            // =====================================================
+            // ASSIGN & NOTIFY VENDORS
+            // =====================================================
+
+            if ($vendors->isNotEmpty()) {
+
+                // Attach vendors to enquiry
+                $enquiry->assignedVendors()
+                    ->attach($vendors->pluck('id'));
+
+
                 foreach ($vendors as $vendor) {
+
+                    // Email notification
                     Mail::to($vendor->email)->queue(
-                        new VendorDirectEnquiryMail($enquiry, $vendor)
+                        new VendorDirectEnquiryMail(
+                            $enquiry,
+                            $vendor
+                        )
                     );
 
-                    // In-app notification
-                    $vendor->notify(new VendorDirectEnquiryNotification($enquiry));
 
-                    // Push notification with hoarding details
-                    $hoardingTypes = implode(', ', array_map('strtoupper', $data['hoarding_type']));
+                    // In-app notification
+                    $vendor->notify(
+                        new VendorDirectEnquiryNotification(
+                            $enquiry
+                        )
+                    );
+
+
+                    // Push notification
+                    $hoardingTypes = implode(
+                        ', ',
+                        array_map(
+                            'strtoupper',
+                            $data['hoarding_type']
+                        )
+                    );
+
                     send(
                         $vendor,
                         'New Hoarding Enquiry Received',
                         "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
                         [
-                            'type'           => 'vendor_direct_enquiry',
-                            'enquiry_id'     => $enquiry->id,
-                            'customer_name'  => $enquiry->name,
-                            'hoarding_type'  => implode(',', $data['hoarding_type']),
-                            'city'           => $normalizedCity,
-                            'source'         => 'website'
+                            'type' => 'vendor_direct_enquiry',
+
+                            'enquiry_id' => $enquiry->id,
+
+                            'customer_name' => $enquiry->name,
+
+                            'hoarding_type' => implode(
+                                ',',
+                                $data['hoarding_type']
+                            ),
+
+                            'city' => $normalizedCity,
+
+                            'source' => 'website',
                         ]
                     );
 
-                    Log::info('Vendor notified of direct enquiry', [
-                        'vendor_id' => $vendor->id,
-                        'enquiry_id' => $enquiry->id,
-                    ]);
+
+                    \Log::info(
+                        'Vendor notified of direct enquiry',
+                        [
+                            'vendor_id' => $vendor->id,
+                            'enquiry_id' => $enquiry->id,
+                        ]
+                    );
                 }
 
-                Log::info('Enquiry assigned to vendors', [
-                    'enquiry_id' => $enquiry->id,
-                    'vendor_count' => $vendors->count(),
-                    'city' => $normalizedCity
-                ]);
+
+                \Log::info(
+                    'Enquiry assigned to vendors',
+                    [
+                        'enquiry_id' => $enquiry->id,
+                        'vendor_count' => $vendors->count(),
+                        'city' => $normalizedCity,
+                    ]
+                );
             }
 
-            // Send confirmation to customer
+
+            // =====================================================
+            // CUSTOMER ENQUIRY CONFIRMATION EMAIL
+            // =====================================================
+
             Mail::to($enquiry->email)->queue(
-                new UserDirectEnquiryConfirmation($enquiry)
+                new UserDirectEnquiryConfirmation(
+                    $enquiry
+                )
             );
 
-            // Send in-app notification to customer if registered user
-            $existingCustomer = User::where('email', $enquiry->email)
-                ->where('active_role', 'customer')
-                ->first();
 
-            if ($existingCustomer) {
-                // In-app notification for registered customer
-                $existingCustomer->notify(new \Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification($enquiry));
+            // =====================================================
+            // NEW CUSTOMER WELCOME + LOGIN CREDENTIALS
+            // =====================================================
 
-                // Push notification to customer
-                $hoardingTypes = implode(', ', array_map('strtoupper', $data['hoarding_type']));
+            if ($isNewCustomer && $password) {
+
+                Mail::to($user->email)->queue(
+                    new CustomerWelcomeMail(
+                        $user,
+                        $password
+                    )
+                );
+
+
+                \Log::info(
+                    'New customer welcome mail queued',
+                    [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                    ]
+                );
+            }
+
+
+            // =====================================================
+            // CUSTOMER IN-APP + PUSH NOTIFICATION
+            // =====================================================
+
+            if ($user) {
+
+                // In-app notification
+                $user->notify(
+                    new \Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification(
+                        $enquiry
+                    )
+                );
+
+
+                // Push notification
+                $hoardingTypes = implode(
+                    ', ',
+                    array_map(
+                        'strtoupper',
+                        $data['hoarding_type']
+                    )
+                );
+
+
                 send(
-                    $existingCustomer,
+                    $user,
                     'Enquiry Submitted Successfully',
                     "Your {$hoardingTypes} hoarding enquiry for {$normalizedCity} has been submitted.",
                     [
-                        'type'           => 'customer_direct_enquiry',
-                        'enquiry_id'     => $enquiry->id,
-                        'hoarding_type'  => implode(',', $data['hoarding_type']),
-                        'city'           => $normalizedCity,
-                        'status'         => 'submitted'
+                        'type' => 'customer_direct_enquiry',
+
+                        'enquiry_id' => $enquiry->id,
+
+                        'hoarding_type' => implode(
+                            ',',
+                            $data['hoarding_type']
+                        ),
+
+                        'city' => $normalizedCity,
+
+                        'status' => 'submitted',
                     ]
                 );
 
-                Log::info('Customer notified of direct enquiry submission', [
-                    'customer_id' => $existingCustomer->id,
-                    'enquiry_id' => $enquiry->id,
-                ]);
+
+                \Log::info(
+                    'Customer notified of direct enquiry submission',
+                    [
+                        'customer_id' => $user->id,
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
             }
 
-            // Notify admins
-            $admins = User::whereIn('active_role', ['admin', 'superadmin'])
+
+            // =====================================================
+            // NOTIFY ADMINS
+            // =====================================================
+
+            $admins = User::whereIn(
+                'active_role',
+                ['admin', 'superadmin']
+            )
                 ->where('status', 'active')
                 ->get();
 
+
             foreach ($admins as $admin) {
+
+                // Admin email
                 Mail::to($admin->email)->queue(
-                    new AdminDirectEnquiryMail($enquiry, $vendors)
+                    new AdminDirectEnquiryMail(
+                        $enquiry,
+                        $vendors
+                    )
                 );
-                $admin->notify(new AdminDirectEnquiryNotification($enquiry));
+
+
+                // Admin notification
+                $admin->notify(
+                    new AdminDirectEnquiryNotification(
+                        $enquiry
+                    )
+                );
             }
+
+
+            // =====================================================
+            // COMMIT TRANSACTION
+            // =====================================================
 
             DB::commit();
 
-            // Clean up - delete OTP records after successful submission
+
+            // =====================================================
+            // CLEANUP OTP
+            // =====================================================
+
             DB::table('guest_user_otps')
-                ->where('identifier', $request->phone)
-                ->where('purpose', 'direct_enquiry')
+                ->where(
+                    'identifier',
+                    $request->phone
+                )
+                ->where(
+                    'purpose',
+                    'direct_enquiry'
+                )
                 ->delete();
+
 
             // Clear captcha
             session()->forget('captcha_answer');
 
-            Log::info('Direct enquiry created successfully', [
-                'enquiry_id' => $enquiry->id,
-                'city' => $normalizedCity,
-                'vendors_notified' => $vendors->count()
-            ]);
+
+            // =====================================================
+            // SUCCESS LOG
+            // =====================================================
+
+            \Log::info(
+                'Direct enquiry created successfully',
+                [
+                    'enquiry_id' => $enquiry->id,
+
+                    'user_id' => $user->id,
+
+                    'new_customer_created' => $isNewCustomer,
+
+                    'city' => $normalizedCity,
+
+                    'vendors_notified' => $vendors->count(),
+                ]
+            );
+
+
+            // =====================================================
+            // RESPONSE
+            // =====================================================
 
             return response()->json([
                 'success' => true,
-                'message' => 'Enquiry submitted successfully! You will receive quotes within 24-48 hours.',
-                'enquiry_id' => $enquiry->id
+
+                'message' =>
+                    'Enquiry submitted successfully! You will receive quotes within 24-48 hours.',
+
+                'enquiry_id' => $enquiry->id,
+
+                'user_id' => $user->id,
             ]);
+
+
         } catch (\Exception $e) {
+
             DB::rollBack();
 
-            Log::error('Enquiry submission failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
+            \Log::error(
+                'Enquiry submission failed',
+                [
+                    'error' => $e->getMessage(),
+
+                    'trace' => $e->getTraceAsString(),
+                ]
+            );
+
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit enquiry. Please try again.'
+
+                'message' =>
+                    'Failed to submit enquiry. Please try again.',
             ], 500);
         }
     }
@@ -628,11 +895,13 @@ class DirectEnquiryController extends Controller
             ->where('active_role', 'vendor')
             ->where('status', 'active')
             ->whereNotNull('email')
-            ->with(['hoardings' => function ($query) use ($city) {
-                $query->where('city', 'like', "%{$city}%")
-                    ->where('status', 'active')
-                    ->select('id', 'vendor_id', 'title', 'city', 'locality', 'hoarding_type');
-            }])
+            ->with([
+                'hoardings' => function ($query) use ($city) {
+                    $query->where('city', 'like', "%{$city}%")
+                        ->where('status', 'active')
+                        ->select('id', 'vendor_id', 'title', 'city', 'locality', 'hoarding_type');
+                }
+            ])
             ->get();
 
         Log::info('Vendors matched for enquiry', [
@@ -686,9 +955,11 @@ class DirectEnquiryController extends Controller
         $vendor = Auth::user();
 
         $query = $vendor->assignedEnquiries()
-            ->with(['assignedVendors' => function ($q) use ($vendor) {
-                $q->where('users.id', $vendor->id);
-            }])
+            ->with([
+                'assignedVendors' => function ($q) use ($vendor) {
+                    $q->where('users.id', $vendor->id);
+                }
+            ])
             ->latest('direct_web_enquiries.created_at');
 
         // Search filter
@@ -696,9 +967,9 @@ class DirectEnquiryController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('location_city', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('location_city', 'like', "%{$search}%");
             });
         }
 
@@ -743,9 +1014,11 @@ class DirectEnquiryController extends Controller
         $enquiry->markViewedBy($vendor->id);
 
         // Load relationships
-        $enquiry->load(['assignedVendors' => function ($q) use ($vendor) {
-            $q->where('users.id', $vendor->id);
-        }]);
+        $enquiry->load([
+            'assignedVendors' => function ($q) use ($vendor) {
+                $q->where('users.id', $vendor->id);
+            }
+        ]);
 
         // Get vendor's pivot data
         $vendorPivot = $enquiry->assignedVendors->first()->pivot;

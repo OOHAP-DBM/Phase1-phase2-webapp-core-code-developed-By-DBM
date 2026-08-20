@@ -17,7 +17,16 @@ use App\Http\Controllers\Admin\RazorpaySettingsController;
 use App\Http\Controllers\Customer\CustomerOfferController;
 
 
+use App\Http\Controllers\NotificationController;
 
+Route::middleware('auth')->prefix('api/v1/notifications')->group(function () {
+
+    Route::get('/unread-count', [
+        NotificationController::class,
+        'unreadCount'
+    ]);
+
+});
 
 
 // ============================================

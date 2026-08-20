@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,9 +10,12 @@
     <title>@yield('title', 'Book Outdoor Ads in India | Billboard & Hoarding | OOHAPP')</title>
 
     {{-- ── SEO Meta ──────────────────────────────────────────────── --}}
-    <meta name="description" content="@yield('meta_description', 'Book billboard and hoarding ads across India with OOHAPP. Explore 1000+ outdoor advertising locations, compare prices, and launch your ad campaign instantly.')">
-    <meta name="keywords" content="outdoor advertising India, billboard advertising India, hoarding advertising India, outdoor media booking, OOH advertising platform, billboard booking India">
-    <meta name="robots" content="@yield('meta_robots', 'index, follow, max-snippet:-1, max-video-preview:-1, max-image-preview:large')">
+    <meta name="description"
+        content="@yield('meta_description', 'Book billboard and hoarding ads across India with OOHAPP. Explore 1000+ outdoor advertising locations, compare prices, and launch your ad campaign instantly.')">
+    <meta name="keywords"
+        content="outdoor advertising India, billboard advertising India, hoarding advertising India, outdoor media booking, OOH advertising platform, billboard booking India">
+    <meta name="robots"
+        content="@yield('meta_robots', 'index, follow, max-snippet:-1, max-video-preview:-1, max-image-preview:large')">
     <meta name="author" content="OOHAPP">
     <meta name="google-site-verification" content="Cj2NPz4_gTnvaitO3OAv51DDtIaNmE1N4VIP6WiGlDM" />
 
@@ -20,37 +24,43 @@
     <link rel="canonical" href="{{ $canonicalUrl }}">
 
     {{-- ── Favicon ────────────────────────────────────────────────── --}}
-    <link rel="icon"            type="image/png"  href="{{ asset('assets/images/favicon/Vector (1).png') }}">
-    <link rel="shortcut icon"                     href="{{ asset('assets/images/favicon/Vector (1).png') }}">
-    <link rel="apple-touch-icon"                  href="{{ asset('assets/images/favicon/Vector (1).png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('assets/images/favicon/Vector (1).png') }}">
+    <link rel="shortcut icon" href="{{ asset('assets/images/favicon/Vector (1).png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('assets/images/favicon/Vector (1).png') }}">
 
     {{-- ── Open Graph ─────────────────────────────────────────────── --}}
-    <meta property="og:type"        content="website">
-    <meta property="og:title"       content="@yield('og_title', 'Book Outdoor Ads in India | Billboard & Hoarding | OOHAPP')">
-    <meta property="og:description" content="@yield('og_description', 'Book billboard and hoarding ads across India with OOHAPP. Explore 1000+ outdoor advertising locations, compare prices, and launch your ad campaign instantly.')">
-    <meta property="og:url"         content="{{ $canonicalUrl }}">
-    <meta property="og:site_name"   content="OOHAPP">
-    <meta property="og:image"       content="{{ asset('assets/images/logo/logo_image.webp') }}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="@yield('og_title', 'Book Outdoor Ads in India | Billboard & Hoarding | OOHAPP')">
+    <meta property="og:description"
+        content="@yield('og_description', 'Book billboard and hoarding ads across India with OOHAPP. Explore 1000+ outdoor advertising locations, compare prices, and launch your ad campaign instantly.')">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
+    <meta property="og:site_name" content="OOHAPP">
+    <meta property="og:image" content="{{ asset('assets/images/logo/logo_image.webp') }}">
     <meta property="og:image:width" content="600">
     <meta property="og:image:height" content="120">
 
     {{-- ── Twitter Card ────────────────────────────────────────────── --}}
-    <meta name="twitter:card"        content="summary_large_image">
-    <meta name="twitter:site"        content="@oohapp">
-    <meta name="twitter:creator"     content="@oohapp">
-    <meta name="twitter:title"       content="@yield('twitter_title', 'Outdoor Advertising in India | Book Billboard & Hoarding Ads | OOHAPP')">
-    <meta name="twitter:description" content="@yield('twitter_description', 'Book billboard and hoarding ads across India with OOHAPP. Explore 1000+ outdoor advertising locations and launch campaigns instantly.')">
-    <meta name="twitter:image"       content="{{ asset('assets/images/logo/logo_image.webp') }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@oohapp">
+    <meta name="twitter:creator" content="@oohapp">
+    <meta name="twitter:title"
+        content="@yield('twitter_title', 'Outdoor Advertising in India | Book Billboard & Hoarding Ads | OOHAPP')">
+    <meta name="twitter:description"
+        content="@yield('twitter_description', 'Book billboard and hoarding ads across India with OOHAPP. Explore 1000+ outdoor advertising locations and launch campaigns instantly.')">
+    <meta name="twitter:image" content="{{ asset('assets/images/logo/logo_image.webp') }}">
 
     {{-- ── Fonts (preconnect first to avoid extra round-trips) ──────── --}}
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap"></noscript>
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" media="print"
+        onload="this.media='all'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap">
+    </noscript>
     {{-- Alpine Collapse Plugin — x-collapse ke liye --}}
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
-{{-- Alpine Core — collapse plugin ke BAAD load hona chahiye --}}
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+    {{-- Alpine Core — collapse plugin ke BAAD load hona chahiye --}}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     {{-- ── CSS (non-blocking order: base → icons → datepicker) ──────── --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -61,57 +71,58 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr" defer></script>
     <script>
         window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
+        function gtag() { dataLayer.push(arguments); }
         gtag('js', new Date());
         gtag('config', 'G-ST51N3C0N6');
     </script>
 
     {{-- ── Structured Data (JSON-LD) ──────────────────────────────────── --}}
     @verbatim
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@graph": [
+        <script type="application/ld+json">
         {
-          "@type": "Organization",
-          "@id": "https://oohapp.io/#organization",
-          "name": "OOHAPP",
-          "url": "https://oohapp.io/",
-          "logo": {
-            "@type": "ImageObject",
-            "@id": "https://oohapp.io/#logo",
-            "url": "https://oohapp.io/assets/images/favicon/Vector%20(1).png",
-            "width": 512,
-            "height": 512
-          },
-          "telephone": "+91 8118805835",
-          "email": "enquiry@oohapp.io",
-          "foundingDate": "2022",
-          "areaServed": { "@type": "Country", "name": "India" }
-        },
-        {
-          "@type": "LocalBusiness",
-          "@id": "https://oohapp.io/#localbusiness",
-          "name": "OOHAPP",
-          "parentOrganization": { "@id": "https://oohapp.io/#organization" },
-          "url": "https://oohapp.io/",
-          "image": { "@type": "ImageObject", "url": "https://oohapp.io/assets/images/favicon/Vector%20(1).png" },
-          "telephone": "+91 8118805835",
-          "email": "enquiry@oohapp.io",
-          "priceRange": "INR"
-        },
-        {
-          "@type": "WebSite",
-          "@id": "https://oohapp.io/#website",
-          "url": "https://oohapp.io/",
-          "name": "OOHAPP"
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              "@id": "https://oohapp.io/#organization",
+              "name": "OOHAPP",
+              "url": "https://oohapp.io/",
+              "logo": {
+                "@type": "ImageObject",
+                "@id": "https://oohapp.io/#logo",
+                "url": "https://oohapp.io/assets/images/favicon/Vector%20(1).png",
+                "width": 512,
+                "height": 512
+              },
+              "telephone": "+91 8118805835",
+              "email": "enquiry@oohapp.io",
+              "foundingDate": "2022",
+              "areaServed": { "@type": "Country", "name": "India" }
+            },
+            {
+              "@type": "LocalBusiness",
+              "@id": "https://oohapp.io/#localbusiness",
+              "name": "OOHAPP",
+              "parentOrganization": { "@id": "https://oohapp.io/#organization" },
+              "url": "https://oohapp.io/",
+              "image": { "@type": "ImageObject", "url": "https://oohapp.io/assets/images/favicon/Vector%20(1).png" },
+              "telephone": "+91 8118805835",
+              "email": "enquiry@oohapp.io",
+              "priceRange": "INR"
+            },
+            {
+              "@type": "WebSite",
+              "@id": "https://oohapp.io/#website",
+              "url": "https://oohapp.io/",
+              "name": "OOHAPP"
+            }
+          ]
         }
-      ]
-    }
-    </script>
+        </script>
     @endverbatim
 
 </head>
+
 <body class="antialiased">
     <div id="app" class="min-h-screen bg-white w-full ">
         <!-- Main Content -->
@@ -129,63 +140,63 @@
     {{-- All JS is now bundled via Vite --}}
 
     {{-- ================================
-         GUEST STATE RESTORE — page load pe
-         LocalStorage se wishlist + cart buttons restore karo
+    GUEST STATE RESTORE — page load pe
+    LocalStorage se wishlist + cart buttons restore karo
     ================================= --}}
     <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const isAuth = document.querySelector('[data-auth]')?.dataset?.auth === '1';
+        document.addEventListener('DOMContentLoaded', function () {
+            const isAuth = document.querySelector('[data-auth]')?.dataset?.auth === '1';
 
-        if (!isAuth) {
-            // ─── Wishlist buttons restore ─────────────────────────
-            const savedWishlist = JSON.parse(localStorage.getItem('guest_wishlist') || '[]');
+            if (!isAuth) {
+                // ─── Wishlist buttons restore ─────────────────────────
+                const savedWishlist = JSON.parse(localStorage.getItem('guest_wishlist') || '[]');
 
-            document.querySelectorAll('.shortlist-btn').forEach(function (btn) {
-                if (savedWishlist.includes(String(btn.dataset.id))) {
-                    btn.classList.add('is-wishlisted', 'bg-[#daf2e7]');
-                    btn.classList.remove('bg-[#9e9e9b]');
-                }
-            });
+                document.querySelectorAll('.shortlist-btn').forEach(function (btn) {
+                    if (savedWishlist.includes(String(btn.dataset.id))) {
+                        btn.classList.add('is-wishlisted', 'bg-[#daf2e7]');
+                        btn.classList.remove('bg-[#9e9e9b]');
+                    }
+                });
 
-            // Wishlist header count update
-            const wishlistBadges = document.querySelectorAll('.shortlist-count');
-            wishlistBadges.forEach(function (b) {
-                b.textContent = savedWishlist.length;
-                b.style.display = savedWishlist.length > 0 ? 'flex' : 'none';
-            });
+                // Wishlist header count update
+                const wishlistBadges = document.querySelectorAll('.shortlist-count');
+                wishlistBadges.forEach(function (b) {
+                    b.textContent = savedWishlist.length;
+                    b.style.display = savedWishlist.length > 0 ? 'flex' : 'none';
+                });
 
-            // ─── Cart buttons restore (with new format support) ────────────────────────────
-            let savedCart = JSON.parse(localStorage.getItem('guest_cart') || '[]');
+                // ─── Cart buttons restore (with new format support) ────────────────────────────
+                let savedCart = JSON.parse(localStorage.getItem('guest_cart') || '[]');
 
-            // Convert old format (array of IDs) to new format (array of objects)
-            savedCart = savedCart.map(item => typeof item === 'string' ? { hoardingId: item, vendorId: null } : item);
+                // Convert old format (array of IDs) to new format (array of objects)
+                savedCart = savedCart.map(item => typeof item === 'string' ? { hoardingId: item, vendorId: null } : item);
 
-            // Create a set of hoarding IDs for quick lookup
-            const cartIds = new Set(savedCart.map(item => String(item.hoardingId)));
+                // Create a set of hoarding IDs for quick lookup
+                const cartIds = new Set(savedCart.map(item => String(item.hoardingId)));
 
-            document.querySelectorAll('.cart-btn').forEach(function (btn) {
-                const id = String(btn.dataset.id);
-                const inCart = cartIds.has(id);
-                applyCartUI(btn, inCart);
-            });
+                document.querySelectorAll('.cart-btn').forEach(function (btn) {
+                    const id = String(btn.dataset.id);
+                    const inCart = cartIds.has(id);
+                    applyCartUI(btn, inCart);
+                });
 
-            // Cart header count update
-            const cartBadges = document.querySelectorAll('.cart-count');
-            cartBadges.forEach(function (b) {
-                b.textContent = savedCart.length;
-                b.style.display = savedCart.length > 0 ? 'flex' : 'none';
-            });
-        } else {
-            // ─── Logged in — normal DB based cart buttons ─────────
-            document.querySelectorAll('.cart-btn').forEach(function (btn) {
-                applyCartUI(btn, btn.dataset.inCart === '1');
-            });
-        }
-    });
+                // Cart header count update
+                const cartBadges = document.querySelectorAll('.cart-count');
+                cartBadges.forEach(function (b) {
+                    b.textContent = savedCart.length;
+                    b.style.display = savedCart.length > 0 ? 'flex' : 'none';
+                });
+            } else {
+                // ─── Logged in — normal DB based cart buttons ─────────
+                document.querySelectorAll('.cart-btn').forEach(function (btn) {
+                    applyCartUI(btn, btn.dataset.inCart === '1');
+                });
+            }
+        });
     </script>
 
-   {{-- ================================
-        CART
+    {{-- ================================
+    CART
     ================================= --}}
     <script>
         function applyCartUI(btn, inCart) {
@@ -336,94 +347,94 @@
                 },
                 body: JSON.stringify(payload)
             })
-            .then(function (res) {
-                if (res.status === 401 || res.status === 419) {
-                    window.location.href = '/login?intended=' + encodeURIComponent(window.location.href);
-                    return null;
-                }
-                return res.json();
-            })
-            .then(function (data) {
-                if (!data) return;
+                .then(function (res) {
+                    if (res.status === 401 || res.status === 419) {
+                        window.location.href = '/login?intended=' + encodeURIComponent(window.location.href);
+                        return null;
+                    }
+                    return res.json();
+                })
+                .then(function (data) {
+                    if (!data) return;
 
-                // ─── VENDOR CONFLICT DETECTED ─────────────────────
-                if (data.status === 'vendor_conflict') {
-                    Swal.fire({
-                        title: 'Different Vendor Hoardings',
-                        html: '<p>' + data.message + '</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonColor: '#3085d6',
-                        cancelButtonColor: '#d33',
-                        confirmButtonText: 'Yes, Remove & Add',
-                        cancelButtonText: 'Keep Existing Cart'
-                    }).then(function (result) {
-                        if (result.isConfirmed) {
-                            // Clear cart and then add new hoarding
-                            fetch("{{ route('cart.clear') }}", {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                    'Accept': 'application/json',
-                                    'Content-Type': 'application/json'
-                                }
-                            })
-                            .then(res => res.json())
-                            .then(() => {
-                                // Now add the new hoarding
-                                fetch("{{ route('cart.add') }}", {
+                    // ─── VENDOR CONFLICT DETECTED ─────────────────────
+                    if (data.status === 'vendor_conflict') {
+                        Swal.fire({
+                            title: 'Different Vendor Hoardings',
+                            html: '<p>' + data.message + '</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'Yes, Remove & Add',
+                            cancelButtonText: 'Keep Existing Cart'
+                        }).then(function (result) {
+                            if (result.isConfirmed) {
+                                // Clear cart and then add new hoarding
+                                fetch("{{ route('cart.clear') }}", {
                                     method: 'POST',
                                     headers: {
                                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                                         'Accept': 'application/json',
                                         'Content-Type': 'application/json'
-                                    },
-                                    body: JSON.stringify({ hoarding_id: hoardingId, vendor_id: vendorId })
-                                })
-                                .then(res => res.json())
-                                .then(addData => {
-                                    if (addData.status === 'added') {
-                                        applyCartUI(btn, true);
-                                        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Hoarding added to cart', showConfirmButton: false, timer: 1400 });
-                                        setTimeout(function () { location.reload(); }, 800);
                                     }
                                 })
-                                .catch(() => {
-                                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to add hoarding', showConfirmButton: false, timer: 2000 });
-                                });
-                            })
-                            .catch(() => {
-                                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to clear cart', showConfirmButton: false, timer: 2000 });
-                            })
-                            .finally(function () { btn.disabled = false; });
-                        } else {
-                            btn.disabled = false;
-                        }
-                    });
-                    return;
-                }
+                                    .then(res => res.json())
+                                    .then(() => {
+                                        // Now add the new hoarding
+                                        fetch("{{ route('cart.add') }}", {
+                                            method: 'POST',
+                                            headers: {
+                                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                'Accept': 'application/json',
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify({ hoarding_id: hoardingId, vendor_id: vendorId })
+                                        })
+                                            .then(res => res.json())
+                                            .then(addData => {
+                                                if (addData.status === 'added') {
+                                                    applyCartUI(btn, true);
+                                                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Hoarding added to cart', showConfirmButton: false, timer: 1400 });
+                                                    setTimeout(function () { location.reload(); }, 800);
+                                                }
+                                            })
+                                            .catch(() => {
+                                                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to add hoarding', showConfirmButton: false, timer: 2000 });
+                                            });
+                                    })
+                                    .catch(() => {
+                                        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to clear cart', showConfirmButton: false, timer: 2000 });
+                                    })
+                                    .finally(function () { btn.disabled = false; });
+                            } else {
+                                btn.disabled = false;
+                            }
+                        });
+                        return;
+                    }
 
-                // ─── VENDOR MISMATCH ERROR ──────────────────────
-                if (data.status === 'vendor_mismatch') {
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message, showConfirmButton: false, timer: 2000 });
+                    // ─── VENDOR MISMATCH ERROR ──────────────────────
+                    if (data.status === 'vendor_mismatch') {
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message, showConfirmButton: false, timer: 2000 });
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    // ─── SUCCESS ─────────────────────────────────────
+                    applyCartUI(btn, data.in_cart);
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: data.message, showConfirmButton: false, timer: 1400 });
+                    setTimeout(function () { location.reload(); }, 800);
+                })
+                .catch(function () {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Server error occurred', showConfirmButton: false, timer: 2000 });
                     btn.disabled = false;
-                    return;
-                }
-
-                // ─── SUCCESS ─────────────────────────────────────
-                applyCartUI(btn, data.in_cart);
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: data.message, showConfirmButton: false, timer: 1400 });
-                setTimeout(function () { location.reload(); }, 800);
-            })
-            .catch(function () {
-                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Server error occurred', showConfirmButton: false, timer: 2000 });
-                btn.disabled = false;
-            });
+                });
         };
     </script>
 
     {{-- ================================
-         SHORTLIST MANAGER (btn-wishlist class)
+    SHORTLIST MANAGER (btn-wishlist class)
     ================================= --}}
     <script>
         (function () {
@@ -506,17 +517,17 @@
 
                 async updateCount() {
                     @auth
-                    @if(auth()->user()->hasRole('customer'))
-                    try {
-                        const response = await fetch(`${this.baseUrl}/count`, {
-                            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
-                        });
-                        const data = await response.json();
-                        if (data.success) this.updateCountBadge(data.count);
-                    } catch (error) {
-                        console.error('Error fetching shortlist count:', error);
-                    }
-                    @endif
+                        @if(auth()->user()->hasRole('customer'))
+                            try {
+                                const response = await fetch(`${this.baseUrl}/count`, {
+                                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+                                });
+                                const data = await response.json();
+                                if (data.success) this.updateCountBadge(data.count);
+                            } catch (error) {
+                                console.error('Error fetching shortlist count:', error);
+                            }
+                        @endif
                     @endauth
                 }
             };
@@ -537,86 +548,86 @@
     </script>
 
     {{-- ================================
-         HEART BUTTON (toggleShortlist)
-         — Guest LocalStorage + Logged in DB
+    HEART BUTTON (toggleShortlist)
+    — Guest LocalStorage + Logged in DB
     ================================= --}}
     <script>
-    function toggleShortlist(btn) {
-        const hoardingId = btn.dataset.id;
-        const isAuth     = btn.dataset.auth === '1';
+        function toggleShortlist(btn) {
+            const hoardingId = btn.dataset.id;
+            const isAuth = btn.dataset.auth === '1';
 
-        if (!hoardingId) return;
+            if (!hoardingId) return;
 
-        /* ─── GUEST — LocalStorage ─── */
-        if (!isAuth) {
-            let saved = JSON.parse(localStorage.getItem('guest_wishlist') || '[]');
-            const idx = saved.indexOf(String(hoardingId));
+            /* ─── GUEST — LocalStorage ─── */
+            if (!isAuth) {
+                let saved = JSON.parse(localStorage.getItem('guest_wishlist') || '[]');
+                const idx = saved.indexOf(String(hoardingId));
 
-            if (idx === -1) {
-                saved.push(String(hoardingId));
-                btn.classList.add('is-wishlisted', 'bg-[#daf2e7]');
-                btn.classList.remove('bg-[#9e9e9b]');
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Saved to wishlist', showConfirmButton: false, timer: 1800 });
-            } else {
-                saved.splice(idx, 1);
-                btn.classList.remove('is-wishlisted', 'bg-[#daf2e7]');
-                btn.classList.add('bg-[#9e9e9b]');
-                Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Removed from wishlist', showConfirmButton: false, timer: 1800 });
-            }
+                if (idx === -1) {
+                    saved.push(String(hoardingId));
+                    btn.classList.add('is-wishlisted', 'bg-[#daf2e7]');
+                    btn.classList.remove('bg-[#9e9e9b]');
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Saved to wishlist', showConfirmButton: false, timer: 1800 });
+                } else {
+                    saved.splice(idx, 1);
+                    btn.classList.remove('is-wishlisted', 'bg-[#daf2e7]');
+                    btn.classList.add('bg-[#9e9e9b]');
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Removed from wishlist', showConfirmButton: false, timer: 1800 });
+                }
 
-            localStorage.setItem('guest_wishlist', JSON.stringify(saved));
+                localStorage.setItem('guest_wishlist', JSON.stringify(saved));
 
-            // Header wishlist count update
-            document.querySelectorAll('.shortlist-count').forEach(function (b) {
-                b.textContent = saved.length;
-                b.style.display = saved.length > 0 ? 'flex' : 'none';
-            });
+                // Header wishlist count update
+                document.querySelectorAll('.shortlist-count').forEach(function (b) {
+                    b.textContent = saved.length;
+                    b.style.display = saved.length > 0 ? 'flex' : 'none';
+                });
 
-            return;
-        }
-
-        /* ─── LOGGED IN USER — DB ─── */
-        btn.disabled = true;
-
-        fetch(`/shortlist/toggle/${hoardingId}`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                'Accept': 'application/json'
-            }
-        })
-        .then(function (res) {
-            if (res.status === 401 || res.status === 419) throw new Error('Unauthorized');
-            return res.json();
-        })
-        .then(function (data) {
-            if (!data.success) {
-                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message || 'Something went wrong', showConfirmButton: false, timer: 2500 });
                 return;
             }
-            const isAdded = data.action === 'added';
-            if (isAdded) {
-                btn.classList.add('is-wishlisted', 'bg-[#daf2e7]');
-                btn.classList.remove('bg-[#9e9e9b]');
-            } else {
-                btn.classList.remove('is-wishlisted', 'bg-[#daf2e7]');
-                btn.classList.add('bg-[#9e9e9b]');
-            }
-            Swal.fire({ toast: true, position: 'top-end', icon: isAdded ? 'success' : 'info', title: isAdded ? 'Added to wishlist' : 'Removed from wishlist', showConfirmButton: false, timer: 1800 });
-            setTimeout(function () { window.location.reload(); }, 1200);
-        })
-        .catch(function () {
-            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Session expired. Please login again.', showConfirmButton: false, timer: 2500 });
-            setTimeout(function () { window.location.href = "{{ route('login') }}"; }, 2000);
-        })
-        .finally(function () { btn.disabled = false; });
-    }
+
+            /* ─── LOGGED IN USER — DB ─── */
+            btn.disabled = true;
+
+            fetch(`/shortlist/toggle/${hoardingId}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            })
+                .then(function (res) {
+                    if (res.status === 401 || res.status === 419) throw new Error('Unauthorized');
+                    return res.json();
+                })
+                .then(function (data) {
+                    if (!data.success) {
+                        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message || 'Something went wrong', showConfirmButton: false, timer: 2500 });
+                        return;
+                    }
+                    const isAdded = data.action === 'added';
+                    if (isAdded) {
+                        btn.classList.add('is-wishlisted', 'bg-[#daf2e7]');
+                        btn.classList.remove('bg-[#9e9e9b]');
+                    } else {
+                        btn.classList.remove('is-wishlisted', 'bg-[#daf2e7]');
+                        btn.classList.add('bg-[#9e9e9b]');
+                    }
+                    Swal.fire({ toast: true, position: 'top-end', icon: isAdded ? 'success' : 'info', title: isAdded ? 'Added to wishlist' : 'Removed from wishlist', showConfirmButton: false, timer: 1800 });
+                    setTimeout(function () { window.location.reload(); }, 1200);
+                })
+                .catch(function () {
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Session expired. Please login again.', showConfirmButton: false, timer: 2500 });
+                    setTimeout(function () { window.location.href = "{{ route('login') }}"; }, 2000);
+                })
+                .finally(function () { btn.disabled = false; });
+        }
     </script>
     <script>
         @if(session('merge_guest_data') && auth()->check())
             document.addEventListener('DOMContentLoaded', function () {
                 const wishlist = JSON.parse(localStorage.getItem('guest_wishlist') || '[]');
-                let cart       = JSON.parse(localStorage.getItem('guest_cart') || '[]');
+                let cart = JSON.parse(localStorage.getItem('guest_cart') || '[]');
 
                 if (wishlist.length === 0 && cart.length === 0) return;
 
@@ -632,49 +643,54 @@
                     },
                     body: JSON.stringify({ wishlist: wishlist, cart: cart })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        localStorage.removeItem('guest_wishlist');
-                        localStorage.removeItem('guest_cart');
-                        let msg = 'Your wishlist and cart have been merged.';
-                        if (data.skipped_owner_hoardings && (data.skipped_owner_hoardings.wishlist.length > 0 || data.skipped_owner_hoardings.cart.length > 0)) {
-                            msg += '\nSome hoardings you own were not merged.';
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            localStorage.removeItem('guest_wishlist');
+                            localStorage.removeItem('guest_cart');
+                            let msg = 'Your wishlist and cart have been merged.';
+                            if (data.skipped_owner_hoardings && (data.skipped_owner_hoardings.wishlist.length > 0 || data.skipped_owner_hoardings.cart.length > 0)) {
+                                msg += '\nSome hoardings you own were not merged.';
+                            }
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Welcome!',
+                                text: msg,
+                                timer: 2200,
+                                showConfirmButton: false
+                            });
+                            setTimeout(function () { window.location.reload(); }, 1500);
                         }
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Welcome!',
-                            text: msg,
-                            timer: 2200,
-                            showConfirmButton: false
-                        });
-                        setTimeout(function() { window.location.reload(); }, 1500);
-                    }
-                })
-                .catch(err => {
-                    console.error('Merge failed:', err);
-                    Swal.fire({ icon: 'error', title: 'Merge failed', text: 'Could not merge your wishlist/cart.' });
-                });
+                    })
+                    .catch(err => {
+                        console.error('Merge failed:', err);
+                        Swal.fire({ icon: 'error', title: 'Merge failed', text: 'Could not merge your wishlist/cart.' });
+                    });
             });
         @endif
     </script>
 
     <script>
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
+        !function (f, b, e, v, n, t, s) {
+            if (f.fbq) return; n = f.fbq = function () {
+                n.callMethod ?
+                n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+            };
+            if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
+            n.queue = []; t = b.createElement(e); t.async = !0;
+            t.src = v; s = b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t, s)
+        }(window, document, 'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
         fbq('init', '1651081729239968');
         fbq('track', 'PageView');
     </script>
     <noscript><img height="1" width="1" style="display:none"
-        src="https://www.facebook.com/tr?id=1651081729239968&ev=PageView&noscript=1" alt="facebook_pixel"
-        />
+            src="https://www.facebook.com/tr?id=1651081729239968&ev=PageView&noscript=1" alt="facebook_pixel" />
     </noscript>
 
+    <script src="{{ asset('js/notifications.js') }}"></script>
+
 </body>
+
 </html>
