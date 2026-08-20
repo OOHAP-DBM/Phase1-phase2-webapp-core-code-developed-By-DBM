@@ -165,20 +165,34 @@
                             </table>
 
                             @if($batch->valid_rows > 10)
-                                <p style="margin-top:15px; text-align:center;">
 
+                                <p style="margin-top:15px; text-align:center;">
                                     Showing first 10 inventories out of
                                     <strong>{{ $batch->valid_rows }}</strong>
-
                                 </p>
+
+                                <div style="text-align:center; margin-top:15px;">
+
+                                    <a href="https://staging.oohapp.io/vendor/inventories" style="
+                                                background:#16a34a;
+                                                color:#ffffff;
+                                                padding:12px 24px;
+                                                text-decoration:none;
+                                                border-radius:6px;
+                                                display:inline-block;
+                                                font-size:14px;
+                                                font-weight:600;
+                                           ">
+                                        View All Inventories
+                                    </a>
+
+                                </div>
+
                             @endif
 
                         </td>
                     </tr>
 
-                   
-
-                    <!-- Button -->
                     <tr>
                         <td align="center" style="padding:25px 40px;">
 
@@ -193,6 +207,8 @@
                                 Login To Dashboard
 
                             </a>
+
+
 
                         </td>
                     </tr>
