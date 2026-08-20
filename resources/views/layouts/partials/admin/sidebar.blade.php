@@ -72,6 +72,49 @@
         </a>
         <hr class="mt-5 border-gray-200">
     </div>
+
+    @php
+        $adminSidebarUser = auth()->user();
+        $adminSidebarProfile = DB::table('user_profiles')->where('user_id', $adminSidebarUser->id)->first();
+        $adminSidebarFields = [
+            $adminSidebarUser?->name,
+            $adminSidebarUser?->email,
+            $adminSidebarUser?->avatar,
+            $adminSidebarProfile?->company_name,
+            $adminSidebarProfile?->business_type,
+            $adminSidebarProfile?->gstin,
+            $adminSidebarProfile?->pan_document,
+            $adminSidebarProfile?->bank_name,
+            $adminSidebarProfile?->account_holder_name,
+            $adminSidebarProfile?->account_number,
+            $adminSidebarProfile?->ifsc_code,
+            $adminSidebarProfile?->country,
+            $adminSidebarProfile?->state,
+            $adminSidebarProfile?->city,
+            $adminSidebarProfile?->pincode,
+            $adminSidebarProfile?->address,
+        ];
+        $adminSidebarProfileCompletion = count($adminSidebarFields) > 0
+            ? round((count(array_filter($adminSidebarFields, fn ($value) => !is_null($value) && $value !== '')) / count($adminSidebarFields)) * 100)
+            : 0;
+        $adminSidebarProfileBarColor = $adminSidebarProfileCompletion >= 100
+            ? 'bg-green-500'
+            : ($adminSidebarProfileCompletion >= 50 ? 'bg-yellow-400' : 'bg-red-400');
+    @endphp
+
+    <div class="px-4 pt-2 pb-3">
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <div class="mb-2 flex items-center justify-between">
+                <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Profile Completed</span>
+                <span class="text-xs font-semibold text-gray-800">{{ $adminSidebarProfileCompletion }}%</span>
+            </div>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                <div class="{{ $adminSidebarProfileBarColor }} h-full rounded-full transition-all duration-300"
+                    style="width: {{ $adminSidebarProfileCompletion }}%"></div>
+            </div>
+        </div>
+    </div>
+
     <nav class="flex-1 overflow-y-auto px-2 py-4">
         <div class="space-y-1">
             <div>
