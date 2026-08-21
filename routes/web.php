@@ -81,6 +81,14 @@ Route::get('auth/google/redirect', function () {
     return app(\App\Http\Controllers\OAuthController::class)->redirectToProvider('google');
 });
 
+// Alternative callback path to avoid ModSecurity triggers. Update Google Console to use this if /auth/google/callback is blocked.
+Route::get('gcb/google/callback', function () {
+    return app(\App\Http\Controllers\OAuthController::class)->handleProviderCallback('google');
+});
+Route::get('gcb/google/redirect', function () {
+    return app(\App\Http\Controllers\OAuthController::class)->redirectToProvider('google');
+});
+
 // Keep the generic redirects as well
 Route::get('auth/redirect/{provider}', [\App\Http\Controllers\OAuthController::class, 'redirectToProvider'])->name('oauth.redirect');
 
