@@ -71,6 +71,10 @@ Route::prefix('admin-login-9f3b2x')->name('admin.')->middleware('guest')->group(
 Route::get('auth/redirect/{provider}', [\App\Http\Controllers\OAuthController::class, 'redirectToProvider'])->name('oauth.redirect');
 Route::get('auth/callback/{provider}', [\App\Http\Controllers\OAuthController::class, 'handleProviderCallback'])->name('oauth.callback');
 
+// Backwards-compatible routes for common Google redirect URI formats (some Google console examples use /auth/google/callback)
+Route::get('auth/google/callback', [\App\Http\Controllers\OAuthController::class, 'handleProviderCallback'])->name('oauth.callback.google')->defaults('provider', 'google');
+Route::get('auth/google/redirect', [\App\Http\Controllers\OAuthController::class, 'redirectToProvider'])->name('oauth.redirect.google')->defaults('provider', 'google');
+
 // Admin: OAuth providers management
 Route::prefix('admin/oauth-providers')->name('admin.oauth_providers.')->middleware(['auth','role:admin|superadmin'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Admin\OauthProviderController::class, 'index'])->name('index');
@@ -965,7 +969,7 @@ Route::middleware(['auth', 'role:admin|superadmin'])->prefix('admin')->name('adm
     Route::put('/customers/{id}', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{id}', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'destroy'])->name('customers.destroy');
 
-    
+
 
 
     // KYC Verification
