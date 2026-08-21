@@ -240,7 +240,8 @@ class DirectEnquiryController extends Controller
             'preferred_modes' => 'nullable|array',
             'preferred_modes.*' => 'in:Call,WhatsApp,Email',
             'captcha' => 'required|numeric',
-            'phone_verified' => 'required|in:1'
+            'phone_verified' => 'required|in:1',
+            'customer_account_consent' => 'required|accepted',
         ]);
 
         if ($validator->fails()) {
