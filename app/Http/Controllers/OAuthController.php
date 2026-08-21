@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class OAuthController extends Controller
 {
@@ -28,7 +29,38 @@ class OAuthController extends Controller
             'redirect' => $providerRecord->redirect,
         ]]);
 
-        return Socialite::driver($provider)->redirect();
+        // For Google, construct the OAuth URL explicitly using the redirect URI stored in DB to avoid redirect_uri_mismatch
+        if ($provider === 'google') {
+            $state = Str::random(40);
+            session(['oauth_state' => $state]);
+
+            $params = [
+                'client_id' => $providerRecord->client_id,
+                'redirect_uri' => $providerRecord->redirect,
+                'response_type' => 'code',
+                'scope' => 'openid email profile',
+                'access_type' => 'offline',
+                'prompt' => 'consent',
+                'state' => $state,
+            ];
+
+            $url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+
+            Log::info('OAuth redirect target (manual)', ['provider' => $provider, 'target' => $url, 'db_redirect' => $providerRecord->redirect]);
+
+            return redirect()->away($url);
+        }
+
+        // Fallback: use Socialite for other providers
+        $redirectResponse = Socialite::driver($provider)->redirect();
+        try {
+            $target = method_exists($redirectResponse, 'getTargetUrl') ? $redirectResponse->getTargetUrl() : null;
+            Log::info('OAuth redirect target', ['provider' => $provider, 'target' => $target, 'db_redirect' => $providerRecord->redirect]);
+        } catch (\Exception $e) {
+            Log::error('Unable to log OAuth redirect target', ['provider' => $provider, 'error' => $e->getMessage()]);
+        }
+
+        return $redirectResponse;
     }
 
     public function handleProviderCallback($provider)
