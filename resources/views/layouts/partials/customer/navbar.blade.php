@@ -21,7 +21,7 @@
         {{-- Notification Dropdown --}}
         <div id="notificationDropdown" x-data="notificationDropdown()" class="relative block order-last md:order-none">
 
-            <button @click="unlockNotificationSound(); open = !open" type="button"
+            <button @click="unlockSound(); open = !open" type="button"
                 class="relative p-2 text-gray-400 hover:text-gray-600 rounded-full bg-gray-100 hover:bg-gray-100 cursor-pointer">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -46,14 +46,15 @@
 
                 <div class="max-h-96 overflow-y-auto" id="notificationList">
                     @forelse(auth()->user()->notifications->take(5) as $notification)
-                        <a href="{{ route('notifications.open', $notification->id) }}" class="group block px-4 py-3 border-b border-gray-100 transition-all duration-200
-                                          {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }} hover:bg-gray-50">
+                        <a href="{{ route('notifications.open', $notification->id) }}"
+                            class="group block px-4 py-3 border-b border-gray-100 transition-all duration-200
+                                                              {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }} hover:bg-gray-50">
 
                             <div class="flex gap-3 items-start">
                                 <div class="mt-1">
                                     <div
                                         class="w-9 h-9 rounded-full flex items-center justify-center
-                                                        {{ $notification->read_at ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600' }}">
+                                                                            {{ $notification->read_at ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600' }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -160,9 +161,11 @@
 
             notificationSound: null,
 
+            notificationSound: null,
+            soundUnlocked: false,
+
             init() {
 
-                // 🔔 Notification sound
                 this.notificationSound = new Audio(
                     "{{ asset('sounds/beep.mp3') }}"
                 );
@@ -170,61 +173,69 @@
                 this.notificationSound.preload = 'auto';
                 this.notificationSound.volume = 1.0;
 
-                // 🔓 Unlock audio after user's first interaction
-                const unlockNotificationSound = () => {
-
-                    if (!this.notificationSound) {
-                        return;
-                    }
-
-                    this.notificationSound.muted = true;
-
-                    this.notificationSound.play()
-                        .then(() => {
-                            this.notificationSound.pause();
-                            this.notificationSound.currentTime = 0;
-                            this.notificationSound.muted = false;
-
-                            console.log('🔓 Notification sound unlocked');
-                        })
-                        .catch(error => {
-                            console.log('Audio unlock failed:', error);
-                        });
-
-                    document.removeEventListener(
-                        'click',
-                        unlockNotificationSound
-                    );
-
-                    document.removeEventListener(
-                        'touchstart',
-                        unlockNotificationSound
-                    );
+                // First user interaction par audio unlock
+                const unlockOnce = () => {
+                    this.unlockSound();
                 };
 
-                document.addEventListener(
-                    'click',
-                    unlockNotificationSound,
-                    { once: true }
-                );
+                document.addEventListener('click', unlockOnce, {
+                    once: true,
+                    passive: true
+                });
 
-                document.addEventListener(
-                    'touchstart',
-                    unlockNotificationSound,
-                    { once: true }
-                );
+                document.addEventListener('touchstart', unlockOnce, {
+                    once: true,
+                    passive: true
+                });
 
-
-                // 🔄 Initial notification check
+                // Initial notification check
                 this.checkNotifications();
 
-
-                // 🔄 Check every 10 seconds
+                // Every 10 seconds
                 setInterval(() => {
                     this.checkNotifications();
                 }, 10000);
             },
 
+            unlockSound() {
+
+                if (this.soundUnlocked) {
+                    return;
+                }
+
+                if (!this.notificationSound) {
+                    return;
+                }
+
+                this.notificationSound.muted = true;
+                this.notificationSound.currentTime = 0;
+
+                const playPromise = this.notificationSound.play();
+
+                if (playPromise !== undefined) {
+
+                    playPromise
+                        .then(() => {
+
+                            this.notificationSound.pause();
+                            this.notificationSound.currentTime = 0;
+                            this.notificationSound.muted = false;
+
+                            this.soundUnlocked = true;
+
+                            console.log('🔓 Notification sound unlocked');
+
+                        })
+                        .catch(error => {
+
+                            console.log(
+                                '❌ Audio unlock failed:',
+                                error
+                            );
+
+                        });
+                }
+            },
             async checkNotifications() {
 
                 try {
@@ -257,13 +268,13 @@
                     if (newCount > this.lastUnreadCount) {
 
                         console.log(
-                            '🔔 New notification received'
+                            'New notification received'
                         );
 
                         // Update badge
                         this.unreadCount = newCount;
 
-                        // Play sound
+                         
                         this.playNotificationSound();
 
                         // Refresh notification list
@@ -271,7 +282,7 @@
 
                     } else {
 
-                        // Keep badge synced
+                         
                         this.unreadCount = newCount;
 
                     }
@@ -290,34 +301,41 @@
             },
 
 
-          playNotificationSound() {
+            playNotificationSound() {
 
-    if (!this.notificationSound) {
-        console.log('❌ Notification audio not initialized');
-        return;
-    }
+                if (!this.soundUnlocked) {
 
-    this.notificationSound.currentTime = 0;
-    this.notificationSound.muted = false;
-    this.notificationSound.volume = 1.0;
+                    console.log(
+                        'Notification sound is not unlocked yet'
+                    );
 
-    this.notificationSound.play()
-        .then(() => {
+                    return;
+                }
 
-            console.log(
-                '🔔🔊 NEW NOTIFICATION SOUND PLAYED'
-            );
+                const audio = new Audio(
+                    "{{ asset('sounds/beep.mp3') }}"
+                );
 
-        })
-        .catch(error => {
+                audio.volume = 1.0;
+                audio.currentTime = 0;
 
-            console.error(
-                '❌ Notification sound blocked:',
-                error
-            );
+                audio.play()
+                    .then(() => {
 
-        });
-},
+                        console.log(
+                            'NEW NOTIFICATION SOUND PLAYED'
+                        );
+
+                    })
+                    .catch(error => {
+
+                        console.error(
+                            'Notification sound blocked:',
+                            error
+                        );
+
+                    });
+            },
             async loadNotifications() {
 
                 try {
