@@ -630,6 +630,10 @@
                     class="block px-6 py-1 text-sm rounded-md transition {{ request()->routeIs('admin.settings.razorpay') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                         - Razorpay Settings
                     </a>
+                    <a href="{{ route('admin.oauth_providers.index') }}"
+                    class="block px-6 py-1 text-sm rounded-md transition {{ request()->routeIs('admin.oauth_providers.*') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                        - OAuth Providers
+                    </a>
                      <a href="{{ route('admin.settings.pos-cash-limit.edit') }}"
                     class="block px-6 py-1 text-sm rounded-md transition {{ request()->routeIs('admin.settings.pos-cash-limit.edit') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                         - Pos Cash Limit

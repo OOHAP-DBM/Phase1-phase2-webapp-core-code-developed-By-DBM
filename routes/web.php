@@ -67,6 +67,20 @@ Route::prefix('admin-login-9f3b2x')->name('admin.')->middleware('guest')->group(
     Route::post('/login', [Modules\Auth\Http\Controllers\LoginController::class, 'login'])->name('login.submit');
 });
 
+// OAuth redirect/callback routes (dynamic credentials stored in oauth_providers table)
+Route::get('auth/redirect/{provider}', [\App\Http\Controllers\OAuthController::class, 'redirectToProvider'])->name('oauth.redirect');
+Route::get('auth/callback/{provider}', [\App\Http\Controllers\OAuthController::class, 'handleProviderCallback'])->name('oauth.callback');
+
+// Admin: OAuth providers management
+Route::prefix('admin/oauth-providers')->name('admin.oauth_providers.')->middleware(['auth','role:admin|superadmin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\OauthProviderController::class, 'index'])->name('index');
+    Route::get('/create', [\App\Http\Controllers\Admin\OauthProviderController::class, 'create'])->name('create');
+    Route::post('/', [\App\Http\Controllers\Admin\OauthProviderController::class, 'store'])->name('store');
+    Route::get('/{oauth_provider}/edit', [\App\Http\Controllers\Admin\OauthProviderController::class, 'edit'])->name('edit');
+    Route::put('/{oauth_provider}', [\App\Http\Controllers\Admin\OauthProviderController::class, 'update'])->name('update');
+    Route::delete('/{oauth_provider}', [\App\Http\Controllers\Admin\OauthProviderController::class, 'destroy'])->name('destroy');
+});
+
 Route::prefix('enquiry')->name('direct.enquiry.')->group(function () {
 
 
