@@ -238,6 +238,11 @@ class OAuthController extends Controller
 
     public function handleProviderCallback($provider)
     {
+         Log::info('!!! GOOGLE CALLBACK REACHED LARAVEL !!!', [
+        'provider' => $provider,
+        'url' => request()->fullUrl(),
+        'query' => request()->query(),
+    ]);
         Log::info('OAuth callback received', [
             'provider' => $provider,
             'url' => request()->fullUrl(),
