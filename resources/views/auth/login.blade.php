@@ -120,6 +120,7 @@
         align-items: center;
         justify-content: center;
         gap: 10px;
+        margin-top: 10px;
 
         border: 1px solid #d1d5db;
         color: inherit;
@@ -313,12 +314,18 @@
 
 
 
-                <!-- <button class="social-btn google-btn">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                        width="18"
-                        class="me-2">
-                    Continue with Google
-                </button> -->
+                @php
+                    $googleProvider = \App\Models\OauthProvider::where('provider','google')->first();
+                @endphp
+
+                @if($googleProvider && $googleProvider->active)
+                    <a href="{{ route('oauth.redirect','google') }}" class="social-btn google-btn">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                            width="18"
+                            class="me-2">
+                        Continue with Google
+                    </a>
+                @endif
 
 
                 <div class="footer-text">
