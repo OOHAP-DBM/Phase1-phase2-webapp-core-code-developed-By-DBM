@@ -125,8 +125,8 @@
                     @forelse(auth()->user()->notifications->take(5) as $notification)
 
                                     <a href="{{ route('notifications.open', $notification->id) }}" class="group block px-4 py-3 border-b border-gray-100 transition-all duration-200
-                                                            {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }}
-                                                            hover:bg-gray-50">
+                                                                                                            {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }}
+                                                                                                            hover:bg-gray-50">
 
                                         <div class="flex gap-3 items-start">
 
@@ -134,18 +134,19 @@
                                             <div class="mt-1">
 
                                                 <div class="w-9 h-9 rounded-full flex items-center justify-center
-                                                                        {{ $notification->read_at
+                                                                                                                        {{ $notification->read_at
                         ? 'bg-gray-100 text-gray-500'
                         : 'bg-blue-100 text-blue-600' }}">
 
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
                                                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
 
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0
-                                                                                0118 14.2V11a6 6 0 10-12
-                                                                                0v3.2c0 .53-.21 1.04-.6
-                                                                                1.42L4 17h5m6 0a3 3 0
-                                                                                11-6 0" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            d="M15 17h5l-1.4-1.4A2 2 0
+                                                                                                                                0118 14.2V11a6 6 0 10-12
+                                                                                                                                0v3.2c0 .53-.21 1.04-.6
+                                                                                                                                1.42L4 17h5m6 0a3 3 0
+                                                                                                                                11-6 0" />
 
                                                     </svg>
 
@@ -158,7 +159,7 @@
                                             <div class="flex-1 min-w-0">
 
                                                 <p class="text-sm font-semibold
-                                                                        {{ $notification->read_at
+                                                                                                                        {{ $notification->read_at
                         ? 'text-gray-800'
                         : 'text-blue-900' }}">
                                                     {{ $notification->data['title'] ?? 'New Notification' }}
@@ -258,7 +259,7 @@
             </button>
 
 
-            {{-- Dropdown --}}
+
             <div id="vendorUserDropdown"
                 class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg hidden z-50">
 

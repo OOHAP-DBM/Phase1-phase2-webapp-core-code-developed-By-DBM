@@ -45,7 +45,7 @@ class EnquiryController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search   = trim($request->search);
+            $search = trim($request->search);
             $searchId = preg_replace('/\D/', '', $search);
 
             $query->where(function ($q) use ($search, $searchId) {
@@ -99,11 +99,10 @@ class EnquiryController extends Controller
             }
         }
 
-        /* ---------------- DEFAULT ORDER ---------------- */
         $query->orderBy('created_at', 'desc');
 
         $enquiries = $query
-            ->paginate(10)
+            ->paginate(1)
             ->withQueryString();
 
         return view('customer.enquiries.index', compact('enquiries'));
@@ -359,9 +358,11 @@ class EnquiryController extends Controller
      */
     private function enrichEnquiryDataForCustomer($enquiry)
     {
-        $enquiry->load(['items' => function ($query) {
-            $query->with(['hoarding']);
-        }]);
+        $enquiry->load([
+            'items' => function ($query) {
+                $query->with(['hoarding']);
+            }
+        ]);
 
         foreach ($enquiry->items as $item) {
             // Get image URL based on hoarding type
@@ -451,9 +452,9 @@ class EnquiryController extends Controller
             $price = (int) ($priceMap[$service] ?? 0);
 
             $services[] = [
-                'name'  => $service,
+                'name' => $service,
                 'price' => $price,
-                'type'  => $price > 0 ? 'paid' : 'free',
+                'type' => $price > 0 ? 'paid' : 'free',
             ];
         }
 
@@ -466,24 +467,24 @@ class EnquiryController extends Controller
         // Graphics
         if ((int) $hoarding->graphics_included === 1) {
             $services[] = [
-                'name'  => 'graphics',
+                'name' => 'graphics',
                 'price' => 0,
-                'type'  => 'free',
+                'type' => 'free',
             ];
         } elseif (!empty($hoarding->graphics_charge) && $hoarding->graphics_charge > 0) {
             $services[] = [
-                'name'  => 'graphics',
+                'name' => 'graphics',
                 'price' => (int) $hoarding->graphics_charge,
-                'type'  => 'paid',
+                'type' => 'paid',
             ];
         }
 
         // Survey
         if (!empty($hoarding->survey_charge) && $hoarding->survey_charge > 0) {
             $services[] = [
-                'name'  => 'survey',
+                'name' => 'survey',
                 'price' => (int) $hoarding->survey_charge,
-                'type'  => 'paid',
+                'type' => 'paid',
             ];
         }
 

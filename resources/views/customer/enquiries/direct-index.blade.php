@@ -68,6 +68,11 @@
                                 Status
                             </th>
 
+
+                            <th class="px-4 py-3 text-center">
+                                Action
+                            </th>
+
                         </tr>
                     </thead>
 
@@ -223,6 +228,12 @@
 
                                             </td>
 
+                                            <td class="px-4 py-3 text-center">
+                                                <a href="{{ route('customer.direct.enquiries.show', $enquiry->id) }}"
+                                                    class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold inline-block whitespace-nowrap transition-colors">
+                                                    View Details
+                                                </a>
+                                            </td>
                                         </tr>
 
                         @empty

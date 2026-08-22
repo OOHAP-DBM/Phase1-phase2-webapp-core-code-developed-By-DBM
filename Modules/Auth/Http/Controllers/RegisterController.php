@@ -151,41 +151,82 @@ class RegisterController extends Controller
             // Handle vendor-specific setup
             if ($role === 'vendor') {
 
-                // 1️⃣ Create vendor profile
-                VendorProfile::create([
+                // Check vendor auto approval setting
+                $autoApproval = \App\Models\Setting::get(
+                    'auto_vendor_approval',
+                    false
+                );
+
+                $vendorProfile = VendorProfile::create([
                     'user_id' => $user->id,
-                    'onboarding_status' => 'draft',
+                    'onboarding_status' => $autoApproval
+                        ? 'approved'
+                        : 'pending_approval',
                     'onboarding_step' => 1,
                     'inventory_setup_completed' => false,
+                    'approved_at' => $autoApproval ? now() : null,
+                    'approved_by' => null,
                 ]);
-                // 3️⃣ Notify admins (approval pending)
-                $admins = User::role('admin')->get();
-                foreach ($admins as $admin) {
-                    $admin->notify(
+
+
+                 
+                // Create vendor profile
+                VendorProfile::create([
+                    'user_id' => $user->id,
+
+                    // Auto approve if setting is ON,
+                    // otherwise keep vendor pending for admin approval
+                    'onboarding_status' => $autoApproval
+                        ? 'approved'
+                        : 'pending_approval',
+
+                    'onboarding_step' => 1,
+                    'inventory_setup_completed' => false,
+
+                    // Auto approval fields
+                    'approved_at' => $autoApproval ? now() : null,
+                    'approved_by' => null,
+                ]);
+
+                // If auto approval is OFF,
+                // notify admins and vendor about pending approval
+                if (!$autoApproval) {
+
+                    // Notify admins
+                    $admins = User::role('admin')->get();
+
+                    foreach ($admins as $admin) {
+                        $admin->notify(
+                            new VendorApprovalPendingNotification($user)
+                        );
+                    }
+
+                    // Notify vendor
+                    $user->notify(
                         new VendorApprovalPendingNotification($user)
                     );
                 }
 
-                // 4️⃣ Notify vendor
-                $user->notify(
-                    new VendorApprovalPendingNotification($user)
-                );
-
-                // 2️⃣ Commit DB changes FIRST
+                // Commit DB changes
                 DB::commit();
 
-
-
-                // 5️⃣ Clear session role
+                // Clear signup role
                 session()->forget('signup_role');
 
-                // 6️⃣ Login vendor
+                // Login vendor
                 Auth::login($user);
+
                 session(['merge_guest_data' => true]);
 
-                // 7️⃣ Redirect to onboarding
-                return redirect()->route('vendor.onboarding.contact-details')
-                    ->with('success', 'Account created! Please complete your vendor onboarding.');
+                // Redirect to onboarding
+                return redirect()
+                    ->route('vendor.onboarding.contact-details')
+                    ->with(
+                        'success',
+                        $autoApproval
+                        ? 'Account created successfully! Your vendor account has been approved.'
+                        : 'Account created! Please wait for admin approval.'
+                    );
             }
 
 

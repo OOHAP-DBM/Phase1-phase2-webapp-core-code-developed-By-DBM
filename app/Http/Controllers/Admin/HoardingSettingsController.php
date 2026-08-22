@@ -51,4 +51,31 @@ class HoardingSettingsController extends Controller
 
         return redirect()->back()->with('success', 'POS cash limit updated!');
     }
+
+    public function editVendor()
+    {
+        $autoApproval = Setting::get('auto_vendor_approval', false);
+
+        return view(
+            'admin.settings.vendor_auto_approval',
+            compact('autoApproval')
+        );
+    }
+
+    public function updateVendor(Request $request)
+    {
+        $value = $request->input('auto_vendor_approval') == '1';
+
+        Setting::set(
+            'auto_vendor_approval',
+            $value,
+            Setting::TYPE_BOOLEAN,
+            Setting::GROUP_AUTOMATION,
+            'Auto approval for vendor registration'
+        );
+
+        return redirect()
+            ->back()
+            ->with('success', 'Vendor auto approval setting updated!');
+    }
 }
