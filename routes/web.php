@@ -111,6 +111,16 @@ Route::prefix('admin/oauth-providers')->name('admin.oauth_providers.')->middlewa
     Route::delete('/{oauth_provider}', [\App\Http\Controllers\Admin\OauthProviderController::class, 'destroy'])->name('destroy');
 });
 
+Route::get(
+    'oauth/select-role',
+    [\App\Http\Controllers\OAuthController::class, 'showOAuthRoleSelection']
+)->name('oauth.select-role');
+
+Route::post(
+    'oauth/select-role',
+    [\App\Http\Controllers\OAuthController::class, 'completeOAuthSignup']
+)->name('oauth.select-role.submit');
+
 Route::prefix('enquiry')->name('direct.enquiry.')->group(function () {
 
 
