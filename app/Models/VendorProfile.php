@@ -17,6 +17,7 @@ class VendorProfile extends Model
         'onboarding_status',
         'onboarding_step',
         'onboarding_completed_at',
+        'inventory_setup_completed',
         'approved_at',
         'approved_by',
         'rejection_reason',
@@ -90,6 +91,7 @@ class VendorProfile extends Model
         'commission_percentage' => 'decimal:2',
         'additional_emails' => 'array',
         'email_preferences' => 'array',
+        'inventory_setup_completed' => 'boolean',
     ];
 
 

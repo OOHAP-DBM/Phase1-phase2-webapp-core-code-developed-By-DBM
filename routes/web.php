@@ -3,6 +3,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Web\PageController;
+use Modules\Admin\Controllers\Web\Vendor\VendorController;
 use Modules\Auth\Http\Controllers\OnboardingController;
 use App\Http\Controllers\Web\Customer\ProfileController;
 use Modules\Search\Controllers\SearchController;
@@ -15,6 +16,7 @@ use Modules\Auth\Http\Controllers\MobileForgotPasswordController;
 use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\Admin\RazorpaySettingsController;
 use App\Http\Controllers\Customer\CustomerOfferController;
+ 
 
 
 use App\Http\Controllers\NotificationController;
@@ -26,6 +28,11 @@ Route::middleware('auth')->prefix('api/v1/notifications')->group(function () {
         'unreadCount'
     ]);
 
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/vendor/welcome', [VendorController::class, 'landing'])
+        ->name('vendor.landing');
 });
 
 
@@ -172,8 +179,8 @@ Route::prefix('vendor/pos')->middleware(['auth', 'role:vendor'])->name('vendor.p
     Route::get('/bookings/{id}', [\Modules\POS\Controllers\Web\VendorPosController::class, 'show'])->name('show');
     Route::get('/customers', [\Modules\POS\Controllers\Web\VendorPosController::class, 'customers'])->name('customers');
     Route::get('/customers/{id}', [\Modules\POS\Controllers\Web\VendorPosController::class, 'showCustomer'])->name('customers.show');
-Route::get('/my-customers', [\Modules\POS\Controllers\Web\VendorPosController::class, 'myCustomers'])
-    ->name('my-customers');
+    Route::get('/my-customers', [\Modules\POS\Controllers\Web\VendorPosController::class, 'myCustomers'])
+        ->name('my-customers');
 
     Route::prefix('api')->group(function () {
         Route::get('/settings', [\Modules\POS\Controllers\Web\VendorPosController::class, 'getSettings'])->name('settings');
@@ -591,17 +598,17 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
         // Refresh Stats
         Route::post('/refresh-stats', [\App\Http\Controllers\Customer\CustomerDashboardController::class, 'refreshStats'])->name('refresh-stats');
 
-        });
-        Route::prefix('offers')->name('offers.')->group(function () {
-    Route::get('/', [CustomerOfferController::class, 'index'])->name('index');
-    Route::get('/{offer}', [CustomerOfferController::class, 'show'])->name('show');
-    Route::post('/{offer}/accept', [CustomerOfferController::class, 'accept'])->name('accept');
-    Route::post('/{offer}/reject', [CustomerOfferController::class, 'reject'])->name('reject');
-    Route::post('/{offer}/modify', [CustomerOfferController::class, 'requestModification'])->name('modify');
-     Route::get('/{offer}/modify',       [CustomerOfferController::class, 'modify'])->name('modify');
-    Route::post('/{offer}/modify',      [CustomerOfferController::class, 'storeModification'])->name('modify.store');
-    Route::get('/{offer}/api/hoardings', [CustomerOfferController::class, 'getHoardings'])->name('api.hoardings');
-});
+    });
+    Route::prefix('offers')->name('offers.')->group(function () {
+        Route::get('/', [CustomerOfferController::class, 'index'])->name('index');
+        Route::get('/{offer}', [CustomerOfferController::class, 'show'])->name('show');
+        Route::post('/{offer}/accept', [CustomerOfferController::class, 'accept'])->name('accept');
+        Route::post('/{offer}/reject', [CustomerOfferController::class, 'reject'])->name('reject');
+        Route::post('/{offer}/modify', [CustomerOfferController::class, 'requestModification'])->name('modify');
+        Route::get('/{offer}/modify', [CustomerOfferController::class, 'modify'])->name('modify');
+        Route::post('/{offer}/modify', [CustomerOfferController::class, 'storeModification'])->name('modify.store');
+        Route::get('/{offer}/api/hoardings', [CustomerOfferController::class, 'getHoardings'])->name('api.hoardings');
+    });
     // Route::middleware(['auth', 'role:customer'])
     // ->prefix('customer.my.offers')
     // ->name('customer.offers.')
@@ -736,7 +743,7 @@ Route::middleware(['auth', 'role:vendor'])->prefix('vendor')->name('vendor.')->g
             ->name('offers.archive');
 
         Route::post('/offers/{offer}/unarchive', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'unarchive'])
-         ->name('offers.unarchive');
+            ->name('offers.unarchive');
 
         Route::post('/offers/{offer}/remind', [\App\Http\Controllers\Web\Vendor\OfferController::class, 'sendReminder'])
             ->name('offers.remind');
@@ -951,7 +958,7 @@ Route::middleware(['auth', 'role:admin|superadmin'])->prefix('admin')->name('adm
     Route::put('/customers/{id}', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{id}', [\Modules\Admin\Controllers\Web\Customer\CustomerController::class, 'destroy'])->name('customers.destroy');
 
-    
+
 
 
     // KYC Verification

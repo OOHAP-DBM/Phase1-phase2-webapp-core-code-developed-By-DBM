@@ -732,4 +732,18 @@ class VendorController extends Controller
             ], 500);
         }
     }
+
+    public function landing()
+    {
+        $vendorProfile = auth()->user()->vendorProfile;
+        if (!$vendorProfile) {
+            abort(404, 'Vendor profile not found.');
+        }
+
+        if ($vendorProfile->inventory_setup_completed) {
+            return redirect()->route('vendor.dashboard');
+        }
+
+        return view('vendor.landing', compact('vendorProfile'));
+    }
 }

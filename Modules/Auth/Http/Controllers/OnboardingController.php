@@ -23,7 +23,6 @@ use Modules\Auth\Http\Requests\VerifyOTPRequest;
 use Modules\Auth\Services\OTPService;
 use Illuminate\Http\JsonResponse;
 class OnboardingController extends Controller
-
 {
     /**
      * Ensure vendor has profile
@@ -78,7 +77,7 @@ class OnboardingController extends Controller
     protected function getVendorProfile()
     {
         $user = Auth::user();
-        
+
         if (!$user->vendorProfile) {
             return VendorProfile::create([
                 'user_id' => $user->id,
@@ -324,8 +323,10 @@ class OnboardingController extends Controller
         // Mark onboarding as complete and submit for approval
         $profile->completeOnboarding();
 
-        return redirect()->route('vendor.onboarding.waiting')
-            ->with('success', 'Onboarding completed! Your application is under review.');
+        // return redirect()->route('vendor.onboarding.waiting')
+        //     ->with('success', 'Onboarding completed! Your application is under review.');
+        return redirect()->route('vendor.landing')
+            ->with('success', 'Onboarding completed! Let’s get your inventory started.');
     }
 
     /**
@@ -373,9 +374,11 @@ class OnboardingController extends Controller
         }
 
         // Email already used by another account
-        if (User::where('email', $request->email)
-            ->where('id', '!=', $user->id)
-            ->exists()) {
+        if (
+            User::where('email', $request->email)
+                ->where('id', '!=', $user->id)
+                ->exists()
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email already in use'
@@ -446,9 +449,11 @@ class OnboardingController extends Controller
         }
 
         // Phone already used by another account
-        if (User::where('phone', $request->phone)
-            ->where('id', '!=', $user->id)
-            ->exists()) {
+        if (
+            User::where('phone', $request->phone)
+                ->where('id', '!=', $user->id)
+                ->exists()
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Mobile number already in use'
@@ -460,7 +465,7 @@ class OnboardingController extends Controller
         Cache::put(
             'vendor_phone_otp_' . $user->id,
             [
-                'otp'   => $otp,
+                'otp' => $otp,
                 'phone' => $request->phone
             ],
             now()->addMinutes(10)
