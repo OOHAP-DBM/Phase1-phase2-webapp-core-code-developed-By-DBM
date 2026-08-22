@@ -13,7 +13,7 @@
     }
 @endphp
 @extends($layout)
-@section('title', 'Enquiry & Offers')
+@section('title', 'Enquiries')
 
 @section('content')
 <div x-data="{
@@ -33,7 +33,7 @@
                     </svg>
                 </button>
                 <h1 class="md:text-xl font-semibold text-gray-900">
-                    Enquiry & Offers
+                    Enquiries
                 </h1>
             </div>
             <p class="text-sm text-gray-500 mt-2">

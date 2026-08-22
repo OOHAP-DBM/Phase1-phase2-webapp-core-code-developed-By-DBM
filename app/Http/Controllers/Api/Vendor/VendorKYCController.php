@@ -14,10 +14,7 @@ use Illuminate\Support\Facades\Validator;
 
 class VendorKYCController extends Controller
 {
-    /**
-     * Submit or update vendor KYC
-     * POST /api/v1/vendor/kyc
-     */
+
     public function submit(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -27,18 +24,18 @@ class VendorKYCController extends Controller
             'gst_number' => 'nullable|string|size:15|regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/',
             'pan_number' => 'required|string|size:10|regex:/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/',
             'legal_name' => 'required|string|max:200',
-            
+
             // Contact Information
             'contact_name' => 'required|string|max:100',
             'contact_email' => 'required|email|max:100',
             'contact_phone' => 'required|string|max:15',
-            
+
             // Address
             'address' => 'required|string',
             'city' => 'nullable|string|max:100',
             'state' => 'nullable|string|max:100',
             'pincode' => 'nullable|string|size:6|regex:/^[0-9]{6}$/',
-            
+
             // Bank Details
             'account_holder_name' => 'required|string|max:200',
             'account_number' => 'required|string|min:8|max:18',
@@ -46,7 +43,7 @@ class VendorKYCController extends Controller
             'ifsc' => 'required|string|size:11|regex:/^[A-Z]{4}0[A-Z0-9]{6}$/',
             'bank_name' => 'required|string|max:100',
             'account_type' => 'required|in:savings,current',
-            
+
             // Documents
             'pan_card' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
             'aadhar_card' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
@@ -91,12 +88,12 @@ class VendorKYCController extends Controller
 
             // Handle document uploads
             $documentFields = ['pan_card', 'aadhar_card', 'gst_certificate', 'business_proof', 'cancelled_cheque'];
-            
+
             foreach ($documentFields as $field) {
                 if ($request->hasFile($field)) {
                     // Remove old media if exists
                     $vendorKYC->clearMediaCollection($field);
-                    
+
                     // Add new media
                     $vendorKYC->addMediaFromRequest($field)
                         ->toMediaCollection($field);

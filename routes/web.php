@@ -16,7 +16,7 @@ use Modules\Auth\Http\Controllers\MobileForgotPasswordController;
 use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\Admin\RazorpaySettingsController;
 use App\Http\Controllers\Customer\CustomerOfferController;
- 
+
 
 
 use App\Http\Controllers\NotificationController;
@@ -139,6 +139,18 @@ Route::prefix('direct-enquiries')
 
         Route::post('/{enquiry}/mark-viewed', [DirectEnquiryController::class, 'markAsViewed'])
             ->name('mark.viewed');
+    });
+
+Route::prefix('customer/direct-enquiries')
+    ->name('customer.direct.enquiries.')
+    ->middleware(['auth'])
+    ->group(function () {
+
+        Route::get('/', [DirectEnquiryController::class, 'customerIndex'])
+            ->name('index');
+
+        Route::get('/{enquiry}', [DirectEnquiryController::class, 'customerShow'])
+            ->name('show');
     });
 
 Route::prefix('vendor/direct-enquiries')->name('vendor.direct-enquiries.')->middleware(['auth', 'role:vendor'])->group(function () {
