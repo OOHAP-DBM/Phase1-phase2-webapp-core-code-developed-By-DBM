@@ -132,7 +132,7 @@ class RegisterController extends Controller
             }
             if ($role === 'customer') {
 
-                // 🔔 Admin notification
+
                 $admins = User::role('admin')->get();
                 foreach ($admins as $admin) {
                     $admin->notify(
@@ -140,7 +140,7 @@ class RegisterController extends Controller
                     );
                 }
 
-                // 🔔 Customer dashboard notification
+
                 $user->notify(
                     new UserWelcomeNotification('customer')
                 );
@@ -156,6 +156,7 @@ class RegisterController extends Controller
                     'user_id' => $user->id,
                     'onboarding_status' => 'draft',
                     'onboarding_step' => 1,
+                    'inventory_setup_completed' => false,
                 ]);
                 // 3️⃣ Notify admins (approval pending)
                 $admins = User::role('admin')->get();
@@ -188,7 +189,7 @@ class RegisterController extends Controller
             }
 
 
-            // Customer flow
+            // Customer flow    
             DB::commit();
 
             // Clear session role
@@ -297,13 +298,13 @@ class RegisterController extends Controller
 
                 Log::warning('Twilio credentials not found.');
 
-                
+
                 Log::info("Phone OTP for {$request->phone}: {$otp}");
 
                 return response()->json([
                     'success' => true,
                     'message' => 'OTP generated successfully (Development Mode).',
-                  
+
                 ]);
             }
 

@@ -1184,4 +1184,52 @@ class DirectEnquiryController extends Controller
             'message' => 'Notes updated successfully'
         ]);
     }
+
+
+    public function customerIndex(Request $request)
+    {
+        $customer = Auth::user();
+
+        $query = DirectEnquiry::where('user_id', $customer->id);
+
+         
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('location_city', 'like', "%{$search}%")
+                    ->orWhere('hoarding_type', 'like', "%{$search}%");
+            });
+        }
+
+         
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $enquiries = $query
+            ->with('assignedVendors')
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('customer.enquiries.direct-index', compact('enquiries'));
+    }
+
+
+
+    public function customerShow($enquiryId)
+    {
+        $customer = Auth::user();
+
+        $enquiry = DirectEnquiry::where('id', $enquiryId)
+            ->where('user_id', $customer->id)
+            ->with('assignedVendors')
+            ->firstOrFail();
+
+        return view('customer.enquiries.direct-show', compact('enquiry'));
+    }
 }

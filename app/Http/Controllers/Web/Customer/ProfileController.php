@@ -19,7 +19,8 @@ class ProfileController extends Controller
 {
     public function __construct(
         protected OTPService $otpService
-    ) {}
+    ) {
+    }
     /**
      * Show customer profile.
      *
@@ -39,13 +40,18 @@ class ProfileController extends Controller
     public function update(Request $request)
     {
         $user = auth()->user();
+        $request->merge([
+            'gstin' => filled($request->gstin)
+                ? strtoupper(trim($request->gstin))
+                : null,
+        ]);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'nullable|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|unique:users,phone,' . $user->id,
             'company_name' => 'nullable|string|max:255',
-            'gstin'        => 'nullable|string|max:15|unique:users,gstin,' . $user->id,
+            'gstin' => 'nullable|string|max:15|unique:users,gstin,' . $user->id,
             'avatar' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
@@ -55,21 +61,22 @@ class ProfileController extends Controller
                     Storage::disk('public')->delete($user->avatar);
                 }
                 $file = $request->file('avatar');
-                $filename = time().'_'.Str::uuid().'.'.$file->getClientOriginalExtension();
+                $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
                 $path = $file->storeAs(
-                    'media/users/avatars/'.$user->id,
+                    'media/users/avatars/' . $user->id,
                     $filename,
                     'public'
                 );
                 $validated['avatar'] = $path;
             } catch (\Exception $e) {
-                Log::error('Avatar upload failed', ['error'=>$e->getMessage()]);
+                Log::error('Avatar upload failed', ['error' => $e->getMessage()]);
                 return back()->withErrors([
                     'avatar' => 'Avatar upload failed. Please try again.'
                 ]);
             }
         }
 
+        $validated['gstin'] = $validated['gstin'] ?? null;
         $user->update($validated);
 
         return redirect()
@@ -214,7 +221,7 @@ class ProfileController extends Controller
                 'message' => 'OTP expired. Please resend.'
             ], 422);
         }
-        if ((string)$cachedOtp !== (string)$request->otp) {
+        if ((string) $cachedOtp !== (string) $request->otp) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid OTP'
@@ -247,21 +254,21 @@ class ProfileController extends Controller
 
         // ✅ Validation
         $validated = $request->validate([
-            'name'             => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'phone' => 'required|digits:10|unique:users,phone,' . auth()->id(),
-            'email'            => 'required|email|max:255',
-            'billing_address'  => 'required|string|max:500',
-            'billing_city'     => 'nullable|string|max:255',
-            'billing_state'    => 'nullable|string|max:255',
-            'billing_pincode'  => 'required|string|max:10',
+            'email' => 'required|email|max:255',
+            'billing_address' => 'required|string|max:500',
+            'billing_city' => 'nullable|string|max:255',
+            'billing_state' => 'nullable|string|max:255',
+            'billing_pincode' => 'required|string|max:10',
         ]);
 
         $updateData = [
-            'name'             => $validated['name'],
-            'billing_address'  => $validated['billing_address'],
-            'billing_city'     => $validated['billing_city'] ?? null,
-            'billing_state'    => $validated['billing_state'] ?? null,
-            'billing_pincode'  => $validated['billing_pincode'],
+            'name' => $validated['name'],
+            'billing_address' => $validated['billing_address'],
+            'billing_city' => $validated['billing_city'] ?? null,
+            'billing_state' => $validated['billing_state'] ?? null,
+            'billing_pincode' => $validated['billing_pincode'],
         ];
 
         /**
