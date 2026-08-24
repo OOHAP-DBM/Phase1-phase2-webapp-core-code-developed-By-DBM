@@ -151,41 +151,133 @@ class RegisterController extends Controller
             // Handle vendor-specific setup
             if ($role === 'vendor') {
 
-                // 1️⃣ Create vendor profile
-                VendorProfile::create([
+                \Log::info('========== VENDOR AUTO APPROVAL DEBUG START ==========', [
                     'user_id' => $user->id,
-                    'onboarding_status' => 'draft',
-                    'onboarding_step' => 1,
-                    'inventory_setup_completed' => false,
+                    'user_email' => $user->email,
+                    'role' => $role,
                 ]);
-                // 3️⃣ Notify admins (approval pending)
-                $admins = User::role('admin')->get();
-                foreach ($admins as $admin) {
-                    $admin->notify(
-                        new VendorApprovalPendingNotification($user)
-                    );
-                }
-
-                // 4️⃣ Notify vendor
-                $user->notify(
-                    new VendorApprovalPendingNotification($user)
+ 
+                $autoApproval = \App\Models\Setting::get(
+                    'auto_vendor_approval',
+                    false
                 );
 
-                // 2️⃣ Commit DB changes FIRST
+                \Log::info('VENDOR AUTO APPROVAL: Setting fetched', [
+                    'setting_key' => 'auto_vendor_approval',
+                    'value' => $autoApproval,
+                    'type' => gettype($autoApproval),
+                    'boolean_value' => (bool) $autoApproval,
+                ]);
+
+                 
+                $onboardingStatus = $autoApproval
+                    ? 'approved'
+                    : 'pending_approval';
+
+                \Log::info('VENDOR AUTO APPROVAL: Status determined', [
+                    'auto_approval' => (bool) $autoApproval,
+                    'onboarding_status' => $onboardingStatus,
+                ]);
+
+                 
+                $vendorProfile = VendorProfile::create([
+                    'user_id' => $user->id,
+
+                    'onboarding_status' => $onboardingStatus,
+
+                    'onboarding_step' => 1,
+
+                    'inventory_setup_completed' => false,
+
+                    'approved_at' => $autoApproval ? now() : null,
+
+                    // NULL because this is system auto-approval.
+                    // Admin approval will set auth()->id().
+                    'approved_by' => null,
+                ]);
+
+                \Log::info('VENDOR AUTO APPROVAL: Vendor profile created', [
+                    'profile_id' => $vendorProfile->id,
+                    'user_id' => $vendorProfile->user_id,
+                    'saved_status' => $vendorProfile->onboarding_status,
+                    'onboarding_step' => $vendorProfile->onboarding_step,
+                    'inventory_setup_completed' => $vendorProfile->inventory_setup_completed,
+                    'approved_at' => $vendorProfile->approved_at,
+                    'approved_by' => $vendorProfile->approved_by,
+                ]);
+
+                 
+                $savedProfile = VendorProfile::find($vendorProfile->id);
+
+                \Log::info('VENDOR AUTO APPROVAL: Database verification', [
+                    'profile_id' => $savedProfile?->id,
+                    'db_status' => $savedProfile?->onboarding_status,
+                    'db_approved_at' => $savedProfile?->approved_at,
+                    'db_approved_by' => $savedProfile?->approved_by,
+                ]);
+ 
+                if (!$autoApproval) {
+
+                    \Log::warning('VENDOR AUTO APPROVAL: Auto approval is OFF', [
+                        'user_id' => $user->id,
+                        'profile_id' => $vendorProfile->id,
+                    ]);
+
+                   
+                    $admins = User::role('admin')->get();
+
+                    \Log::info('VENDOR AUTO APPROVAL: Sending pending notification', [
+                        'admin_count' => $admins->count(),
+                        'vendor_id' => $user->id,
+                    ]);
+
+                    foreach ($admins as $admin) {
+                        $admin->notify(
+                            new VendorApprovalPendingNotification($user)
+                        );
+                    }
+
+                  
+                    $user->notify(
+                        new VendorApprovalPendingNotification($user)
+                    );
+
+                } else {
+ 
+                    \Log::info('VENDOR AUTO APPROVAL: Vendor AUTO APPROVED', [
+                        'user_id' => $user->id,
+                        'profile_id' => $vendorProfile->id,
+                        'status' => $vendorProfile->onboarding_status,
+                    ]);
+                }
+ 
                 DB::commit();
 
+                \Log::info('VENDOR AUTO APPROVAL: Transaction committed', [
+                    'user_id' => $user->id,
+                    'profile_id' => $vendorProfile->id,
+                    'final_status' => $vendorProfile->fresh()->onboarding_status,
+                ]);
 
+                \Log::info('========== VENDOR AUTO APPROVAL DEBUG END ==========');
 
-                // 5️⃣ Clear session role
+                
                 session()->forget('signup_role');
 
-                // 6️⃣ Login vendor
+                 
                 Auth::login($user);
+
                 session(['merge_guest_data' => true]);
 
-                // 7️⃣ Redirect to onboarding
-                return redirect()->route('vendor.onboarding.contact-details')
-                    ->with('success', 'Account created! Please complete your vendor onboarding.');
+                 
+                return redirect()
+                    ->route('vendor.onboarding.contact-details')
+                    ->with(
+                        'success',
+                        $autoApproval
+                        ? 'Account created successfully! Your vendor account has been approved.'
+                        : 'Account created! Please wait for admin approval.'
+                    );
             }
 
 

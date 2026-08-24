@@ -31,7 +31,8 @@ class VendorOnboardingController extends Controller
     private function upgradeToStepTwo(User $user): void
     {
         $profile = $user->vendorProfile;
-        if (!$profile) return;
+        if (!$profile)
+            return;
 
         if ($profile->onboarding_step < 2) {
             $profile->update(['onboarding_step' => 2]);
@@ -51,23 +52,23 @@ class VendorOnboardingController extends Controller
      *     tags={"Vendor Onboarding"},
      *     summary="Send OTP to vendor phone/email",
      *     description="Generates and sends a 4-digit OTP to the provided identifier (phone or email).",
-        * security={{"sanctum":{}}},
-        * @OA\RequestBody(
-        * required=true,
-        * @OA\JsonContent(
-        * required={"identifier"},
-        * @OA\Property(property="identifier", type="string", example="9876543210", description="Phone number or Email address")
-        * )
-        * ),
-        * @OA\Response(
-        * response=200,
-        * description="OTP sent successfully",
-        * @OA\JsonContent(@OA\Property(property="message", type="string", example="OTP sent successfully"))
-        * ),
-        * @OA\Response(response=401, description="Unauthenticated"),
-        * @OA\Response(response=422, description="Validation error")
-        * )
-        */
+     * security={{"sanctum":{}}},
+     * @OA\RequestBody(
+     * required=true,
+     * @OA\JsonContent(
+     * required={"identifier"},
+     * @OA\Property(property="identifier", type="string", example="9876543210", description="Phone number or Email address")
+     * )
+     * ),
+     * @OA\Response(
+     * response=200,
+     * description="OTP sent successfully",
+     * @OA\JsonContent(@OA\Property(property="message", type="string", example="OTP sent successfully"))
+     * ),
+     * @OA\Response(response=401, description="Unauthenticated"),
+     * @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function sendOtp(SendOTPRequest $request, OTPService $otpService): JsonResponse
     {
         $otpService->generateAndSendOTP($request->identifier);
@@ -210,23 +211,34 @@ class VendorOnboardingController extends Controller
      * )
      */
 
-    public function submitBusinessInfo(VendorBusinessInfoRequest $request, VendorOnboardingService $service): JsonResponse
-    {
+    public function submitBusinessInfo(
+        VendorBusinessInfoRequest $request,
+        VendorOnboardingService $service
+    ): JsonResponse {
         $user = Auth::user();
         $profile = $user->vendorProfile;
 
         if (!$profile) {
-            return response()->json(['message' => 'Vendor profile not found'], 404);
+            return response()->json([
+                'message' => 'Vendor profile not found'
+            ], 404);
         }
 
-        // Logic to save business info via service
-        $service->saveBusinessInfo($user, $request->validated());
+        // Save business information
+        $service->saveBusinessInfo(
+            $user,
+            $request->validated()
+        );
+
+        // Only update onboarding progress.
+        // DO NOT overwrite approval status.
         $profile->update([
             'onboarding_step' => 3,
-            'onboarding_status' => 'pending_approval'
         ]);
 
-        return response()->json(['message' => 'Business info submitted']);
+        return response()->json([
+            'message' => 'Business info submitted'
+        ]);
     }
 
     /**
@@ -262,14 +274,19 @@ class VendorOnboardingController extends Controller
         $profile = $user->vendorProfile;
 
         if (!$profile) {
-            return response()->json(['message' => 'Vendor profile not found'], 404);
+            return response()->json([
+                'message' => 'Vendor profile not found'
+            ], 404);
         }
 
+        // Only update onboarding progress.
+        // Keep existing approval status unchanged.
         $profile->update([
             'onboarding_step' => 3,
-            'onboarding_status' => 'pending_approval'
         ]);
 
-        return response()->json(['message' => 'Business info skipped']);
+        return response()->json([
+            'message' => 'Business info skipped'
+        ]);
     }
 }

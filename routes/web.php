@@ -20,7 +20,9 @@ use App\Http\Controllers\Customer\CustomerOfferController;
 
 
 use App\Http\Controllers\NotificationController;
+use App\Http\Middleware\EnsureVendorOnboardingApproved;
 
+ 
 Route::middleware('auth')->prefix('api/v1/notifications')->group(function () {
 
     Route::get('/unread-count', [
@@ -100,7 +102,7 @@ Route::get('gcb/google/redirect', function () {
 Route::get('auth/redirect/{provider}', [\App\Http\Controllers\OAuthController::class, 'redirectToProvider'])->name('oauth.redirect');
 
 // Admin: OAuth providers management
-Route::prefix('admin/oauth-providers')->name('admin.oauth_providers.')->middleware(['auth','role:admin|superadmin'])->group(function () {
+Route::prefix('admin/oauth-providers')->name('admin.oauth_providers.')->middleware(['auth', 'role:admin|superadmin'])->group(function () {
     Route::get('/', [\App\Http\Controllers\Admin\OauthProviderController::class, 'index'])->name('index');
     Route::get('/create', [\App\Http\Controllers\Admin\OauthProviderController::class, 'create'])->name('create');
     Route::post('/', [\App\Http\Controllers\Admin\OauthProviderController::class, 'store'])->name('store');
@@ -1462,6 +1464,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin/settings')->name('admin
     Route::post('/razorpay', [RazorpaySettingsController::class, 'update'])->name('razorpay.update');
     Route::post('/razorpay/test', [RazorpaySettingsController::class, 'testCredentials'])->name('razorpay.test');
     Route::post('/razorpay/toggle', [RazorpaySettingsController::class, 'toggleActive'])->name('razorpay.toggle');
+
+    // vendor auto approval settings
+
+    Route::get('vendor-auto-approval', [\App\Http\Controllers\Admin\HoardingSettingsController::class, 'editVendor'])
+        ->name('vendor_auto_approval.edit');
+
+    Route::post('vendor-auto-approval', [\App\Http\Controllers\Admin\HoardingSettingsController::class, 'updateVendor'])
+        ->name('vendor_auto_approval.update');
 });
 Route::get('/twilio-test', function () {
     $service = app(\App\Services\Whatsapp\TwilioWhatsappService::class);
