@@ -833,6 +833,454 @@ class OAuthController extends Controller
 
     return redirect()->route('oauth.select-role');
 }
+// /**
+//  * API: Google Sign-In for mobile
+//  *
+//  * Supports:
+//  * 1. id_token - Google ID token verified by server
+//  * 2. provider_id + email - direct mobile profile payload
+//  *
+//  * Expected JSON:
+//  * {
+//  *     "id_token": "<google-id-token>",
+//  *     "provider_id": "google-user-id",
+//  *     "name": "Pranav Mishra",
+//  *     "email": "dbmtester2@gmail.com",
+//  *     "photo": "https://...",
+//  *     "role": "vendor"
+//  * }
+//  */
+// public function apiGoogleLogin(Request $request)
+// {
+//     $request->validate([
+//         'id_token'    => 'nullable|string',
+//         'provider_id' => 'nullable|string',
+//         'name'        => 'nullable|string',
+//         'email'       => 'required|email',
+//         'photo'       => 'nullable|string',
+//         'role'        => 'nullable|in:customer,vendor',
+//     ]);
+
+//     $idToken    = $request->input('id_token');
+//     $providerId = $request->input('provider_id');
+//     $email      = strtolower(trim($request->input('email')));
+//     $name       = $request->input('name');
+//     $avatar     = $request->input('photo');
+
+//     // Same default as normal registration
+//     $role = $request->input('role', 'customer');
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Google ID Token Verification
+//     |--------------------------------------------------------------------------
+//     */
+//     if ($idToken) {
+
+//         $providerRecord = OauthProvider::where('provider', 'google')
+//             ->where('active', true)
+//             ->first();
+
+//         if (!$providerRecord) {
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Google login is not available.',
+//             ], 400);
+//         }
+
+//         try {
+
+//             $resp = Http::asForm()->get(
+//                 'https://oauth2.googleapis.com/tokeninfo',
+//                 [
+//                     'id_token' => $idToken,
+//                 ]
+//             );
+
+//         } catch (\Throwable $e) {
+
+//             Log::error('Google token verification failed', [
+//                 'error' => $e->getMessage(),
+//             ]);
+
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Unable to verify Google token.',
+//             ], 500);
+//         }
+
+//         if (!$resp->ok()) {
+
+//             Log::warning('Invalid Google ID token', [
+//                 'email' => $email,
+//             ]);
+
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Invalid id_token.',
+//             ], 400);
+//         }
+
+//         $payload = $resp->json();
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Check Google Client ID
+//         |--------------------------------------------------------------------------
+//         */
+//         if (
+//             isset($payload['aud']) &&
+//             !empty($providerRecord->client_id) &&
+//             $payload['aud'] !== $providerRecord->client_id
+//         ) {
+
+//             Log::warning('Google ID token audience mismatch', [
+//                 'aud'      => $payload['aud'],
+//                 'expected' => $providerRecord->client_id,
+//             ]);
+
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Token audience mismatch.',
+//             ], 400);
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Get Google User Data
+//         |--------------------------------------------------------------------------
+//         */
+//         $email = isset($payload['email'])
+//             ? strtolower(trim($payload['email']))
+//             : $email;
+
+//         $name = $payload['name'] ?? $name ?? $email;
+
+//         $avatar = $payload['picture'] ?? $avatar;
+
+//         $providerId = $payload['sub'] ?? $providerId;
+
+//         $emailVerified = $payload['email_verified']
+//             ?? ($payload['verified_email'] ?? false);
+
+//         if (!$emailVerified || $emailVerified === 'false') {
+
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Google account email is not verified.',
+//             ], 400);
+//         }
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Validate Email
+//     |--------------------------------------------------------------------------
+//     */
+//     if (!$email) {
+
+//         return response()->json([
+//             'success' => false,
+//             'message' => 'Email is required.',
+//         ], 400);
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Validate Role
+//     |--------------------------------------------------------------------------
+//     */
+//     if (!in_array($role, ['customer', 'vendor'], true)) {
+//         $role = 'customer';
+//     }
+
+//     Log::info('Google mobile login request', [
+//         'email' => $email,
+//         'role'  => $role,
+//     ]);
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Find Existing User
+//     |--------------------------------------------------------------------------
+//     */
+//     $user = User::where('email', $email)->first();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Existing User
+//     |--------------------------------------------------------------------------
+//     */
+//     if ($user) {
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Check Suspension
+//         |--------------------------------------------------------------------------
+//         */
+//         if (
+//             method_exists($user, 'isSuspended') &&
+//             $user->isSuspended()
+//         ) {
+
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Account suspended.',
+//             ], 403);
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Update Google Profile Information
+//         |--------------------------------------------------------------------------
+//         */
+//         $updated = [];
+
+//         if ($name && $user->name !== $name) {
+//             $updated['name'] = $name;
+//         }
+
+//         if ($avatar && $user->avatar !== $avatar) {
+//             $updated['avatar'] = $avatar;
+//         }
+
+//         if (!empty($updated)) {
+//             $user->update($updated);
+//         }
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | IMPORTANT
+//         |--------------------------------------------------------------------------
+//         | Existing user's role is NOT changed automatically.
+//         |
+//         | We use the already assigned active_role.
+//         |--------------------------------------------------------------------------
+//         */
+//         $user->load('roles');
+
+//         $activeRole = $user->active_role;
+
+//         if (!$activeRole) {
+//             $activeRole = $user->getRoleNames()->first();
+//         }
+
+//         $role = $activeRole ?: 'customer';
+
+//         Log::info('Existing Google user login', [
+//             'user_id'     => $user->id,
+//             'email'       => $user->email,
+//             'active_role' => $user->active_role,
+//             'role'        => $role,
+//         ]);
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | New User
+//     |--------------------------------------------------------------------------
+//     */
+//     else {
+
+//         DB::beginTransaction();
+
+//         try {
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | Create User
+//             |--------------------------------------------------------------------------
+//             */
+//             $user = User::create([
+//                 'name'              => $name ?? $email,
+//                 'email'             => $email,
+//                 'email_verified_at' => now(),
+//                 'password'          => Hash::make(Str::random(24)),
+//                 'status'            => 'active',
+//                 'avatar'            => $avatar,
+//             ]);
+
+//             Log::info('Google mobile user created', [
+//                 'user_id' => $user->id,
+//                 'email'   => $user->email,
+//                 'role'    => $role,
+//             ]);
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | Assign Active Role
+//             |--------------------------------------------------------------------------
+//             |
+//             | SAME AS NORMAL REGISTRATION
+//             |--------------------------------------------------------------------------
+//             */
+//             $user->update([
+//                 'active_role' => $role,
+//             ]);
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | Assign Spatie Role
+//             |--------------------------------------------------------------------------
+//             |
+//             | SAME AS NORMAL REGISTRATION
+//             |--------------------------------------------------------------------------
+//             */
+//             $user->assignRole($role);
+
+//             Log::info('Google mobile role assigned', [
+//                 'user_id'        => $user->id,
+//                 'email'          => $user->email,
+//                 'active_role'    => $user->active_role,
+//                 'assigned_roles' => $user->getRoleNames()->toArray(),
+//             ]);
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | Vendor Specific Logic
+//             |--------------------------------------------------------------------------
+//             */
+//             if ($role === 'vendor') {
+
+//                 VendorProfile::create([
+//                     'user_id'                   => $user->id,
+//                     'onboarding_status'         => 'draft',
+//                     'onboarding_step'           => 1,
+//                     'inventory_setup_completed' => false,
+//                 ]);
+
+//                 Log::info('Vendor profile created', [
+//                     'user_id' => $user->id,
+//                 ]);
+//             }
+
+//             /*
+//             |--------------------------------------------------------------------------
+//             | Commit
+//             |--------------------------------------------------------------------------
+//             */
+//             DB::commit();
+
+//         } catch (\Throwable $e) {
+
+//             DB::rollBack();
+
+//             Log::error('Failed to create Google mobile user', [
+//                 'email'   => $email,
+//                 'role'    => $role,
+//                 'error'   => $e->getMessage(),
+//                 'file'    => $e->getFile(),
+//                 'line'    => $e->getLine(),
+//                 'trace'   => $e->getTraceAsString(),
+//             ]);
+
+//             return response()->json([
+//                 'success' => false,
+//                 'message' => 'Unable to create account.',
+//                 'error'   => config('app.debug')
+//                     ? $e->getMessage()
+//                     : null,
+//             ], 500);
+//         }
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Create Sanctum Token
+//     |--------------------------------------------------------------------------
+//     */
+//     try {
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Use Active Role
+//         |--------------------------------------------------------------------------
+//         */
+//         $activeRole = $user->active_role;
+
+//         if (!$activeRole) {
+//             $activeRole = $user->getRoleNames()->first();
+//         }
+
+//         $activeRole = $activeRole ?: 'customer';
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Create Token WITH ROLE ABILITY
+//         |--------------------------------------------------------------------------
+//         |
+//         | Same pattern as normal registration:
+//         | ['role:' . $role]
+//         |--------------------------------------------------------------------------
+//         */
+//         $token = $user->createToken(
+//             'auth_token',
+//             ['role:' . $activeRole]
+//         )->plainTextToken;
+
+//         /*
+//         |--------------------------------------------------------------------------
+//         | Update Last Login
+//         |--------------------------------------------------------------------------
+//         */
+//         if (method_exists($user, 'updateLastLogin')) {
+
+//             $user->updateLastLogin();
+
+//         } else {
+
+//             $user->update([
+//                 'last_login_at' => now(),
+//             ]);
+//         }
+
+//     } catch (\Throwable $e) {
+
+//         Log::error(
+//             'Failed to create API token after Google login',
+//             [
+//                 'user_id' => $user->id ?? null,
+//                 'error'   => $e->getMessage(),
+//             ]
+//         );
+
+//         return response()->json([
+//             'success' => false,
+//             'message' => 'Unable to create access token.',
+//         ], 500);
+//     }
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Reload User
+//     |--------------------------------------------------------------------------
+//     */
+//     $user->refresh();
+//     $user->load('roles');
+
+//     $assignedRole = $user->active_role
+//         ?: $user->getRoleNames()->first();
+
+//     /*
+//     |--------------------------------------------------------------------------
+//     | Response
+//     |--------------------------------------------------------------------------
+//     */
+//     return response()->json([
+//         'success' => true,
+//         'message' => 'Google login successful.',
+
+//         'data' => [
+//             'user' => $user,
+//             'role' => $assignedRole,
+
+//             'is_vendor' => $assignedRole === 'vendor',
+//             'is_customer' => $assignedRole === 'customer',
+
+//             'token' => $token,
+//         ],
+//     ], 200);
+// }
 /**
  * API: Google Sign-In for mobile
  *
@@ -847,7 +1295,8 @@ class OAuthController extends Controller
  *     "name": "Pranav Mishra",
  *     "email": "dbmtester2@gmail.com",
  *     "photo": "https://...",
- *     "role": "vendor"
+ *     "role": "vendor",
+ *     "fcm_token": "fcm_token_example"
  * }
  */
 public function apiGoogleLogin(Request $request)
@@ -859,6 +1308,7 @@ public function apiGoogleLogin(Request $request)
         'email'       => 'required|email',
         'photo'       => 'nullable|string',
         'role'        => 'nullable|in:customer,vendor',
+        'fcm_token'   => 'nullable|string',
     ]);
 
     $idToken    = $request->input('id_token');
@@ -866,6 +1316,7 @@ public function apiGoogleLogin(Request $request)
     $email      = strtolower(trim($request->input('email')));
     $name       = $request->input('name');
     $avatar     = $request->input('photo');
+    $fcmToken   = $request->input('fcm_token');
 
     // Same default as normal registration
     $role = $request->input('role', 'customer');
@@ -995,8 +1446,9 @@ public function apiGoogleLogin(Request $request)
     }
 
     Log::info('Google mobile login request', [
-        'email' => $email,
-        'role'  => $role,
+        'email'     => $email,
+        'role'      => $role,
+        'fcm_token' => $fcmToken ? 'provided' : 'not provided',
     ]);
 
     /*
@@ -1031,7 +1483,7 @@ public function apiGoogleLogin(Request $request)
 
         /*
         |--------------------------------------------------------------------------
-        | Update Google Profile Information
+        | Update Google Profile Information + FCM Token
         |--------------------------------------------------------------------------
         */
         $updated = [];
@@ -1044,17 +1496,21 @@ public function apiGoogleLogin(Request $request)
             $updated['avatar'] = $avatar;
         }
 
+        // Update FCM token when mobile sends it
+        if ($fcmToken && $user->fcm_token !== $fcmToken) {
+            $updated['fcm_token'] = $fcmToken;
+        }
+
         if (!empty($updated)) {
             $user->update($updated);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | IMPORTANT
+        | Existing User Role
         |--------------------------------------------------------------------------
-        | Existing user's role is NOT changed automatically.
         |
-        | We use the already assigned active_role.
+        | Do NOT change existing user's role automatically.
         |--------------------------------------------------------------------------
         */
         $user->load('roles');
@@ -1072,6 +1528,7 @@ public function apiGoogleLogin(Request $request)
             'email'       => $user->email,
             'active_role' => $user->active_role,
             'role'        => $role,
+            'fcm_token'   => $user->fcm_token ? 'saved' : 'not available',
         ]);
     }
 
@@ -1098,12 +1555,14 @@ public function apiGoogleLogin(Request $request)
                 'password'          => Hash::make(Str::random(24)),
                 'status'            => 'active',
                 'avatar'            => $avatar,
+                'fcm_token'         => $fcmToken,
             ]);
 
             Log::info('Google mobile user created', [
-                'user_id' => $user->id,
-                'email'   => $user->email,
-                'role'    => $role,
+                'user_id'   => $user->id,
+                'email'     => $user->email,
+                'role'      => $role,
+                'fcm_token' => $fcmToken ? 'saved' : 'not provided',
             ]);
 
             /*
@@ -1191,11 +1650,6 @@ public function apiGoogleLogin(Request $request)
     */
     try {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Use Active Role
-        |--------------------------------------------------------------------------
-        */
         $activeRole = $user->active_role;
 
         if (!$activeRole) {
@@ -1207,10 +1661,6 @@ public function apiGoogleLogin(Request $request)
         /*
         |--------------------------------------------------------------------------
         | Create Token WITH ROLE ABILITY
-        |--------------------------------------------------------------------------
-        |
-        | Same pattern as normal registration:
-        | ['role:' . $role]
         |--------------------------------------------------------------------------
         */
         $token = $user->createToken(
@@ -1271,13 +1721,11 @@ public function apiGoogleLogin(Request $request)
         'message' => 'Google login successful.',
 
         'data' => [
-            'user' => $user,
-            'role' => $assignedRole,
-
-            'is_vendor' => $assignedRole === 'vendor',
-            'is_customer' => $assignedRole === 'customer',
-
-            'token' => $token,
+            'user'         => $user,
+            'role'         => $assignedRole,
+            'is_vendor'    => $assignedRole === 'vendor',
+            'is_customer'  => $assignedRole === 'customer',
+            'token'        => $token,
         ],
     ], 200);
 }

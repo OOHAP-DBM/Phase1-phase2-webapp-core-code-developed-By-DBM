@@ -35,6 +35,13 @@ class ApiGoogleAuthMobile
      *                 @OA\Property(property="email", type="string", format="email", description="User email (required)", example="dbmtester2@gmail.com"),
      *                 @OA\Property(property="photo", type="string", description="Profile photo URL from Google", example="https://lh3.googleusercontent.com/a/ACg8ocK..."),
      *                 @OA\Property(property="role", type="string", description="Optional role to assign when creating a new account (customer|vendor). Defaults to customer.", example="vendor", enum={"customer","vendor"}),
+     *    @OA\Property(
+     *                     property="fcm_token",
+     *                     type="string",
+     *                     nullable=true,
+     *                     description="Firebase Cloud Messaging token used for push notifications. The token is saved to the user's fcm_token field.",
+     *                     example="fcm_token_example"
+     *                 ),
      *                 required={"email"}
      *             )
      *         )
