@@ -1530,6 +1530,20 @@ public function apiGoogleLogin(Request $request)
             'role'        => $role,
             'fcm_token'   => $user->fcm_token ? 'saved' : 'not available',
         ]);
+          if ($user->fcm_token) {
+                $sent = send(
+                    $user->fcm_token,
+                    'Login to OOHAPP🎉',
+                    'Your login was successful. Explore our app to find the best advertising solutions',
+                    ['type' => 'Login', 'user_id' => $user->id]
+                );
+
+
+                if (!$sent) {
+                    // Optional: Log or handle failure
+                    \Log::warning("FCM notification failed for user ID {$user->id}");
+                }
+            }
     }
 
     /*
