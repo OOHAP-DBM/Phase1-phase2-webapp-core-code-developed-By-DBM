@@ -17,12 +17,15 @@ use App\Http\Controllers\GeocodeController;
 use App\Http\Controllers\Admin\RazorpaySettingsController;
 use App\Http\Controllers\Customer\CustomerOfferController;
 
+use App\Http\Controllers\Logs\ActivityLogController;
+use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Logs\SessionLogController;
 
 
 use App\Http\Controllers\NotificationController;
 use App\Http\Middleware\EnsureVendorOnboardingApproved;
 
- 
+
 Route::middleware('auth')->prefix('api/v1/notifications')->group(function () {
 
     Route::get('/unread-count', [
@@ -1482,4 +1485,85 @@ Route::get('/twilio-test', function () {
 // To download invoice PDFs for authenticated users
 Route::middleware(['auth', 'role:customer|admin|vendor'])->prefix('invoices')->name('invoices.')->group(function () {
     Route::get('/{invoice}/download', [\App\Http\Controllers\InvoiceController::class, 'download'])->name('download');
+});
+
+
+//  logs routes 
+
+Route::middleware(['auth'])->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Logs
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('admin/logs')
+        ->name('admin.logs.')
+        ->middleware(['role:admin|superadmin|super_admin'])
+        ->group(function () {
+
+            Route::get('/activity', [ActivityLogController::class, 'index'])
+                ->name('activity.index');
+
+            Route::get('/activity/{activityLog}', [ActivityLogController::class, 'show'])
+                ->name('activity.show');
+
+            Route::get('/audit', [AuditLogController::class, 'index'])
+                ->name('audit.index');
+
+            Route::get('/audit/{auditLog}', [AuditLogController::class, 'show'])
+                ->name('audit.show');
+
+            Route::get('/session', [SessionLogController::class, 'index'])
+                ->name('session.index');
+
+            Route::get('/session/{sessionLog}', [SessionLogController::class, 'show'])
+                ->name('session.show');
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Vendor Logs
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('vendor/logs')
+        ->name('vendor.logs.')
+        ->middleware(['role:vendor'])
+        ->group(function () {
+
+            Route::get('/activity', [ActivityLogController::class, 'index'])
+                ->name('activity.index');
+
+            Route::get('/audit', [AuditLogController::class, 'index'])
+                ->name('audit.index');
+
+            Route::get('/session', [SessionLogController::class, 'vendorIndex'])
+                ->name('session.index');
+
+            Route::get('/session/{sessionLog}', [SessionLogController::class, 'vendorShow'])
+                ->name('session.show');
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Customer Logs
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('customer/logs')
+        ->name('customer.logs.')
+        ->middleware(['role:customer'])
+        ->group(function () {
+
+            Route::get('/activity', [ActivityLogController::class, 'index'])
+                ->name('activity.index');
+
+            Route::get('/audit', [AuditLogController::class, 'index'])
+                ->name('audit.index');
+
+            Route::get('/session', [SessionLogController::class, 'customerIndex'])
+                ->name('session.index');
+        });
+
 });

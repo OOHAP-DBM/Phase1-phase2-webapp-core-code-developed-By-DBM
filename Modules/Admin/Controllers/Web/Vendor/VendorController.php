@@ -13,8 +13,12 @@ use App\Mail\VendorDisabledMail;
 use Illuminate\Support\Facades\Mail;
 use Modules\Mail\VendorWelcomeMail;
 use Illuminate\Support\Str;
+use App\Services\LoggingService;
 class VendorController extends Controller
 {
+    public function __construct(
+        protected LoggingService $logging
+    ) {}
     // public function index(Request $request)
     // {
     //     $vendors = User::role('vendor')->orderByDesc('created_at')->paginate(30);
@@ -215,6 +219,14 @@ class VendorController extends Controller
                     \Log::error('Vendor approval email failed: ' . $e->getMessage());
                 }
             }
+
+
+            LoggingService::activity(
+                action: 'vendor_approved',
+                description: 'Vendor approved successfully',
+                module: 'vendor',
+                subject: $vendor
+            );
 
             return response()->json([
                 'success' => true,
@@ -668,7 +680,7 @@ class VendorController extends Controller
             $user->assignRole('vendor');
 
             // Create Minimal Vendor Profile
-           $profile = VendorProfile::create([
+            $profile = VendorProfile::create([
                 'user_id' => $user->id,
 
                 // Since popup has no company field

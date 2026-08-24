@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\VendorProfile;
 use Illuminate\Support\Facades\DB;
+use App\Services\LoggingService;
 
 
 // /**
@@ -28,8 +29,12 @@ class AuthController extends Controller
 {
     public function __construct(
         protected UserService $userService,
-        protected OTPService $otpService
-    ) {}
+        protected OTPService $otpService,
+        protected LoggingService $loggingService
+    ) {
+        $this->userService = $userService;
+        $this->loggingService = $loggingService;
+    }
 
     /**
      * @OA\Post(
@@ -151,74 +156,74 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-    *     path="/auth/register",
-    *     tags={"Authentication"},
-    *     summary="Complete registration after OTP verification",
-    *     description="Registers user after OTP verification, handles merge logic, and issues access token. If the user has previous data (e.g., guest cart or shortlist), the response will include 'should_merge' to indicate frontend should merge local data.",
+     *     path="/auth/register",
+     *     tags={"Authentication"},
+     *     summary="Complete registration after OTP verification",
+     *     description="Registers user after OTP verification, handles merge logic, and issues access token. If the user has previous data (e.g., guest cart or shortlist), the response will include 'should_merge' to indicate frontend should merge local data.",
      *
      *     @OA\RequestBody(
-    *         required=true,
-    *         @OA\JsonContent(
-    *             required={"email","name","password","password_confirmation"},
-    *             @OA\Property(
-    *                 property="email",
-    *                 type="string",
-    *                 example="test@email.com",
-    *                 description="User email address or phone number used during OTP verification"
-    *             ),
-    *             @OA\Property(
-    *                 property="name",
-    *                 type="string",
-    *                 example="John Doe"
-    *             ),
-    *             @OA\Property(
-    *                 property="password",
-    *                 type="string",
-    *                 example="Password@123"
-    *             ),
-    *             @OA\Property(
-    *                 property="password_confirmation",
-    *                 type="string",
-    *                 example="Password@123"
-    *             ),
-    *             @OA\Property(
-    *                 property="role",
-    *                 type="string",
-    *                 enum={"customer","vendor"},
-    *                 example="customer",
-    *                 description="Allowed values: customer, vendor. Default is customer"
-    *             ),
-    *             @OA\Property(
-    *                 property="fcm_token",
-    *                 type="string",
-    *                 example="fcm_token_example",
-    *                 description="Optional. FCM token for push notifications."
-    *             )
-    *         )
-    *     ),
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email","name","password","password_confirmation"},
+     *             @OA\Property(
+     *                 property="email",
+     *                 type="string",
+     *                 example="test@email.com",
+     *                 description="User email address or phone number used during OTP verification"
+     *             ),
+     *             @OA\Property(
+     *                 property="name",
+     *                 type="string",
+     *                 example="John Doe"
+     *             ),
+     *             @OA\Property(
+     *                 property="password",
+     *                 type="string",
+     *                 example="Password@123"
+     *             ),
+     *             @OA\Property(
+     *                 property="password_confirmation",
+     *                 type="string",
+     *                 example="Password@123"
+     *             ),
+     *             @OA\Property(
+     *                 property="role",
+     *                 type="string",
+     *                 enum={"customer","vendor"},
+     *                 example="customer",
+     *                 description="Allowed values: customer, vendor. Default is customer"
+     *             ),
+     *             @OA\Property(
+     *                 property="fcm_token",
+     *                 type="string",
+     *                 example="fcm_token_example",
+     *                 description="Optional. FCM token for push notifications."
+     *             )
+     *         )
+     *     ),
      *
-    *     @OA\Response(
-    *         response=201,
-    *         description="Registration successful",
-    *         @OA\JsonContent(
-    *             @OA\Property(property="success", type="boolean", example=true),
-    *             @OA\Property(property="message", type="string", example="Registration complete!"),
-    *             @OA\Property(property="data", type="object",
-    *                 @OA\Property(property="user", type="object", description="User resource object"),
-    *                 @OA\Property(property="token", type="string", description="Access token"),
-    *                 @OA\Property(property="should_merge", type="boolean", description="Indicates if frontend should merge local data (cart, shortlist, etc.)", example=true)
-    *             )
-    *         )
-    *     ),
-    *     @OA\Response(
-    *         response=403,
-    *         description="OTP not verified"
-    *     ),
-    *     @OA\Response(
-    *         response=404,
-    *         description="User not found"
-    *     )
-    * )
+     *     @OA\Response(
+     *         response=201,
+     *         description="Registration successful",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Registration complete!"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="user", type="object", description="User resource object"),
+     *                 @OA\Property(property="token", type="string", description="Access token"),
+     *                 @OA\Property(property="should_merge", type="boolean", description="Indicates if frontend should merge local data (cart, shortlist, etc.)", example=true)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="OTP not verified"
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="User not found"
+     *     )
+     * )
      */
 
     // public function register(RegisterRequest $request): JsonResponse
@@ -367,7 +372,7 @@ class AuthController extends Controller
         }
     }
 
-   /**
+    /**
      * @OA\Post(
      *     path="/auth/login",
      *     tags={"Authentication"},
@@ -395,9 +400,9 @@ class AuthController extends Controller
      *         description="Account inactive or role mismatch"
      *     )
      * )
-    */
+     */
 
-   public function login(LoginRequest $request): JsonResponse
+    public function login(LoginRequest $request): JsonResponse
     {
         $user = $this->userService->verifyCredentials(
             $request->input('identifier'),
@@ -417,9 +422,9 @@ class AuthController extends Controller
                 'message' => 'Your account is ' . $user->status,
             ], 403);
         }
-        
 
         $requestedRole = $request->input('role');
+
         try {
             if (!$user->hasRole($requestedRole)) {
                 return response()->json([
@@ -433,25 +438,31 @@ class AuthController extends Controller
                 'message' => 'Invalid role format provided.',
             ], 422);
         }
-        // ✅ Check if user has this role
-        if (!$user->hasRole($requestedRole)) {
-            return response()->json([
-                'success' => false,
-                'message' => "You are not registered as a {$requestedRole}. Please login with the correct role.",
-            ], 403);
-        }
 
-        // ✅ Set active role based on request (not default anymore)
-        $user->update(['active_role' => $requestedRole]);
+        $user->update([
+            'active_role' => $requestedRole,
+        ]);
 
-        // Update last login
         $user->updateLastLogin();
 
         $freshUser = $user->fresh('vendorProfile');
         $activeRole = $requestedRole;
 
-        // Create token with role scope
-        $token = $user->createToken('auth_token', ['role:' . $activeRole])->plainTextToken;
+        $token = $user
+            ->createToken(
+                'auth_token',
+                ['role:' . $activeRole]
+            )
+            ->plainTextToken;
+
+        /*
+         * Log successful login
+         */
+        $this->loggingService->login([
+            'role' => $activeRole,
+            'identifier' => $request->input('identifier'),
+            'token_created' => true,
+        ]);
 
         $responseData = [
             'user' => new UserResource($freshUser),
@@ -462,8 +473,11 @@ class AuthController extends Controller
         ];
 
         if ($activeRole === 'vendor') {
-            $responseData['onboarding_status'] = $freshUser->vendorProfile?->onboarding_status;
-            $responseData['onboarding_step'] = $freshUser->vendorProfile?->onboarding_step;
+            $responseData['onboarding_status'] =
+                $freshUser->vendorProfile?->onboarding_status;
+
+            $responseData['onboarding_step'] =
+                $freshUser->vendorProfile?->onboarding_step;
         }
 
         return response()->json([
@@ -497,7 +511,9 @@ class AuthController extends Controller
 
     public function sendOTP(SendOTPRequest $request): JsonResponse
     {
-        $result = $this->otpService->generateAndSendOTP($request->input('identifier'));
+        $identifier = $request->input('identifier');
+
+        $result = $this->otpService->generateAndSendOTP($identifier);
 
         if (!$result['success']) {
             return response()->json([
@@ -505,6 +521,17 @@ class AuthController extends Controller
                 'message' => $result['message'],
             ], 404);
         }
+
+        $this->loggingService->activity(
+            action: 'otp_sent',
+            description: 'OTP generated and sent successfully',
+            module: 'authentication',
+            metadata: [
+                'identifier_type' => filter_var($identifier, FILTER_VALIDATE_EMAIL)
+                    ? 'email'
+                    : 'mobile',
+            ]
+        );
 
         return response()->json([
             'success' => true,
@@ -540,8 +567,10 @@ class AuthController extends Controller
      */
     public function verifyOTP(VerifyOTPRequest $request): JsonResponse
     {
+        $identifier = $request->input('identifier');
+
         $result = $this->otpService->verifyOTP(
-            $request->input('identifier'),
+            $identifier,
             $request->input('otp')
         );
 
@@ -556,6 +585,28 @@ class AuthController extends Controller
 
         // Create API token
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Log successful OTP verification
+        $this->loggingService->activityForUser(
+            $user->id,
+            'otp_verified',
+            'OTP verified successfully',
+            'authentication',
+            [
+                'auth_method' => 'otp',
+                'token_created' => true,
+            ]
+        );
+
+        // Log successful session/login
+        $this->loggingService->sessionForUser(
+            $user->id,
+            'login',
+            'User logged in through OTP verification',
+            [
+                'auth_method' => 'otp',
+            ]
+        );
 
         return response()->json([
             'success' => true,
@@ -624,6 +675,27 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // Log logout before token deletion
+        $this->loggingService->sessionForUser(
+            $user->id,
+            'logout',
+            'User logged out successfully',
+            [
+                'auth_method' => 'sanctum',
+                'active_role' => $user->active_role,
+            ]
+        );
+
+        $this->loggingService->activity(
+            'logout',
+            'User logged out successfully',
+            'authentication',
+            $user,
+            [
+                'auth_method' => 'sanctum',
+                'active_role' => $user->active_role,
+            ]
+        );
         // Delete current token
         if ($user->currentAccessToken()) {
             $user->currentAccessToken()->delete();
@@ -699,7 +771,7 @@ class AuthController extends Controller
         ]);
 
         $result = $this->otpService->generateAndSendPasswordResetOTP(
-            $request->identifier
+            $request->input('identifier')
         );
 
         if (!$result['success']) {
@@ -709,12 +781,25 @@ class AuthController extends Controller
             ], 404);
         }
 
+        $this->loggingService->activity(
+            'password_reset_otp_requested',
+            'Password reset OTP requested',
+            'authentication',
+            null,
+            [
+                'auth_method' => 'otp',
+                'identifier_type' => filter_var(
+                    $request->input('identifier'),
+                    FILTER_VALIDATE_EMAIL
+                ) ? 'email' : 'mobile',
+            ]
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'OTP sent for password reset',
         ]);
     }
-
     /**
      * @OA\Post(
      *     path="/auth/password/verify-otp",
@@ -742,8 +827,8 @@ class AuthController extends Controller
         ]);
 
         $result = $this->otpService->verifyPasswordResetOTP(
-            $request->identifier,
-            $request->otp
+            $request->input('identifier'),
+            $request->input('otp')
         );
 
         if (!$result['success']) {
@@ -752,6 +837,20 @@ class AuthController extends Controller
                 'message' => $result['message'],
             ], 422);
         }
+
+        $this->loggingService->activity(
+            'password_reset_otp_verified',
+            'Password reset OTP verified successfully',
+            'authentication',
+            null,
+            [
+                'auth_method' => 'otp',
+                'identifier_type' => filter_var(
+                    $request->input('identifier'),
+                    FILTER_VALIDATE_EMAIL
+                ) ? 'email' : 'mobile',
+            ]
+        );
 
         return response()->json([
             'success' => true,
@@ -787,8 +886,8 @@ class AuthController extends Controller
         ]);
 
         $result = $this->otpService->resetPassword(
-            $request->identifier,
-            $request->password
+            $request->input('identifier'),
+            $request->input('password')
         );
 
         if (!$result['success']) {
@@ -797,6 +896,20 @@ class AuthController extends Controller
                 'message' => $result['message'],
             ], 403);
         }
+
+        $this->loggingService->activity(
+            'password_reset',
+            'Password reset successfully',
+            'authentication',
+            null,
+            [
+                'auth_method' => 'otp',
+                'identifier_type' => filter_var(
+                    $request->input('identifier'),
+                    FILTER_VALIDATE_EMAIL
+                ) ? 'email' : 'mobile',
+            ]
+        );
 
         return response()->json([
             'success' => true,
@@ -827,7 +940,9 @@ class AuthController extends Controller
             'identifier' => 'required|string',
         ]);
 
-        $result = $this->otpService->resendOTP($request->identifier);
+        $result = $this->otpService->resendOTP(
+            $request->input('identifier')
+        );
 
         if (!$result['success']) {
             return response()->json([
@@ -835,6 +950,20 @@ class AuthController extends Controller
                 'message' => $result['message'],
             ], $result['status'] ?? 400);
         }
+
+        $this->loggingService->activity(
+            'otp_resent',
+            'OTP resent successfully',
+            'authentication',
+            null,
+            [
+                'auth_method' => 'otp',
+                'identifier_type' => filter_var(
+                    $request->input('identifier'),
+                    FILTER_VALIDATE_EMAIL
+                ) ? 'email' : 'mobile',
+            ]
+        );
 
         return response()->json([
             'success' => true,

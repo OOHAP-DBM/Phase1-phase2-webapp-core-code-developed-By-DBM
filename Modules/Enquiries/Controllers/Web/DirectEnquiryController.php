@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Mail\CustomerWelcomeMail;
 use App\Models\Hoarding; // Adjust namespace based on your structure
 use Carbon\Carbon;
+use App\Models\ActivityLog;
 
 class DirectEnquiryController extends Controller
 {
@@ -128,6 +129,7 @@ class DirectEnquiryController extends Controller
     //         ], 500);
     //     }
     // }
+
     public function sendOtp(Request $request, GuestOtpService $otpService)
     {
         $request->validate([
@@ -136,7 +138,7 @@ class DirectEnquiryController extends Controller
 
         $identifier = $request->identifier;
 
-        // Validate phone format (Indian mobile numbers: 10 digits starting with 6-9)
+        // Validate phone format
         if (!preg_match('/^[6-9][0-9]{9}$/', $identifier)) {
             return response()->json([
                 'success' => false,
@@ -144,24 +146,62 @@ class DirectEnquiryController extends Controller
             ], 422);
         }
 
+        // Mask phone number
+        $maskedPhone = substr($identifier, 0, 2)
+            . 'XXXXXX'
+            . substr($identifier, -2);
+
         try {
+
             // Generate and send OTP
             $otpService->generate($identifier, 'direct_enquiry');
 
             Log::info('OTP sent for direct enquiry', [
-                'phone_masked' => substr($identifier, 0, 2) . 'XXXXXX' . substr($identifier, -2),
+                'phone_masked' => $maskedPhone,
                 'ip' => $request->ip()
             ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | Activity Log
+            |--------------------------------------------------------------------------
+            */
+            ActivityLog::record(
+                action: 'direct_enquiry_otp_sent',
+                description: 'OTP sent successfully for direct enquiry verification.',
+                module: 'direct_enquiry',
+                metadata: [
+                    'phone_masked' => $maskedPhone,
+                    'verification_type' => 'otp',
+                ]
+            );
+
             return response()->json([
                 'success' => true,
-                'message' => 'OTP sent successfully to +91-' . substr($identifier, 0, 2) . 'XXXXXX' . substr($identifier, -2)
+                'message' => 'OTP sent successfully to +91-' . $maskedPhone
             ]);
+
         } catch (\Exception $e) {
+
             Log::error('OTP Send Failed', [
-                'phone_masked' => substr($identifier, 0, 2) . 'XXXXXX' . substr($identifier, -2),
+                'phone_masked' => $maskedPhone,
                 'error' => $e->getMessage()
             ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Activity Log - Failed OTP
+            |--------------------------------------------------------------------------
+            */
+            ActivityLog::record(
+                action: 'direct_enquiry_otp_failed',
+                description: 'Failed to send OTP for direct enquiry verification.',
+                module: 'direct_enquiry',
+                metadata: [
+                    'phone_masked' => $maskedPhone,
+                    'verification_type' => 'otp',
+                ]
+            );
 
             return response()->json([
                 'success' => false,
@@ -180,7 +220,12 @@ class DirectEnquiryController extends Controller
             'otp' => 'required|digits:4'
         ]);
 
+        $maskedPhone = substr($request->identifier, 0, 2)
+            . 'XXXXXX'
+            . substr($request->identifier, -2);
+
         try {
+
             // Verify OTP directly without user lookup
             $verified = $otpService->verify(
                 $request->identifier,
@@ -188,11 +233,28 @@ class DirectEnquiryController extends Controller
                 'direct_enquiry'
             );
 
+            /*
+            |--------------------------------------------------------------------------
+            | Invalid / Expired OTP
+            |--------------------------------------------------------------------------
+            */
             if (!$verified) {
+
                 Log::warning('Invalid OTP attempt', [
-                    'phone_masked' => substr($request->identifier, 0, 2) . 'XXXXXX' . substr($request->identifier, -2),
+                    'phone_masked' => $maskedPhone,
                     'ip' => $request->ip()
                 ]);
+
+                ActivityLog::record(
+                    action: 'direct_enquiry_otp_failed',
+                    description: 'Invalid or expired OTP entered for direct enquiry verification.',
+                    module: 'direct_enquiry',
+                    metadata: [
+                        'phone_masked' => $maskedPhone,
+                        'verification_type' => 'otp',
+                        'reason' => 'invalid_or_expired',
+                    ]
+                );
 
                 return response()->json([
                     'success' => false,
@@ -200,19 +262,47 @@ class DirectEnquiryController extends Controller
                 ], 422);
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | OTP Verified Successfully
+            |--------------------------------------------------------------------------
+            */
             Log::info('OTP verified successfully', [
-                'phone_masked' => substr($request->identifier, 0, 2) . 'XXXXXX' . substr($request->identifier, -2)
+                'phone_masked' => $maskedPhone
             ]);
+
+            ActivityLog::record(
+                action: 'direct_enquiry_otp_verified',
+                description: 'Phone number verified successfully for direct enquiry.',
+                module: 'direct_enquiry',
+                metadata: [
+                    'phone_masked' => $maskedPhone,
+                    'verification_type' => 'otp',
+                ]
+            );
 
             return response()->json([
                 'success' => true,
                 'message' => 'Phone number verified successfully'
             ]);
+
         } catch (\Exception $e) {
+
             Log::error('OTP Verification Failed', [
-                'phone_masked' => substr($request->identifier, 0, 2) . 'XXXXXX' . substr($request->identifier, -2),
+                'phone_masked' => $maskedPhone,
                 'error' => $e->getMessage()
             ]);
+
+            ActivityLog::record(
+                action: 'direct_enquiry_otp_failed',
+                description: 'OTP verification failed due to a system error.',
+                module: 'direct_enquiry',
+                metadata: [
+                    'phone_masked' => $maskedPhone,
+                    'verification_type' => 'otp',
+                    'reason' => 'system_error',
+                ]
+            );
 
             return response()->json([
                 'success' => false,
@@ -344,7 +434,16 @@ class DirectEnquiryController extends Controller
                 $user->assignRole('customer');
 
                 $isNewCustomer = true;
-
+                ActivityLog::record(
+                    action: 'customer_auto_created',
+                    description: 'Customer account was automatically created from a direct enquiry.',
+                    module: 'customer',
+                    subject: $user,
+                    metadata: [
+                        'source' => 'direct_enquiry',
+                        'registration_type' => 'automatic',
+                    ]
+                );
                 \Log::info(
                     'Customer automatically created from direct enquiry',
                     [
@@ -398,6 +497,20 @@ class DirectEnquiryController extends Controller
                 'source' => 'website',
             ]);
 
+            ActivityLog::record(
+                action: 'direct_enquiry_submitted',
+                description: 'Customer submitted a direct hoarding enquiry.',
+                module: 'direct_enquiry',
+                subject: $enquiry,
+                metadata: [
+                    'source' => 'website',
+                    'city' => $normalizedCity,
+                    'hoarding_type' => $data['hoarding_type'],
+                    'preferred_modes' => $data['preferred_modes'] ?? ['Call', 'Email'],
+                    'phone_verified' => true,
+                ]
+            );
+
 
             \Log::info(
                 'Direct enquiry created and linked with user',
@@ -430,7 +543,17 @@ class DirectEnquiryController extends Controller
                 $enquiry->assignedVendors()
                     ->attach($vendors->pluck('id'));
 
-
+                ActivityLog::record(
+                    action: 'direct_enquiry_assigned_to_vendors',
+                    description: 'Direct enquiry was assigned to matching vendors.',
+                    module: 'direct_enquiry',
+                    subject: $enquiry,
+                    metadata: [
+                        'vendor_count' => $vendors->count(),
+                        'city' => $normalizedCity,
+                        'hoarding_type' => $data['hoarding_type'],
+                    ]
+                );
                 foreach ($vendors as $vendor) {
 
                     // Email notification
@@ -651,7 +774,18 @@ class DirectEnquiryController extends Controller
             // Clear captcha
             session()->forget('captcha_answer');
 
-
+            ActivityLog::record(
+                action: 'direct_enquiry_completed',
+                description: 'Direct enquiry submission completed successfully and relevant parties were notified.',
+                module: 'direct_enquiry',
+                subject: $enquiry,
+                metadata: [
+                    'customer_id' => $user->id,
+                    'new_customer_created' => $isNewCustomer,
+                    'vendors_notified' => $vendors->count(),
+                    'city' => $normalizedCity,
+                ]
+            );
             // =====================================================
             // SUCCESS LOG
             // =====================================================
@@ -1192,7 +1326,7 @@ class DirectEnquiryController extends Controller
 
         $query = DirectEnquiry::where('user_id', $customer->id);
 
-         
+
         if ($request->filled('search')) {
             $search = $request->search;
 
@@ -1205,7 +1339,7 @@ class DirectEnquiryController extends Controller
             });
         }
 
-         
+
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }

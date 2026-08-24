@@ -486,6 +486,109 @@
                 </div>
             </div>
 
+            {{-- Logs Dropdown --}}
+<div
+    x-data="{ open: {{ request()->routeIs('vendor.logs.*') ? 'true' : 'false' }} }"
+    class="space-y-1"
+>
+
+    {{-- Parent --}}
+    <button
+        type="button"
+        @click="open = !open"
+        class="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg
+        {{ request()->routeIs('vendor.logs.*')
+            ? 'bg-green-600 text-white'
+            : 'text-gray-700 hover:bg-gray-50' }}"
+    >
+
+        <div class="flex items-center gap-3">
+
+            <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <path
+                    d="M4 4H20V20H4V4ZM8 8H16M8 12H16M8 16H13"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+            </svg>
+
+            Logs
+
+        </div>
+
+        <svg
+            class="w-4 h-4 transition-transform flex-shrink-0"
+            :class="{ 'rotate-180': open }"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+            />
+        </svg>
+
+    </button>
+
+
+    {{-- Children --}}
+    <div
+        x-show="open"
+        x-collapse
+        x-cloak
+        class="space-y-1 pl-3 mt-1"
+    >
+
+        {{-- Activity Logs --}}
+        <a
+            href="{{ route('vendor.logs.activity.index') }}"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('vendor.logs.activity.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Activity Logs
+        </a>
+
+
+        {{-- Audit Logs --}}
+        <a
+            href="#"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('vendor.logs.audit.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Audit Logs
+        </a>
+
+
+        {{-- Session Logs --}}
+        <a
+            href="{{ route('vendor.logs.session.index') }}"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('vendor.logs.session.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Session Logs
+        </a>
+
+    </div>
+
+</div>
+
             <a href="{{ route('vendor.commission.index') }}"
                 class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg {{ request()->routeIs('vendor.commission.*') ? 'bg-[#00995c] text-white' : 'text-gray-700 hover:bg-gray-50' }}">
                 <span class="sidebar-icon flex items-center justify-center min-w-[24px]">

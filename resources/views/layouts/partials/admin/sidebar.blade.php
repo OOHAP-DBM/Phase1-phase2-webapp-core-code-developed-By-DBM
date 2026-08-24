@@ -350,24 +350,21 @@
                 <div x-show="open" x-collapse x-cloak class="space-y-1 pl-3 mt-1">
 
 
-                    <a href="{{ route('vendor.enquiries.index') }}"
-                        class="{{ request()->routeIs('vendor.enquiries.*')
+                    <a href="{{ route('vendor.enquiries.index') }}" class="{{ request()->routeIs('vendor.enquiries.*')
     ? 'submenu-active bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
     : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }} block px-6 py-1 text-sm rounded-md transition">
 
 
                         - Admin Hoarding Enquiry
                     </a>
-                    <a href="{{ route('admin.enquiries.index') }}"
-                        class="{{ request()->routeIs('admin.enquiries.*')
+                    <a href="{{ route('admin.enquiries.index') }}" class="{{ request()->routeIs('admin.enquiries.*')
     ? 'submenu-active bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
     : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }} block px-6 py-1 text-sm rounded-md transition">
 
 
                         - Enquiries & Offers
                     </a>
-                    <a href="{{ route('admin.direct-enquiries.index') }}"
-                        class="{{ request()->routeIs('admin.direct-enquiries.*')
+                    <a href="{{ route('admin.direct-enquiries.index') }}" class="{{ request()->routeIs('admin.direct-enquiries.*')
     ? 'submenu-active bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
     : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }} block px-6 py-1 text-sm rounded-md transition">
 
@@ -549,6 +546,64 @@
                         <a href="{{ route('admin.settings.pos-cash-limit.edit') }}"
                             class="block px-6 py-1 text-sm rounded-md transition {{ request()->routeIs('admin.settings.pos-cash-limit.edit') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                             - Pos Cash Limit
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <!-- Menu for logs  -->
+            <div class="space-y-1">
+                <div x-data="{ open: @if(request()->routeIs('admin.logs.*')) true @else false @endif }"
+                    class="space-y-1">
+
+                    {{-- Parent: Logs --}}
+                    <button type="button" @click="open = !open"
+                        class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.logs.*') ? 'bg-[#00995c] text-white' : 'text-gray-700 hover:bg-gray-50' }}">
+
+                        <div
+                            class="flex items-center gap-3 {{ request()->routeIs('admin.logs.*') ? 'text-white' : 'text-gray-700' }}">
+
+                            {{-- Logs Icon --}}
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+
+                                <path d="M4 4h16v16H4z" />
+                                <path d="M8 8h8" />
+                                <path d="M8 12h8" />
+                                <path d="M8 16h5" />
+
+                            </svg>
+
+                            Logs
+                        </div>
+
+                        <svg class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': open }"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+
+                        </svg>
+                    </button>
+
+                    {{-- Children: Logs --}}
+                    <div x-show="open" x-collapse x-cloak class="space-y-1 pl-3 mt-1">
+
+                        {{-- Activity Logs --}}
+                        <a href="{{  route('admin.logs.activity.index') }}"
+                            class="block px-6 py-1 text-sm rounded-md transition text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent">
+                            - Activity Logs
+                        </a>
+
+                        {{-- Audit Logs --}}
+                        <a href="#"
+                            class="block px-6 py-1 text-sm rounded-md transition text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent">
+                            - Audit Logs
+                        </a>
+
+                        <a href="{{ route('admin.logs.session.index') }}" class="block px-6 py-1 text-sm rounded-md transition
+          {{ request()->routeIs('admin.logs.session.index')
+    ? 'bg-[#00995c] text-white font-semibold'
+    : 'text-gray-600 hover:bg-gray-50 hover:pl-5' }}">
+                            - Session Logs
                         </a>
                     </div>
                 </div>
