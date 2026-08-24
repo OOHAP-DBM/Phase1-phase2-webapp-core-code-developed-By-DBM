@@ -44,31 +44,83 @@ class OnboardingController extends Controller
      * @param VendorOnboardingService $service
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function submitVendorInfo(VendorBusinessInfoRequest $request, VendorOnboardingService $service)
-    {
+    public function submitVendorInfo(
+        VendorBusinessInfoRequest $request,
+        VendorOnboardingService $service
+    ) {
         $user = Auth::user();
+
         DB::beginTransaction();
+
         try {
+            \Log::info('VENDOR BUSINESS INFO: START', [
+                'user_id' => $user->id,
+                'profile_id' => $user->vendorProfile?->id,
+                'current_status' => $user->vendorProfile?->onboarding_status,
+                'onboarding_step' => $user->vendorProfile?->onboarding_step,
+            ]);
+
             // Save business info, bank info, and PAN upload
-            $profile = $service->saveBusinessInfo($user, $request->validated());
-            // Onboarding step tracking
-            $profile->onboarding_step = max(1, (int) $profile->onboarding_step) + 1;
-            $profile->onboarding_status = 'pending_approval';
+            $profile = $service->saveBusinessInfo(
+                $user,
+                $request->validated()
+            );
+
+            \Log::info('VENDOR BUSINESS INFO: SERVICE SAVED', [
+                'profile_id' => $profile->id,
+                'status_after_service' => $profile->onboarding_status,
+                'step_after_service' => $profile->onboarding_step,
+            ]);
+
+            // Only update onboarding progress.
+            // DO NOT overwrite approval status.
+            $profile->onboarding_step = max(
+                1,
+                (int) $profile->onboarding_step
+            ) + 1;
+
             $profile->save();
+
+            \Log::info('VENDOR BUSINESS INFO: PROFILE UPDATED', [
+                'profile_id' => $profile->id,
+                'final_status' => $profile->onboarding_status,
+                'final_step' => $profile->onboarding_step,
+            ]);
+
             // Assign vendor role if not already assigned
             if (!$user->hasRole('vendor')) {
                 $user->assignRole('vendor');
-                // Set active_role to vendor (but keep previous role)
                 $user->active_role = 'vendor';
+                $user->save();
             }
-            $user->save();
+
             DB::commit();
-            // Redirect to vendor dashboard with flash message
-            // Session::flash('success', 'Your vendor request is pending. Once approved by admin, you will be notified.');
+
+            \Log::info('VENDOR BUSINESS INFO: TRANSACTION COMMITTED', [
+                'user_id' => $user->id,
+                'profile_id' => $profile->id,
+                'final_status' => $profile->onboarding_status,
+            ]);
+
             return Redirect::route('vendor.dashboard');
-        } catch (\Exception $e) {
+
+        } catch (\Throwable $e) {
+
             DB::rollBack();
-            return \Redirect::back()->withErrors(['error' => 'Failed to save vendor info. Please try again.']);
+
+            \Log::error('VENDOR BUSINESS INFO: FAILED', [
+                'user_id' => $user->id,
+                'profile_id' => $user->vendorProfile?->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return Redirect::back()->withErrors([
+                'error' => 'Failed to save vendor info. Please try again.'
+            ]);
         }
     }
     /**
@@ -385,8 +437,7 @@ class OnboardingController extends Controller
             ], 422);
         }
 
-        $otp = 1234; // demo
-
+        $otp = 1234;
         Cache::put(
             'vendor_email_otp_' . $user->id,
             ['otp' => $otp, 'email' => $request->email],
@@ -397,7 +448,7 @@ class OnboardingController extends Controller
 
         return response()->json(['success' => true]);
     }
-    //only  for verifcation vendor @aviral
+
     public function verifyEmailOtp(Request $request)
     {
         $request->validate([
@@ -422,7 +473,7 @@ class OnboardingController extends Controller
             'email_verified_at' => now()
         ]);
 
-        // Increase onboarding_step if needed
+
         $profile = $user->vendorProfile;
         if ($profile && $profile->onboarding_step < 2) {
             $profile->onboarding_step = 2;
@@ -431,7 +482,7 @@ class OnboardingController extends Controller
 
         return response()->json(['success' => true]);
     }
-    //only  for verifcation vendor @aviral
+
     public function sendPhoneOtp(Request $request)
     {
         $request->validate([
@@ -531,10 +582,10 @@ class OnboardingController extends Controller
             $user = auth()->user();
             $profile = $this->getVendorProfile();
 
-            // Update step to 3 and set status to pending so they can access dashboard
+            // Only update onboarding progress.
+            // IMPORTANT: Do not overwrite onboarding approval status.
             $profile->update([
                 'onboarding_step' => 3,
-                'onboarding_status' => 'pending_approval'
             ]);
 
             // Optional: Ensure role is assigned even if they skip
@@ -548,8 +599,12 @@ class OnboardingController extends Controller
                 'success' => true,
                 'redirect' => route('vendor.dashboard')
             ]);
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 

@@ -668,7 +668,7 @@ class VendorController extends Controller
             $user->assignRole('vendor');
 
             // Create Minimal Vendor Profile
-            VendorProfile::create([
+           $profile = VendorProfile::create([
                 'user_id' => $user->id,
 
                 // Since popup has no company field

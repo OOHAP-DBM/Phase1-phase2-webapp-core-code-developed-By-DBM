@@ -151,49 +151,85 @@ class RegisterController extends Controller
             // Handle vendor-specific setup
             if ($role === 'vendor') {
 
-                // Check vendor auto approval setting
+                \Log::info('========== VENDOR AUTO APPROVAL DEBUG START ==========', [
+                    'user_id' => $user->id,
+                    'user_email' => $user->email,
+                    'role' => $role,
+                ]);
+ 
                 $autoApproval = \App\Models\Setting::get(
                     'auto_vendor_approval',
                     false
                 );
 
-                $vendorProfile = VendorProfile::create([
-                    'user_id' => $user->id,
-                    'onboarding_status' => $autoApproval
-                        ? 'approved'
-                        : 'pending_approval',
-                    'onboarding_step' => 1,
-                    'inventory_setup_completed' => false,
-                    'approved_at' => $autoApproval ? now() : null,
-                    'approved_by' => null,
+                \Log::info('VENDOR AUTO APPROVAL: Setting fetched', [
+                    'setting_key' => 'auto_vendor_approval',
+                    'value' => $autoApproval,
+                    'type' => gettype($autoApproval),
+                    'boolean_value' => (bool) $autoApproval,
                 ]);
-
 
                  
-                // Create vendor profile
-                VendorProfile::create([
+                $onboardingStatus = $autoApproval
+                    ? 'approved'
+                    : 'pending_approval';
+
+                \Log::info('VENDOR AUTO APPROVAL: Status determined', [
+                    'auto_approval' => (bool) $autoApproval,
+                    'onboarding_status' => $onboardingStatus,
+                ]);
+
+                 
+                $vendorProfile = VendorProfile::create([
                     'user_id' => $user->id,
 
-                    // Auto approve if setting is ON,
-                    // otherwise keep vendor pending for admin approval
-                    'onboarding_status' => $autoApproval
-                        ? 'approved'
-                        : 'pending_approval',
+                    'onboarding_status' => $onboardingStatus,
 
                     'onboarding_step' => 1,
+
                     'inventory_setup_completed' => false,
 
-                    // Auto approval fields
                     'approved_at' => $autoApproval ? now() : null,
+
+                    // NULL because this is system auto-approval.
+                    // Admin approval will set auth()->id().
                     'approved_by' => null,
                 ]);
 
-                // If auto approval is OFF,
-                // notify admins and vendor about pending approval
+                \Log::info('VENDOR AUTO APPROVAL: Vendor profile created', [
+                    'profile_id' => $vendorProfile->id,
+                    'user_id' => $vendorProfile->user_id,
+                    'saved_status' => $vendorProfile->onboarding_status,
+                    'onboarding_step' => $vendorProfile->onboarding_step,
+                    'inventory_setup_completed' => $vendorProfile->inventory_setup_completed,
+                    'approved_at' => $vendorProfile->approved_at,
+                    'approved_by' => $vendorProfile->approved_by,
+                ]);
+
+                 
+                $savedProfile = VendorProfile::find($vendorProfile->id);
+
+                \Log::info('VENDOR AUTO APPROVAL: Database verification', [
+                    'profile_id' => $savedProfile?->id,
+                    'db_status' => $savedProfile?->onboarding_status,
+                    'db_approved_at' => $savedProfile?->approved_at,
+                    'db_approved_by' => $savedProfile?->approved_by,
+                ]);
+ 
                 if (!$autoApproval) {
 
-                    // Notify admins
+                    \Log::warning('VENDOR AUTO APPROVAL: Auto approval is OFF', [
+                        'user_id' => $user->id,
+                        'profile_id' => $vendorProfile->id,
+                    ]);
+
+                   
                     $admins = User::role('admin')->get();
+
+                    \Log::info('VENDOR AUTO APPROVAL: Sending pending notification', [
+                        'admin_count' => $admins->count(),
+                        'vendor_id' => $user->id,
+                    ]);
 
                     foreach ($admins as $admin) {
                         $admin->notify(
@@ -201,24 +237,39 @@ class RegisterController extends Controller
                         );
                     }
 
-                    // Notify vendor
+                  
                     $user->notify(
                         new VendorApprovalPendingNotification($user)
                     );
-                }
 
-                // Commit DB changes
+                } else {
+ 
+                    \Log::info('VENDOR AUTO APPROVAL: Vendor AUTO APPROVED', [
+                        'user_id' => $user->id,
+                        'profile_id' => $vendorProfile->id,
+                        'status' => $vendorProfile->onboarding_status,
+                    ]);
+                }
+ 
                 DB::commit();
 
-                // Clear signup role
+                \Log::info('VENDOR AUTO APPROVAL: Transaction committed', [
+                    'user_id' => $user->id,
+                    'profile_id' => $vendorProfile->id,
+                    'final_status' => $vendorProfile->fresh()->onboarding_status,
+                ]);
+
+                \Log::info('========== VENDOR AUTO APPROVAL DEBUG END ==========');
+
+                
                 session()->forget('signup_role');
 
-                // Login vendor
+                 
                 Auth::login($user);
 
                 session(['merge_guest_data' => true]);
 
-                // Redirect to onboarding
+                 
                 return redirect()
                     ->route('vendor.onboarding.contact-details')
                     ->with(
