@@ -28,7 +28,7 @@
                     {{-- Default User Icon --}}
                     <svg class="w-14 h-14 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804
-                                                M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                 @endif
             </div>
@@ -189,15 +189,15 @@
                 {{-- Child Menus --}}
                 <div x-show="open" x-transition class="space-y-1 pl-3 mt-1">
 
-                    
+
                     <a href="{{ route('customer.enquiries.index') }}" class="block px-6 py-2 text-sm rounded-md
                             {{ request()->routeIs('customer.enquiries.*')
-                            ? 'bg-emerald-50 text-gray-900 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50' }}">
-                            General Enquiries
+    ? 'bg-emerald-50 text-gray-900 font-semibold'
+    : 'text-gray-600 hover:bg-gray-50' }}">
+                        General Enquiries
                     </a>
 
-                     
+
                     <a href="{{ route('customer.direct.enquiries.index') }}" class="block px-6 py-1 text-sm rounded-md transition
                             {{ request()->routeIs('customer.direct.enquiries.index') }}
                             ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
@@ -244,6 +244,112 @@
                 </svg>
                 POS Booking
             </a>
+
+           {{-- Logs Dropdown --}}
+<div
+    x-data="{ open: {{ request()->routeIs('customer.logs.*') ? 'true' : 'false' }} }"
+    class="space-y-1"
+>
+
+    {{-- Parent --}}
+    <button
+        type="button"
+        @click="open = !open"
+        class="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg
+        {{ request()->routeIs('customer.logs.*')
+            ? 'bg-green-600 text-white'
+            : 'text-gray-700 hover:bg-gray-50' }}"
+    >
+
+        <div class="flex items-center gap-3">
+
+            {{-- Logs Icon --}}
+            <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+            >
+                <path
+                    d="M4 4H20V20H4V4ZM8 8H16M8 12H16M8 16H13"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+            </svg>
+
+            Logs
+        </div>
+
+        {{-- Arrow --}}
+        <svg
+            class="w-4 h-4 transition-transform flex-shrink-0"
+            :class="{ 'rotate-180': open }"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+            />
+        </svg>
+
+    </button>
+
+
+    {{-- Children --}}
+    <div
+        x-show="open"
+        x-collapse
+        x-cloak
+        class="space-y-1 pl-3 mt-1"
+    >
+
+        {{-- Activity Logs --}}
+        <a
+            href="{{ route('customer.logs.activity.index') }}"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('customer.logs.activity.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Activity Logs
+        </a>
+
+
+        {{-- Audit Logs --}}
+        <a
+            href="#"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('customer.logs.audit.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Audit Logs
+        </a>
+
+
+        {{-- Session Logs --}}
+        <a
+            href="{{ route('customer.logs.session.index') }}"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('customer.logs.session.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Session Logs
+        </a>
+
+    </div>
+
+</div>
+
+
             <!-- LogOut -->
             <button type="button" onclick="openLogoutModal()" class="cursor-pointer block w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg
                     text-gray-700 hover:text-red-700 hover:bg-red-100">

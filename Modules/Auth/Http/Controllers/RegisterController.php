@@ -19,7 +19,7 @@ use App\Notifications\UserWelcomeNotification;
 use App\Notifications\VendorApprovalPendingNotification;
 use Twilio\Rest\Client;
 use Illuminate\Support\Facades\Log;
-
+use App\Models\ActivityLog;
 
 
 
@@ -44,6 +44,15 @@ class RegisterController extends Controller
 
         // Store role in session
         session(['signup_role' => $request->role]);
+
+        ActivityLog::record(
+            action: 'registration_role_selected',
+            description: 'User selected registration role: ' . $request->role,
+            module: 'registration',
+            metadata: [
+                'role' => $request->role,
+            ]
+        );
 
         return redirect()->route('register.form');
     }
@@ -156,7 +165,7 @@ class RegisterController extends Controller
                     'user_email' => $user->email,
                     'role' => $role,
                 ]);
- 
+
                 $autoApproval = \App\Models\Setting::get(
                     'auto_vendor_approval',
                     false
@@ -169,7 +178,7 @@ class RegisterController extends Controller
                     'boolean_value' => (bool) $autoApproval,
                 ]);
 
-                 
+
                 $onboardingStatus = $autoApproval
                     ? 'approved'
                     : 'pending_approval';
@@ -179,8 +188,9 @@ class RegisterController extends Controller
                     'onboarding_status' => $onboardingStatus,
                 ]);
 
-                 
+
                 $vendorProfile = VendorProfile::create([
+
                     'user_id' => $user->id,
 
                     'onboarding_status' => $onboardingStatus,
@@ -196,17 +206,21 @@ class RegisterController extends Controller
                     'approved_by' => null,
                 ]);
 
-                \Log::info('VENDOR AUTO APPROVAL: Vendor profile created', [
-                    'profile_id' => $vendorProfile->id,
-                    'user_id' => $vendorProfile->user_id,
-                    'saved_status' => $vendorProfile->onboarding_status,
-                    'onboarding_step' => $vendorProfile->onboarding_step,
-                    'inventory_setup_completed' => $vendorProfile->inventory_setup_completed,
-                    'approved_at' => $vendorProfile->approved_at,
-                    'approved_by' => $vendorProfile->approved_by,
-                ]);
+                ActivityLog::record(
+                    action: 'vendor_registered',
+                    description: 'New vendor account registered successfully.',
+                    module: 'registration',
+                    subject: $user,
+                    metadata: [
+                        'vendor_profile_id' => $vendorProfile->id,
+                        'onboarding_status' => $onboardingStatus,
+                        'auto_approved' => (bool) $autoApproval,
+                    ]
+                );
 
-                 
+
+
+
                 $savedProfile = VendorProfile::find($vendorProfile->id);
 
                 \Log::info('VENDOR AUTO APPROVAL: Database verification', [
@@ -215,7 +229,7 @@ class RegisterController extends Controller
                     'db_approved_at' => $savedProfile?->approved_at,
                     'db_approved_by' => $savedProfile?->approved_by,
                 ]);
- 
+
                 if (!$autoApproval) {
 
                     \Log::warning('VENDOR AUTO APPROVAL: Auto approval is OFF', [
@@ -223,7 +237,18 @@ class RegisterController extends Controller
                         'profile_id' => $vendorProfile->id,
                     ]);
 
-                   
+                    ActivityLog::record(
+                        action: 'vendor_pending_approval',
+                        description: 'Vendor registration submitted and is pending admin approval.',
+                        module: 'vendor_approval',
+                        subject: $vendorProfile,
+                        metadata: [
+                            'user_id' => $user->id,
+                            'status' => 'pending_approval',
+                        ]
+                    );
+
+
                     $admins = User::role('admin')->get();
 
                     \Log::info('VENDOR AUTO APPROVAL: Sending pending notification', [
@@ -237,20 +262,31 @@ class RegisterController extends Controller
                         );
                     }
 
-                  
+
                     $user->notify(
                         new VendorApprovalPendingNotification($user)
                     );
 
                 } else {
- 
+
                     \Log::info('VENDOR AUTO APPROVAL: Vendor AUTO APPROVED', [
                         'user_id' => $user->id,
                         'profile_id' => $vendorProfile->id,
                         'status' => $vendorProfile->onboarding_status,
                     ]);
+
+                    ActivityLog::record(
+                        action: 'vendor_auto_approved',
+                        description: 'Vendor account was automatically approved.',
+                        module: 'vendor_approval',
+                        subject: $vendorProfile,
+                        metadata: [
+                            'approved_by' => 'system',
+                            'user_id' => $user->id,
+                        ]
+                    );
                 }
- 
+
                 DB::commit();
 
                 \Log::info('VENDOR AUTO APPROVAL: Transaction committed', [
@@ -261,15 +297,24 @@ class RegisterController extends Controller
 
                 \Log::info('========== VENDOR AUTO APPROVAL DEBUG END ==========');
 
-                
+
                 session()->forget('signup_role');
 
-                 
+
                 Auth::login($user);
+                ActivityLog::record(
+                    action: 'customer_registered',
+                    description: 'New customer account registered successfully.',
+                    module: 'registration',
+                    subject: $user,
+                    metadata: [
+                        'registration_method' => 'web',
+                    ]
+                );
 
                 session(['merge_guest_data' => true]);
 
-                 
+
                 return redirect()
                     ->route('vendor.onboarding.contact-details')
                     ->with(
@@ -458,6 +503,15 @@ class RegisterController extends Controller
             return response()->json(['message' => 'Vendor profile not found'], 404);
         }
         $profile->update(['onboarding_step' => 2]);
+        ActivityLog::record(
+            action: 'contact_verification_skipped',
+            description: 'Vendor skipped contact verification during onboarding.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => 2,
+            ]
+        );
         return response()->json(['message' => 'Contact verification skipped']);
     }
 }

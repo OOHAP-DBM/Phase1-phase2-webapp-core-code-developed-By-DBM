@@ -17,7 +17,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/assets/images/favicon/Vector (1).png" />
 
-    <!-- External CSS Libraries -->
+    <!-- External CSS Libraries --> 
     {{-- CSS only in head — no render-blocking JS --}}
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
