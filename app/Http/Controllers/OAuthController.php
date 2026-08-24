@@ -120,6 +120,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use App\Models\VendorProfile;
+use App\Models\Setting;
 
 class OAuthController extends Controller
 {
@@ -1530,20 +1531,20 @@ public function apiGoogleLogin(Request $request)
             'role'        => $role,
             'fcm_token'   => $user->fcm_token ? 'saved' : 'not available',
         ]);
-          if ($user->fcm_token) {
-                $sent = send(
-                    $user->fcm_token,
-                    'Login to OOHAPP🎉',
-                    'Your login was successful. Explore our app to find the best advertising solutions',
-                    ['type' => 'Login', 'user_id' => $user->id]
-                );
+        //   if ($user->fcm_token) {
+        //         $sent = send(
+        //             $user->fcm_token,
+        //             'Login to OOHAPP🎉',
+        //             'Your login was successful. Explore our app to find the best advertising solutions',
+        //             ['type' => 'Login', 'user_id' => $user->id]
+        //         );
 
 
-                if (!$sent) {
-                    // Optional: Log or handle failure
-                    \Log::warning("FCM notification failed for user ID {$user->id}");
-                }
-            }
+        //         if (!$sent) {
+        //             // Optional: Log or handle failure
+        //             \Log::warning("FCM notification failed for user ID {$user->id}");
+        //         }
+        //     }
     }
 
     /*
@@ -1911,21 +1912,26 @@ public function completeOAuthSignup(Request $request)
         */
 
         if ($role === 'vendor') {
+            // Follow same auto-approval logic as normal registration
+            $autoApproval = Setting::get('auto_vendor_approval', false);
+            $onboardingStatus = $autoApproval ? 'approved' : 'pending_approval';
 
             VendorProfile::create([
-
                 'user_id' => $user->id,
-
-                'onboarding_status' => 'draft',
-
+                'onboarding_status' => $onboardingStatus,
                 'onboarding_step' => 1,
-
                 'inventory_setup_completed' => false,
+                'approved_at' => $autoApproval ? now() : null,
+                'approved_by' => $autoApproval ? null : null,
             ]);
 
+            // Ensure active role is vendor so middleware and redirects behave consistently
+            $user->active_role = 'vendor';
+            $user->save();
 
             Log::info('Vendor profile created for OAuth user', [
                 'user_id' => $user->id,
+                'onboarding_status' => $onboardingStatus,
             ]);
         }
 
