@@ -37,20 +37,31 @@ class CartService
             );
         }
 
-        // Check if cart already has hoardings from a different vendor
-        $existingVendorId = DB::table('carts')
-            ->join('hoardings', 'hoardings.id', '=', 'carts.hoarding_id')
-            ->where('carts.user_id', Auth::id())
-            ->whereNull('hoardings.deleted_at')
-            ->value('hoardings.vendor_id');
+        /*
+         * Single-vendor restriction (commented out)
+         *
+         * Previously the cart only allowed hoardings from one vendor at a time.
+         * That logic is intentionally preserved below as commented code so it
+         * can be re-enabled if needed.
+         */
+        // // Check if cart already has hoardings from a different vendor
+        // $existingVendorId = DB::table('carts')
+        //     ->join('hoardings', 'hoardings.id', '=', 'carts.hoarding_id')
+        //     ->where('carts.user_id', Auth::id())
+        //     ->whereNull('hoardings.deleted_at')
+        //     ->value('hoardings.vendor_id');
+        //
+        // if ($existingVendorId && $existingVendorId !== $vendorId) {
+        //     return $this->response(
+        //         'vendor_conflict',
+        //         false,
+        //         'Your cart currently has hoardings from another vendor. You can only book hoardings from one vendor at a time.'
+        //     );
+        // }
 
-        if ($existingVendorId && $existingVendorId !== $vendorId) {
-            return $this->response(
-                'vendor_conflict',
-                false,
-                'Your cart currently has hoardings from another vendor. You can only book hoardings from one vendor at a time.'
-            );
-        }
+        // MULTI-VENDOR: allow adding hoardings from multiple vendors to the cart.
+        // If you want to enforce single-vendor booking at checkout, add validation
+        // in the checkout flow to require all cart items to belong to the same vendor.
 
         // 🔥 FORCE ADD (idempotent behaviour optional)
         DB::table('carts')->updateOrInsert(
