@@ -102,7 +102,7 @@ class EnquiryController extends Controller
         $query->orderBy('created_at', 'desc');
 
         $enquiries = $query
-            ->paginate(1)
+            ->paginate(10)
             ->withQueryString();
 
         return view('customer.enquiries.index', compact('enquiries'));
