@@ -9,6 +9,8 @@ use App\Models\TermsAndCondition;
 use App\Models\Disclaimer;
 use App\Models\PrivacyPolicy;
 use App\Models\CancellationRefundPolicy;
+use App\Models\VendorPartnerInformation;
+use App\Models\PricingPaymentInformation;
 use App\Http\Controllers\Controller;
 
 
@@ -59,6 +61,20 @@ class PageController extends Controller
     {
         $data = CancellationRefundPolicy::where('is_active', 1)->first();
         return view('pages.refund', [
+            'data' => $data ?? null
+        ]);
+    }
+    public function partner_information()
+    {
+        $data = VendorPartnerInformation::where('is_active', 1)->first();
+        return view('pages.vendorpartner', [
+            'data' => $data ?? null
+        ]);
+    }
+    public function pricing_payment()
+    {
+        $data = PricingPaymentInformation::where('is_active', 1)->first();
+        return view('pages.pricingpayment', [
             'data' => $data ?? null
         ]);
     }
