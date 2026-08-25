@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             AdminUserSeeder::class,
             TaxRulesSeeder::class,
-           
+
             SettingsSeeder::class,
             HoardingAttributesSeeder::class,
             TermsAndConditionsSeeder::class,
@@ -39,6 +39,8 @@ class DatabaseSeeder extends Seeder
             AboutLeaderSeeder::class,
             ImportPermissionSeeder::class,
             InvoiceSettingsSeeder::class,
+            VendorPartnerInformationSeeder::class,
+            PricingPaymentInformationSeeder::class,
         ]);
     }
 }

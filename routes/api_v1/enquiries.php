@@ -46,6 +46,19 @@ Route::prefix('direct')->group(function () {
     Route::post('/', [DirectEnquiryApiController::class, 'store']);
 });
 
+// Additional direct-enquiry API compatible with web customers/vendors (uses DirectEnquiryController)
+Route::middleware('auth:sanctum')->prefix('direct-api')->group(function () {
+    // POST /api/v1/enquiries/direct-api (protected — authenticated users only)
+    // Note: submit was removed from controller; keep route commented for now or remove.
+    // Route::post('/', [\Modules\Enquiries\Controllers\API\DirectEnquiryController::class, 'submit']);
+
+    // GET /api/v1/enquiries/direct-api/list -> returns enquiries for authenticated user (no pagination)
+    Route::get('/list', [\Modules\Enquiries\Controllers\API\DirectEnquiryController::class, 'listFor']);
+
+    // GET /api/v1/enquiries/direct-api/{id} -> show a single enquiry (authenticated)
+    Route::get('/{id}', [\Modules\Enquiries\Controllers\API\DirectEnquiryController::class, 'showFor'])->where('id', '[0-9]+');
+});
+
 Route::middleware(['auth:sanctum', 'role:vendor'])
     ->prefix('/vendor/direct-enquiries')
     ->group(function () {
