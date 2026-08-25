@@ -9,29 +9,29 @@
                 </div>
                 Right - Email Form
                 <div class="md:w-1/2 w-full max-w-md">
-                    <form 
-                        action="{{ route('newsletter.subscribe') }}" 
-                        method="POST" 
+                    <form
+                        action="{{ route('newsletter.subscribe') }}"
+                        method="POST"
                         class="flex flex-col sm:flex-row gap-2 w-full"
                         id="newsletterForm"
                     >
                         @csrf
 
-                        <input 
-                            type="email" 
-                            name="email" 
-                            placeholder="Your email" 
+                        <input
+                            type="email"
+                            name="email"
+                            placeholder="Your email"
                             value="{{ old('email') }}"
                             required
-                            class="w-full sm:flex-1 px-4 py-3 rounded border-none bg-white 
-                                focus:outline-none focus:ring-2 focus:ring-teal-500 
+                            class="w-full sm:flex-1 px-4 py-3 rounded border-none bg-white
+                                focus:outline-none focus:ring-2 focus:ring-teal-500
                                 text-gray-900 @error('email') ring-2 ring-red-500 @enderror"
                         >
 
-                        <button 
-                            type="submit" 
-                            class="w-full sm:w-auto px-8 py-3 btn-color 
-                                font-semibold rounded 
+                        <button
+                            type="submit"
+                            class="w-full sm:w-auto px-8 py-3 btn-color
+                                font-semibold rounded
                                 transition-colors whitespace-nowrap"
                           >
                             Subscribe
@@ -65,7 +65,7 @@
                         <x-optimized-image
                             :src="route('brand.oohapp-logo')"
                             alt="OOHApp company logo"
-                        
+
                             width="150"
                             height="48"
                             style="max-height:48px;object-fit:contain;"
@@ -158,6 +158,16 @@
                             Refund & Cancellation Policy
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ route('partner_information') }}" class="text-gray-600 hover:text-gray-900" target="_blank" rel="noopener noreferrer">
+                            Vendor/Partner information
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('pricing_payment') }}" class="text-gray-600 hover:text-gray-900" target="_blank" rel="noopener noreferrer">
+                            Pricing/payment information
+                        </a>
+                    </li>
               </ul>
 
             </div>
@@ -178,11 +188,11 @@
                         ->pluck('city')
                         ->map(fn($city) => 'Hoardings in ' . ucwords(strtolower($city)))
                         ->toArray();
-                    
+
                     // Prepend special links (keep existing behavior)
                     array_unshift($dynamicCities, 'Hoardings near me');
                     $dynamicCities[] = 'All Cities Hoardings';
-                    
+
                     $cities = $dynamicCities;
                 @endphp
 
@@ -239,7 +249,7 @@
 
 <footer id="mobile-footer" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 z-50 md:hidden">
     <div class="flex justify-between items-center max-w-md mx-auto">
-        
+
         <a href="{{ route('home') }}" class="flex flex-col items-center space-y-1 {{ request()->routeIs('home') ? 'text-green-600' : 'text-gray-400' }}">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -290,7 +300,7 @@
         <p class="mt-2 md:mt-0">Made with ❤️ in India</p>
     </div>
 </div> -->
-    
+
 <!-- <script>
     document.getElementById('newsletterForm').addEventListener('submit', function (e) {
         e.preventDefault();
@@ -320,11 +330,11 @@
                 baseClass = 'bg-green-900/40 text-green-300 border border-green-700';
                 icon = '✔️';
                 form.reset();
-            } 
+            }
             else if (data.status === 'info') {
                 baseClass = 'bg-blue-900/40 text-blue-300 border border-blue-700';
                 icon = 'ℹ️';
-            } 
+            }
             else {
                 baseClass = 'bg-red-900/40 text-red-300 border border-red-700';
                 icon = '⚠️';
@@ -364,11 +374,11 @@ document.getElementById('newsletterForm').addEventListener('submit', function (e
             baseClass = 'bg-green-900/40 text-green-300 border border-green-700';
             icon = '✔️';
             form.reset();
-        } 
+        }
         else if (data.status === 'info') {
             baseClass = 'bg-blue-900/40 text-blue-300 border border-blue-700';
             icon = 'ℹ️';
-        } 
+        }
         else {
             baseClass = 'bg-red-900/40 text-red-300 border border-red-700';
             icon = '⚠️';

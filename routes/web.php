@@ -326,7 +326,8 @@ Route::get('/terms-and-conditions', [PageController::class, 'terms'])->name('ter
 Route::get('/legal-disclaimer', [PageController::class, 'disclaimer'])->name('disclaimer');
 Route::get('/privacy-policy', [PageController::class, 'privacy'])->name('privacy');
 Route::get('/refund-cancellation-policy', [PageController::class, 'refund'])->name('refund');
-
+Route::get('/Vendor-partner-information', [PageController::class, 'partner_information'])->name('partner_information');
+Route::get('/pricing-payment-information', [PageController::class, 'pricing_payment'])->name('pricing_payment');
 
 Route::get('/shortlist', [ShortlistController::class, 'index'])->name('shortlist');
 Route::post('/shortlist/toggle/{hoarding}', [ShortlistController::class, 'toggle'])->name('shortlist.toggle');
@@ -1488,7 +1489,7 @@ Route::middleware(['auth', 'role:customer|admin|vendor'])->prefix('invoices')->n
 });
 
 
-//  logs routes 
+//  logs routes
 
 Route::middleware(['auth'])->group(function () {
 
