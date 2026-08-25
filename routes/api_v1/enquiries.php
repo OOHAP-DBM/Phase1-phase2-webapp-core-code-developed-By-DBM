@@ -53,10 +53,10 @@ Route::middleware('auth:sanctum')->prefix('direct-api')->group(function () {
     // Route::post('/', [\Modules\Enquiries\Controllers\API\DirectEnquiryController::class, 'submit']);
 
     // GET /api/v1/enquiries/direct-api/list -> returns enquiries for authenticated user (no pagination)
-    Route::get('/list', [\Modules\Enquiries\Controllers\API\DirectEnquiryController::class, 'listFor']);
+    Route::get('/list', [\Modules\Enquiries\Controllers\Api\DirectEnquiryController::class, 'listFor']);
 
     // GET /api/v1/enquiries/direct-api/{id} -> show a single enquiry (authenticated)
-    Route::get('/{id}', [\Modules\Enquiries\Controllers\API\DirectEnquiryController::class, 'showFor'])->where('id', '[0-9]+');
+    Route::get('/{id}', [\Modules\Enquiries\Controllers\Api\DirectEnquiryController::class, 'showFor'])->where('id', '[0-9]+');
 });
 
 Route::middleware(['auth:sanctum', 'role:vendor'])
