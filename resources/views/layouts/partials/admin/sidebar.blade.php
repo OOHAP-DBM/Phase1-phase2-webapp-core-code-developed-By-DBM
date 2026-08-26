@@ -550,6 +550,64 @@
                     </div>
                 </div>
             </div>
+            {{-- Communication Management --}}
+            <div x-data="{
+        open: false,
+        init() {
+            this.open = !!this.$el.querySelector('.communication-active')
+        }
+    }" class="space-y-1">
+
+                {{-- Parent --}}
+                <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200
+        {{ request()->routeIs('admin.email_templates.*')
+    ? 'bg-[#00995c] text-white'
+    : 'text-gray-700 hover:bg-gray-50' }}">
+
+                    <div class="flex items-center gap-3">
+
+                        {{-- Email / Communication Icon --}}
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 18H4V8L12 13L20 8V18ZM12 11L4 6H20L12 11Z"
+                                fill="currentColor" />
+                        </svg>
+
+                        <span>
+                            Communication
+                        </span>
+
+                    </div>
+
+                    {{-- Arrow --}}
+                    <svg class="w-4 h-4 shrink-0 origin-center transition-transform duration-200"
+                        :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+
+                </button>
+
+
+                {{-- Children --}}
+                <div x-show="open" x-collapse x-cloak class="space-y-1 pl-3 mt-1">
+
+                    {{-- Email Templates --}}
+                    <a href="{{ route('email_templates.index') }}" class="{{ request()->routeIs('email_templates.*')
+                    ? 'communication-active bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}
+                                block px-6 py-1 text-sm rounded-md transition">
+                        - Email Templates
+                    </a>
+                    <a href="{{ route('email_settings.index') }}" class="{{ request()->routeIs('email_settings.*')
+                    ? 'communication-active bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}
+                                block px-6 py-1 text-sm rounded-md transition">
+                        - Email Settings
+                    </a>
+
+                </div>
+
+            </div>
             <!-- Menu for logs  -->
             <div class="space-y-1">
                 <div x-data="{ open: @if(request()->routeIs('admin.logs.*')) true @else false @endif }"
@@ -586,18 +644,17 @@
 
                     {{-- Children: Logs --}}
                     <div x-show="open" x-collapse x-cloak class="space-y-1 pl-3 mt-1">
-
-                        {{-- Activity Logs --}}
+ 
                         <a href="{{  route('admin.logs.activity.index') }}"
                             class="block px-6 py-1 text-sm rounded-md transition text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent">
                             - Activity Logs
                         </a>
 
                         {{-- Audit Logs --}}
-                        <a href="#"
+                        <!-- <a href="#"
                             class="block px-6 py-1 text-sm rounded-md transition text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent">
                             - Audit Logs
-                        </a>
+                        </a> -->
 
                         <a href="{{ route('admin.logs.session.index') }}" class="block px-6 py-1 text-sm rounded-md transition
           {{ request()->routeIs('admin.logs.session.index')

@@ -1,16 +1,7 @@
 {{-- Customer Navbar --}}
 <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-2 sm:px-4">
-
-    {{-- SEARCH BAR (Desktop & Tablet only) --}}
     <p></p>
-    <!-- @include('components.customer.home-search') -->
-
-    {{-- RIGHT SIDE ACTIONS --}}
-    {{-- Changed space-x to gap for better compatibility with 'order' utilities --}}
-    {{-- Removed heavy right margins that were pushing icons off-screen on mobile --}}
     <div class="flex items-center gap-2 sm:gap-3 md:gap-5 pr-2 md:mr-4 ">
-
-        {{-- Mobile Hamburger Button --}}
         <button id="mobile-menu-btn" type="button"
             class="block md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-md order-first md:order-none">
             <svg class="w-6 h-7" fill="none" stroke="currentColor" viewBox="0 0 19 19">
@@ -18,7 +9,6 @@
             </svg>
         </button>
 
-        {{-- Notification Dropdown --}}
         <div id="notificationDropdown" x-data="notificationDropdown()" class="relative block order-last md:order-none">
 
             <button @click="unlockSound(); open = !open" type="button"
@@ -48,13 +38,13 @@
                     @forelse(auth()->user()->notifications->take(5) as $notification)
                         <a href="{{ route('notifications.open', $notification->id) }}"
                             class="group block px-4 py-3 border-b border-gray-100 transition-all duration-200
-                                                              {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }} hover:bg-gray-50">
+                                                                                                                                      {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }} hover:bg-gray-50">
 
                             <div class="flex gap-3 items-start">
                                 <div class="mt-1">
                                     <div
                                         class="w-9 h-9 rounded-full flex items-center justify-center
-                                                                            {{ $notification->read_at ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600' }}">
+                                                                                                                                                    {{ $notification->read_at ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600' }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -104,24 +94,82 @@
             </div>
         </div>
 
-        {{-- Mobile Search (Hidden on medium screens) --}}
         <form action="{{ route('search') }}" method="GET" class="flex md:hidden items-center max-w-[50%] px-1 gap-1">
             <input type="text" name="location" placeholder="Search..."
                 class="flex-1 w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none">
         </form>
 
-        {{-- User Icon --}}
-        <div class="relative text-gray-400" id="user">
-            <button type="button" class="flex items-center focus:outline-none cursor-pointer">
-                <svg width="20" height="19" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" clip-rule="evenodd"
-                        d="M3.5 4.25C3.5 3.69188 3.60993 3.13923 3.82351 2.6236C4.03709 2.10796 4.35015 1.63945 4.7448 1.2448C5.13944 0.850147 5.60796 0.537094 6.1236 0.323512C6.63923 0.109929 7.19188 0 7.75 0C8.30812 0 8.86077 0.109929 9.3764 0.323512C9.89204 0.537094 10.3606 0.850147 10.7552 1.2448C11.1499 1.63945 11.4629 2.10796 11.6765 2.6236C11.8901 3.13923 12 3.69188 12 4.25C12 5.37717 11.5522 6.45817 10.7552 7.2552C9.95817 8.05223 8.87717 8.5 7.75 8.5C6.62283 8.5 5.54183 8.05223 4.7448 7.2552C3.94777 6.45817 3.5 5.37717 3.5 4.25ZM7.75 1.5C7.02065 1.5 6.32118 1.78973 5.80546 2.30546C5.28973 2.82118 5 3.52065 5 4.25C5 4.97935 5.28973 5.67882 5.80546 6.19454C6.32118 6.71027 7.02065 7 7.75 7C8.47935 7 9.17882 6.71027 9.69454 6.19454C10.2103 5.67882 10.5 4.97935 10.5 4.25C10.5 3.52065 10.2103 2.82118 9.69454 2.30546C9.17882 1.78973 8.47935 1.5 7.75 1.5ZM3.75 11.5C3.15326 11.5 2.58097 11.7371 2.15901 12.159C1.73705 12.581 1.5 13.1533 1.5 13.75V14.938C1.5 14.956 1.513 14.972 1.531 14.975C5.65 15.647 9.851 15.647 13.969 14.975C13.9775 14.9731 13.9851 14.9684 13.9907 14.9617C13.9963 14.955 13.9996 14.9467 14 14.938V13.75C14 13.1533 13.7629 12.581 13.341 12.159C12.919 11.7371 12.3467 11.5 11.75 11.5H11.41C11.3832 11.5005 11.3567 11.5045 11.331 11.512L10.466 11.795C8.70118 12.3713 6.79882 12.3713 5.034 11.795L4.168 11.512C4.14296 11.5047 4.11708 11.5006 4.091 11.5H3.75ZM0 13.75C0 12.7554 0.395088 11.8016 1.09835 11.0983C1.80161 10.3951 2.75544 10 3.75 10H4.09C4.27667 10.0007 4.458 10.0293 4.634 10.086L5.5 10.369C6.96203 10.8463 8.53797 10.8463 10 10.369L10.866 10.086C11.041 10.029 11.225 10 11.409 10H11.75C12.7446 10 13.6984 10.3951 14.4017 11.0983C15.1049 11.8016 15.5 12.7554 15.5 13.75V14.938C15.5 15.692 14.954 16.334 14.21 16.455C9.93164 17.1534 5.56836 17.1534 1.29 16.455C0.930184 16.3958 0.603047 16.2108 0.366821 15.9331C0.130596 15.6553 0.000609175 15.3027 0 14.938V13.75Z"
-                        fill="#6E6E6E" />
-                </svg>
-            </button>
-        </div>
+        @auth
+            <div id="user" class="relative text-gray-400">
 
-        {{-- Cart --}}
+                <button id="profileMenuBtn" type="button" class="flex items-center justify-center p-1.5 rounded-full
+                                   hover:bg-gray-100 transition cursor-pointer
+                                   focus:outline-none" aria-label="User menu" aria-expanded="false">
+                    <svg width="20" height="19" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd"
+                            d="M3.5 4.25C3.5 3.69188 3.60993 3.13923 3.82351 2.6236C4.03709 2.10796 4.35015 1.63945 4.7448 1.2448C5.13944 0.850147 5.60796 0.537094 6.1236 0.323512C6.63923 0.109929 7.19188 0 7.75 0C8.30812 0 8.86077 0.109929 9.3764 0.323512C9.89204 0.537094 10.3606 0.850147 10.7552 1.2448C11.1499 1.63945 11.4629 2.10796 11.6765 2.6236C11.8901 3.13923 12 3.69188 12 4.25C12 5.37717 11.5522 6.45817 10.7552 7.2552C9.95817 8.05223 8.87717 8.5 7.75 8.5C6.62283 8.5 5.54183 8.05223 4.7448 7.2552C3.94777 6.45817 3.5 5.37717 3.5 4.25ZM7.75 1.5C7.02065 1.5 6.32118 1.78973 5.80546 2.30546C5.28973 2.82118 5 3.52065 5 4.25C5 4.97935 5.28973 5.67882 5.80546 6.19454C6.32118 6.71027 7.02065 7 7.75 7C8.47935 7 9.17882 6.71027 9.69454 6.19454C10.2103 6.71027 10.5 5.37717 10.5 4.25C10.5 3.52065 10.2103 2.82118 9.17882 2.30546C9.17882 2.82118 9.17882 3.52065 9.17882 3.52065 7.75 1.5Z"
+                            fill="#6E6E6E" />
+
+                        <path fill-rule="evenodd" clip-rule="evenodd"
+                            d="M3.75 11.5C3.15326 11.5 2.58097 11.737 2.15901 12.159C1.73705 12.581 1.5 13.1533 1.5 13.75V14.938C1.5 14.956 1.513 14.972 1.531 14.975C5.65 15.647 9.851 15.647 13.969 14.975C13.9775 14.9731 13.9851 14.9684 13.9907 14.9617C13.9963 14.955 13.9996 14.9467 14 14.938V13.75C14 13.1533 13.7629 12.581 13.341 12.159C12.919 11.7371 12.3467 11.5 11.75 11.5H11.41C11.3832 11.5005 11.3567 11.5045 11.331 11.512L10.466 11.795C8.70118 12.3713 6.79882 12.3713 5.034 11.795L4.168 11.512C4.14296 11.5047 4.11708 11.5006 4.091 11.5H3.75Z"
+                            fill="#6E6E6E" />
+                    </svg>
+                </button>
+
+
+                <div id="profileDropdown" class="hidden absolute right-0 top-full mt-2 w-52
+                                   bg-white rounded-xl border border-gray-200
+                                   shadow-xl overflow-hidden z-[9999]">
+
+                    <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                        <p class="text-sm font-semibold text-gray-800 truncate">
+                            {{ auth()->user()->name }}
+                        </p>
+
+                        <p class="text-xs text-gray-500 truncate mt-0.5">
+                            {{ auth()->user()->email }}
+                        </p>
+                    </div>
+
+
+                    <a href="{{ url('customer/profile') }}" class="flex items-center gap-3 px-4 py-3
+                                       text-sm text-gray-700
+                                       hover:bg-gray-50 hover:text-[#00995c]
+                                       transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0" />
+                        </svg>
+
+                        <span>Profile</span>
+                    </a>
+
+
+                    <div class="border-t border-gray-100">
+
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+
+                            <button type="submit" class="w-full flex items-center gap-3 px-4 py-3
+                                               text-sm text-gray-700
+                                               hover:bg-red-50 hover:text-red-600
+                                               transition cursor-pointer">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H3" />
+                                </svg>
+
+                                <span>Logout</span>
+                            </button>
+                        </form>
+
+                    </div>
+
+                </div>
+            </div>
+        @endauth
+
+
         <a href="{{ route('cart.index') }}" class="relative inline-block text-gray-400 hover:text-gray-600"
             title="Cart">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -149,21 +197,19 @@
 </header>
 
 <script>
+    
+</script>
+
+<script>
     function notificationDropdown() {
 
         return {
-
             open: false,
-
             unreadCount: {{ auth()->user()->unreadNotifications->count() ?? 0 }},
-
             lastUnreadCount: {{ auth()->user()->unreadNotifications->count() ?? 0 }},
-
             notificationSound: null,
-
             notificationSound: null,
             soundUnlocked: false,
-
             init() {
 
                 this.notificationSound = new Audio(
@@ -274,7 +320,7 @@
                         // Update badge
                         this.unreadCount = newCount;
 
-                         
+
                         this.playNotificationSound();
 
                         // Refresh notification list
@@ -282,7 +328,7 @@
 
                     } else {
 
-                         
+
                         this.unreadCount = newCount;
 
                     }
@@ -506,6 +552,42 @@
         };
     }
 </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+        const button = document.getElementById('profileMenuBtn');
+        const dropdown = document.getElementById('profileDropdown');
+        const user = document.getElementById('user');
+
+        if (!button || !dropdown || !user) {
+            console.error('Profile menu elements not found');
+            return;
+        }
+
+        button.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            dropdown.classList.toggle('hidden');
+
+            button.setAttribute(
+                'aria-expanded',
+                !dropdown.classList.contains('hidden')
+            );
+        });
+
+        dropdown.addEventListener('click', function (e) {
+            e.stopPropagation();
+        });
+
+        document.addEventListener('click', function () {
+            dropdown.classList.add('hidden');
+            button.setAttribute('aria-expanded', 'false');
+        });
+
+    });
+</script>
 <script>
     window.notificationOpenUrl = "{{ route('notifications.open', ['notification' => '__ID__']) }}";
     function testNotificationSound() {
@@ -515,10 +597,12 @@
 
         audio.play()
             .then(() => {
-                console.log('🔔 Notification sound playing');
+                console.log('Notification sound playing');
             })
             .catch(error => {
-                console.error('❌ Sound blocked:', error);
+                console.error('Sound blocked:', error);
             });
     }
 </script>
+
+    

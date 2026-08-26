@@ -277,6 +277,7 @@ Route::get('/h/{id}', function ($id) {
     abort(404);
 });
 
+
 Route::middleware(['auth'])->prefix('api/v1/hoardings/{hoarding}')->group(function () {
     Route::get('/availability/heatmap', [\App\Http\Controllers\Api\HoardingAvailabilityController::class, 'getHeatmap'])->name('web.hoardings.availability.heatmap');
     Route::post('/availability/check-dates', [\App\Http\Controllers\Api\HoardingAvailabilityController::class, 'checkMultipleDates'])->name('web.hoardings.availability.check-dates');
@@ -1567,3 +1568,76 @@ Route::middleware(['auth'])->group(function () {
         });
 
 });
+
+
+// email templating logs
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('email-templates')
+    ->name('email_templates.')
+    ->group(function () {
+
+        // Email Templates List
+        Route::get('/', [
+            \App\Http\Controllers\Admin\EmailTemplateController::class,
+            'index'
+        ])->name('index');
+
+
+        // Create Email Template
+        Route::get('/create', [
+            \App\Http\Controllers\Admin\EmailTemplateController::class,
+            'create'
+        ])->name('create');
+
+
+        // Store Email Template
+        Route::post('/', [
+            \App\Http\Controllers\Admin\EmailTemplateController::class,
+            'store'
+        ])->name('store');
+
+
+        // Edit Email Template
+        Route::get('/{emailTemplate}/edit', [
+            \App\Http\Controllers\Admin\EmailTemplateController::class,
+            'edit'
+        ])->name('edit');
+
+
+        // Update Email Template
+        Route::put('/{emailTemplate}', [
+            \App\Http\Controllers\Admin\EmailTemplateController::class,
+            'update'
+        ])->name('update');
+
+
+        // Preview Email Template
+        Route::get('/{emailTemplate}/preview', [
+            \App\Http\Controllers\Admin\EmailTemplateController::class,
+            'preview'
+        ])->name('preview');
+
+    });
+
+
+Route::middleware(['auth', 'role:admin'])
+    ->prefix('email-settings')
+    ->name('email_settings.')
+    ->group(function () {
+
+        Route::get('/', [
+            \App\Http\Controllers\Admin\EmailSettingController::class,
+            'index'
+        ])->name('index');
+
+        Route::put('/', [
+            \App\Http\Controllers\Admin\EmailSettingController::class,
+            'update'
+        ])->name('update');
+
+        Route::post('/test', [
+            \App\Http\Controllers\Admin\EmailSettingController::class,
+            'test'
+        ])->name('test');
+
+    });

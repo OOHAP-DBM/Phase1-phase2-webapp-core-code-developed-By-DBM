@@ -119,6 +119,15 @@ class RegisterController extends Controller
 
                 'status' => 'active',
             ]);
+            app(\App\Services\LoggingService::class)->created(
+                $user,
+                'registration',
+                'User account created through registration.',
+                [
+                    'registration_method' => 'web',
+                    'registration_role' => $role,
+                ]
+            );
 
 
             // Assign role
@@ -189,6 +198,7 @@ class RegisterController extends Controller
                 ]);
 
 
+
                 $vendorProfile = VendorProfile::create([
 
                     'user_id' => $user->id,
@@ -205,6 +215,14 @@ class RegisterController extends Controller
                     // Admin approval will set auth()->id().
                     'approved_by' => null,
                 ]);
+
+                app(\App\Services\LoggingService::class)->statusChanged(
+                    $vendorProfile,
+                    'pending_approval',
+                    'approved',
+                    'vendor_approval',
+                    'Vendor account automatically approved by system.'
+                );
 
                 ActivityLog::record(
                     action: 'vendor_registered',

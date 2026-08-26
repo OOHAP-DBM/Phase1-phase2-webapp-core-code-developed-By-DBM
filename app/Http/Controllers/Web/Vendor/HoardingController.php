@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hoarding;
 use Illuminate\Http\Request;
 use Modules\Hoardings\Services\HoardingService;
-
+use App\Models\ActivityLog;
 class HoardingController extends Controller
 {
     /**
@@ -78,6 +78,17 @@ class HoardingController extends Controller
             $validated['enable_weekly_booking'] = $request->has('enable_weekly_booking');
 
             $hoarding = $this->hoardingService->create($validated);
+            ActivityLog::record(
+                action: 'hoarding_created',
+                description: 'Vendor created a new hoarding successfully.',
+                module: 'hoarding',
+                subject: $hoarding,
+                metadata: [
+                    'vendor_id' => auth()->id(),
+                    'hoarding_id' => $hoarding->id,
+                    'title' => $hoarding->title,
+                ]
+            );
 
             // Clear statistics cache
             $this->hoardingService->clearVendorStatistics(auth()->id());
@@ -150,7 +161,17 @@ class HoardingController extends Controller
             $validated['enable_weekly_booking'] = $request->has('enable_weekly_booking');
 
             $this->hoardingService->update($id, $validated);
-
+            ActivityLog::record(
+                action: 'hoarding_updated',
+                description: 'Vendor updated a hoarding successfully.',
+                module: 'hoarding',
+                subject: $hoarding,
+                metadata: [
+                    'vendor_id' => auth()->id(),
+                    'hoarding_id' => $hoarding->id,
+                    'title' => $hoarding->title,
+                ]
+            );
             // Clear statistics cache
             $this->hoardingService->clearVendorStatistics(auth()->id());
 
