@@ -36,7 +36,7 @@ class EnquiryController extends Controller
     // public function store(Request $request): JsonResponse
     // {
     //     $hoarding = Hoarding::findOrFail($request->hoarding_id);
-        
+
     //     $validator = Validator::make($request->all(), [
     //         'hoarding_id' => 'required|exists:hoardings,id',
     //         'preferred_start_date' => 'required|date|after_or_equal:today',
@@ -180,8 +180,8 @@ class EnquiryController extends Controller
                     $validator->errors()->add("items.$index.hoarding_id", "Hoarding #{$hoarding->id} is currently unavailable for booking.");
                 }
                $this->gracePeriodService->addValidationRule(
-                $validator, 
-                    "items.$index.preferred_start_date", 
+                $validator,
+                    "items.$index.preferred_start_date",
                     $hoarding
                 );
             }
@@ -243,7 +243,7 @@ class EnquiryController extends Controller
                         // If package exists, it might override the duration value (assuming packages are months)
                         if ($package && isset($package->min_booking_duration)) {
                             $value = $package->min_booking_duration;
-                            $unit = 'months'; 
+                            $unit = 'months';
                         }
                     }
 
@@ -299,6 +299,27 @@ class EnquiryController extends Controller
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
+                    // Send FCM notification after enquiry is successfully created
+                    if (!empty($user->fcm_token)) {
+
+                        $sent = send(
+                            $user->fcm_token,
+                            'Enquiry Submitted',
+                            'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                            [
+                                'type'       => 'enquiry_created',
+                                'enquiry_id' => (string) $enquiry->id,
+                                'user_id'    => (string) $user->id,
+                            ]
+                        );
+
+                        if (!$sent) {
+                            \Log::warning(
+                                "FCM notification failed for user ID {$user->id}, enquiry ID {$enquiry->id}"
+                            );
+                        }
+                    }
+
 
                 return response()->json([
                     'success' => true,
