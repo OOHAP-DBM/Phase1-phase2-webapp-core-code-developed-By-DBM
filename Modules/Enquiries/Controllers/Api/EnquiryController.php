@@ -301,7 +301,8 @@ class EnquiryController extends Controller
                 }
                     // Send FCM notification after enquiry is successfully created
                     if (!empty($user->fcm_token)) {
-
+                    \Log::warning("FCM notification failed for user ID {$user->id}, enquiry ID {$enquiry->id}"
+                            );
                         $sent = send(
                             $user->fcm_token,
                             'Enquiry Submitted',
