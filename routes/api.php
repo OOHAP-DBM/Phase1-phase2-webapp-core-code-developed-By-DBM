@@ -92,6 +92,9 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
     Route::prefix('pos')->group(base_path('routes/api_v1/pos.php')); // POS Module
     Route::prefix('pages')->group(base_path('routes/api_v1/cms.php')); // CMS Module
 
+    // Logs module
+    Route::prefix('logs')->group(base_path('routes/api_v1/logs.php'));
+
     Route::middleware('auth:sanctum')->prefix('/email-settings')->group(function () {
         Route::get('/',                     [EmailSettingController::class, 'index']);
         Route::post('/send-verification',   [EmailSettingController::class, 'sendVerification']);
