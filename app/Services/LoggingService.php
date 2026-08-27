@@ -385,7 +385,60 @@ class LoggingService
 
     protected function userAgent(): ?string
     {
-        return request()?->userAgent();
+        // Prefer explicit device name sent by mobile clients (e.g. Flutter/Dart)
+        // Look for common payload keys and headers before falling back to the raw User-Agent.
+        try {
+            $req = request();
+
+            if (!$req) {
+                return null;
+            }
+
+            // 1) Check nested 'device' payload (device._name or device.name)
+            if ($req->has('device')) {
+                $device = $req->input('device');
+
+                if (is_array($device)) {
+                    if (!empty($device['_name'])) {
+                        return $device['_name'];
+                    }
+
+                    if (!empty($device['name'])) {
+                        return $device['name'];
+                    }
+                }
+
+                if (is_object($device)) {
+                    if (!empty($device->_name)) {
+                        return $device->_name;
+                    }
+
+                    if (!empty($device->name)) {
+                        return $device->name;
+                    }
+                }
+            }
+
+            // 2) Check flat fields: device_name, deviceName or _device_name
+            foreach (['device_name', 'deviceName', '_device_name'] as $field) {
+                if ($req->has($field) && $value = $req->input($field)) {
+                    return $value;
+                }
+            }
+
+            // 3) Check common headers: X-Device-Name or Device-Name
+            $headerDevice = $req->header('X-Device-Name') ?? $req->header('Device-Name');
+            if (!empty($headerDevice)) {
+                return $headerDevice;
+            }
+
+            // 4) Finally fall back to the standard User-Agent string
+            return $req->userAgent();
+        } catch (Throwable $e) {
+            report($e);
+
+            return null;
+        }
     }
 
     protected function requestId(): ?string

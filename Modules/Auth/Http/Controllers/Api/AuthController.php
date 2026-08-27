@@ -466,7 +466,7 @@ class AuthController extends Controller
             [
                 'auth_method' => 'password',
                 'role' => $activeRole,
-                'identifier' => $request->input('device_name'),
+                'identifier' => $request->input('identifier'),
                 'token_created' => true,
             ]
         );
