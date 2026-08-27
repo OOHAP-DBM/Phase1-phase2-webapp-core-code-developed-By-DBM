@@ -184,7 +184,7 @@ class VendorHoardingController extends Controller
     public function toggleStatus(Request $request, $id)
     {
         try {
-            
+
             $hoarding = Hoarding::with('vendor')->findOrFail($id);
 
             $oldStatus = $hoarding->status;
@@ -194,10 +194,10 @@ class VendorHoardingController extends Controller
 
             $hoarding->save();
 
-             
+
             event(new HoardingStatusChanged(collect([$hoarding]), $hoarding->status, auth()->user()));
 
-             
+
             if ($hoarding->vendor) {
                 if ($hoarding->status === 'active') {
                     $hoarding->vendor->notify(new HoardingApproved($hoarding));
@@ -208,7 +208,7 @@ class VendorHoardingController extends Controller
                 }
             }
 
-            
+
             if ($hoarding->vendor && $hoarding->vendor->fcm_token) {
                 try {
                     if ($hoarding->status === 'active') {
@@ -306,7 +306,7 @@ class VendorHoardingController extends Controller
                 'type' => strtoupper($h->hoarding_type),
                 'vendor' => $h->vendor,
                 'vendor_commission' => $h->vendor?->vendorProfile?->commission_percentage,
-                'hoarding_commission' => $h->commission _percent,
+                'hoarding_commission' => $h->commission_percent,
                 'address' => $h->address,
                 'display_location' => $h->display_location,
                 'bookings_count' => $h->bookings_count,
@@ -321,7 +321,7 @@ class VendorHoardingController extends Controller
         ]);
     }
 
- 
+
     public function bulkDelete(Request $request)
     {
         $request->validate([
@@ -330,7 +330,7 @@ class VendorHoardingController extends Controller
         ]);
 
         try {
-            
+
             $hoardings = Hoarding::whereIn('id', $request->ids)->get();
             $count = $hoardings->count();
             Hoarding::whereIn('id', $request->ids)->delete();
@@ -851,7 +851,7 @@ class VendorHoardingController extends Controller
                     )
                 );
 
-                
+
                 $vendorProfile = $hoarding->vendor->vendorProfile;
                 $additionalEmails = $vendorProfile->additional_emails ?? [];
                 $emailPreferences = $vendorProfile->email_preferences ?? [];
