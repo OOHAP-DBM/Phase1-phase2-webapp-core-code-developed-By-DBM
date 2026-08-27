@@ -684,26 +684,47 @@ class AuthController extends Controller
         }
 
         // Log logout before token deletion
-        $this->loggingService->sessionForUser(
-            $user->id,
-            'logout',
-            'User logged out successfully',
-            [
-                'auth_method' => 'sanctum',
-                'active_role' => $user->active_role,
-            ]
-        );
+        // $this->loggingService->sessionForUser(
+        //     $user->id,
+        //     'logout',
+        //     'User logged out successfully',
+        //     [
+        //         'auth_method' => 'sanctum',
+        //         'active_role' => $user->active_role,
+        //     ]
+        // );
 
-        $this->loggingService->activity(
-            'logout',
-            'User logged out successfully',
-            'authentication',
-            $user,
-            [
-                'auth_method' => 'sanctum',
-                'active_role' => $user->active_role,
-            ]
-        );
+        // $this->loggingService->activity(
+        //     'logout',
+        //     'User logged out successfully',
+        //     'authentication',
+        //     $user,
+        //     [
+        //         'auth_method' => 'sanctum',
+        //         'active_role' => $user->active_role,
+        //     ]
+        // );
+            try {
+            $sessionLog = \App\Models\SessionLog::activeForUser($user->id);
+
+            if ($sessionLog) {
+                $sessionLog->end();
+
+                \Log::info('API session log ended successfully', [
+                    'user_id' => $user->id,
+                    'session_log_id' => $sessionLog->id,
+                ]);
+            } else {
+                \Log::warning('No active session log found during API logout', [
+                    'user_id' => $user->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \Log::error('Error while ending API session log', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
         // Delete current token
         if ($user->currentAccessToken()) {
             $user->currentAccessToken()->delete();
