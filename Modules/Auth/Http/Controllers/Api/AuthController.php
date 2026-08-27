@@ -116,7 +116,7 @@ class AuthController extends Controller
     }
     /**
      * Register a new user
-     * 
+     *
      * @group Authentication
      * @bodyParam name string required The user's name
      * @bodyParam email string required The user's email
@@ -466,7 +466,7 @@ class AuthController extends Controller
             [
                 'auth_method' => 'password',
                 'role' => $activeRole,
-                'identifier' => $request->input('identifier'),
+                'identifier' => $request->input('device_name'),
                 'token_created' => true,
             ]
         );
@@ -497,7 +497,7 @@ class AuthController extends Controller
 
     /**
      * Send OTP for login
-     * 
+     *
      * @group Authentication
      * @bodyParam identifier string required Email or phone number
      */
@@ -552,7 +552,7 @@ class AuthController extends Controller
 
     /**
      * Verify OTP and login
-     * 
+     *
      * @group Authentication
      * @bodyParam identifier string required Email or phone number
      * @bodyParam otp string required 6-digit OTP
@@ -632,7 +632,7 @@ class AuthController extends Controller
 
     /**
      * Get authenticated user
-     * 
+     *
      * @group Authentication
      * @authenticated
      */
@@ -658,7 +658,7 @@ class AuthController extends Controller
 
     /**
      * Logout (revoke token)
-     * 
+     *
      * @group Authentication
      * @authenticated
      */
@@ -720,7 +720,7 @@ class AuthController extends Controller
 
     /**
      * Refresh token
-     * 
+     *
      * @group Authentication
      * @authenticated
      */
