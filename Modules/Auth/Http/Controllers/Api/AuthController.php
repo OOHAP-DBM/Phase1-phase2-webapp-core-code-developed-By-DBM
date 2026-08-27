@@ -456,19 +456,27 @@ class AuthController extends Controller
             ->plainTextToken;
 
         /*
-         * Log successful login
+         * Log successful login and create session log
          */
-        $this->loggingService->login([
-            'role' => $activeRole,
-            'identifier' => $request->input('identifier'),
-            'token_created' => true,
-        ]);
+        $sessionLog = $this->loggingService->sessionForUser(
+            $user,
+            'login',
+            null,
+            'User logged in',
+            [
+                'auth_method' => 'password',
+                'role' => $activeRole,
+                'identifier' => $request->input('identifier'),
+                'token_created' => true,
+            ]
+        );
 
         $responseData = [
             'user' => new UserResource($freshUser),
             'token' => $token,
             'token_type' => 'Bearer',
             'active_role' => $activeRole,
+            'session_log_id' => $sessionLog?->id,
             'should_merge' => true,
         ];
 
