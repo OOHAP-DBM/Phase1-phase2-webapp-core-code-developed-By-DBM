@@ -171,8 +171,8 @@
                                             <td class="px-5 py-4">
 
                                                 <span class="inline-flex items-center rounded-full
-                                                        bg-gray-100 px-2.5 py-1
-                                                        text-xs font-medium text-gray-700">
+                                                                            bg-gray-100 px-2.5 py-1
+                                                                            text-xs font-medium text-gray-700">
 
                                                     {{ ucfirst(str_replace('_', ' ', $log->user_role ?? 'system')) }}
 

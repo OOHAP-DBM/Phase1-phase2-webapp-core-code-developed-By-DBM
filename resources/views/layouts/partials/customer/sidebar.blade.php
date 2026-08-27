@@ -323,7 +323,7 @@
 
 
         {{-- Audit Logs --}}
-        <a
+        <!-- <a
             href="#"
             class="block px-6 py-1 text-sm rounded-md transition
             {{ request()->routeIs('customer.logs.audit.*')
@@ -331,7 +331,7 @@
                 : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
         >
             Audit Logs
-        </a>
+        </a> -->
 
 
         {{-- Session Logs --}}

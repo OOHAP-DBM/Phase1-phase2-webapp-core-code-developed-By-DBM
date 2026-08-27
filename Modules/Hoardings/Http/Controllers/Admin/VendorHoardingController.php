@@ -184,7 +184,7 @@ class VendorHoardingController extends Controller
     public function toggleStatus(Request $request, $id)
     {
         try {
-            // 👇 vendor eagerly load (IMPORTANT)
+            
             $hoarding = Hoarding::with('vendor')->findOrFail($id);
 
             $oldStatus = $hoarding->status;
@@ -194,10 +194,10 @@ class VendorHoardingController extends Controller
 
             $hoarding->save();
 
-            // Fire event for notification (single)
+             
             event(new HoardingStatusChanged(collect([$hoarding]), $hoarding->status, auth()->user()));
 
-            // Send database notification to vendor
+             
             if ($hoarding->vendor) {
                 if ($hoarding->status === 'active') {
                     $hoarding->vendor->notify(new HoardingApproved($hoarding));
@@ -208,7 +208,7 @@ class VendorHoardingController extends Controller
                 }
             }
 
-            // 📱 Send push notification to vendor
+            
             if ($hoarding->vendor && $hoarding->vendor->fcm_token) {
                 try {
                     if ($hoarding->status === 'active') {
@@ -228,11 +228,11 @@ class VendorHoardingController extends Controller
                         $title,
                         $message,
                         [
-                            'type'          => $type,
-                            'hoarding_id'   => $hoarding->id,
+                            'type' => $type,
+                            'hoarding_id' => $hoarding->id,
                             'hoarding_type' => strtoupper($hoarding->hoarding_type),
-                            'status'        => $hoarding->status,
-                            'action'        => $action
+                            'status' => $hoarding->status,
+                            'action' => $action
                         ]
                     );
 
@@ -243,21 +243,21 @@ class VendorHoardingController extends Controller
                     }
                 } catch (\Throwable $e) {
                     Log::error("Failed to send push notification to vendor on hoarding status toggle", [
-                        'vendor_id'   => $hoarding->vendor->id,
+                        'vendor_id' => $hoarding->vendor->id,
                         'hoarding_id' => $hoarding->id,
-                        'error'       => $e->getMessage()
+                        'error' => $e->getMessage()
                     ]);
                 }
             }
 
             return response()->json([
                 'success' => true,
-                'status'  => $hoarding->status
+                'status' => $hoarding->status
             ]);
         } catch (\Throwable $e) {
             Log::critical('toggleStatus failed', [
                 'hoarding_id' => $id,
-                'error'       => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
@@ -306,7 +306,7 @@ class VendorHoardingController extends Controller
                 'type' => strtoupper($h->hoarding_type),
                 'vendor' => $h->vendor,
                 'vendor_commission' => $h->vendor?->vendorProfile?->commission_percentage,
-                'hoarding_commission' => $h->commission_percent,
+                'hoarding_commission' => $h->commission _percent,
                 'address' => $h->address,
                 'display_location' => $h->display_location,
                 'bookings_count' => $h->bookings_count,
@@ -321,9 +321,7 @@ class VendorHoardingController extends Controller
         ]);
     }
 
-    /**
-     * Bulk delete hoardings
-     */
+ 
     public function bulkDelete(Request $request)
     {
         $request->validate([
@@ -332,7 +330,7 @@ class VendorHoardingController extends Controller
         ]);
 
         try {
-            // Fetch hoardings before deletion for event
+            
             $hoardings = Hoarding::whereIn('id', $request->ids)->get();
             $count = $hoardings->count();
             Hoarding::whereIn('id', $request->ids)->delete();
@@ -349,6 +347,8 @@ class VendorHoardingController extends Controller
             ], 500);
         }
     }
+
+
 
     /**
      * Bulk activate hoardings
@@ -419,12 +419,12 @@ class VendorHoardingController extends Controller
     public function bulkActivate(Request $request)
     {
         $request->validate([
-            'ids'   => 'required|array',
+            'ids' => 'required|array',
             'ids.*' => 'required|integer|exists:hoardings,id',
         ]);
 
         try {
-            $count    = Hoarding::whereIn('id', $request->ids)->update(['status' => 'active']);
+            $count = Hoarding::whereIn('id', $request->ids)->update(['status' => 'active']);
             $hoardings = Hoarding::with('vendor')->whereIn('id', $request->ids)->get();
 
             // event(new HoardingStatusChanged($hoardings, 'activated', auth()->user()));
@@ -432,7 +432,7 @@ class VendorHoardingController extends Controller
             $this->notifyVendorsGrouped(
                 $hoardings,
                 'activated',
-                'Hoardings Activated ✅',
+                'Hoardings Activated',
                 '{count} of your hoardings have been activated and are now live!',
                 'vendor_hoarding_bulk_activated'
             );
@@ -440,7 +440,7 @@ class VendorHoardingController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $count . ' ' . Str::plural('Hoarding', $count) . ' activated successfully',
-                'count'   => $count,
+                'count' => $count,
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Failed: ' . $e->getMessage()], 500);
@@ -518,12 +518,12 @@ class VendorHoardingController extends Controller
     public function bulkDeactivate(Request $request)
     {
         $request->validate([
-            'ids'   => 'required|array',
+            'ids' => 'required|array',
             'ids.*' => 'required|integer|exists:hoardings,id',
         ]);
 
         try {
-            $count     = Hoarding::whereIn('id', $request->ids)->update(['status' => 'inactive']);
+            $count = Hoarding::whereIn('id', $request->ids)->update(['status' => 'inactive']);
             $hoardings = Hoarding::with('vendor')->whereIn('id', $request->ids)->get();
 
             // event(new HoardingStatusChanged($hoardings, 'deactivated', auth()->user()));
@@ -539,7 +539,7 @@ class VendorHoardingController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $count . ' ' . Str::plural('Hoarding', $count) . ' deactivated successfully',
-                'count'   => $count,
+                'count' => $count,
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Failed: ' . $e->getMessage()], 500);
@@ -630,7 +630,7 @@ class VendorHoardingController extends Controller
     public function bulkApprove(Request $request)
     {
         $request->validate([
-            'ids'   => 'required|array',
+            'ids' => 'required|array',
             'ids.*' => 'required|integer|exists:hoardings,id',
         ]);
 
@@ -655,7 +655,7 @@ class VendorHoardingController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $count . ' ' . Str::plural('Hoarding', $count) . ' approved and activated successfully',
-                'count'   => $count,
+                'count' => $count,
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Failed: ' . $e->getMessage()], 500);
@@ -745,13 +745,13 @@ class VendorHoardingController extends Controller
     public function bulkReject(Request $request)
     {
         $request->validate([
-            'ids'              => 'required|array',
-            'ids.*'            => 'required|integer|exists:hoardings,id',
+            'ids' => 'required|array',
+            'ids.*' => 'required|integer|exists:hoardings,id',
             'rejection_reason' => 'nullable|string|max:500',
         ]);
 
         try {
-            $hoardings       = Hoarding::with('vendor')->whereIn('id', $request->ids)->get();
+            $hoardings = Hoarding::with('vendor')->whereIn('id', $request->ids)->get();
             $rejectionReason = $request->input('rejection_reason', 'Admin decision');
 
             foreach ($hoardings as $hoarding) {
@@ -777,7 +777,7 @@ class VendorHoardingController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $count . ' ' . Str::plural('Hoarding', $count) . ' rejected successfully',
-                'count'   => $count,
+                'count' => $count,
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Failed: ' . $e->getMessage()], 500);
@@ -794,7 +794,7 @@ class VendorHoardingController extends Controller
         ?string $fcmType = null
     ): void {
         $adminName = auth()->user()?->name ?? 'Admin';
-        $grouped   = $hoardings->filter(fn($h) => $h->vendor !== null)
+        $grouped = $hoardings->filter(fn($h) => $h->vendor !== null)
             ->groupBy(fn($h) => $h->vendor->id);
 
         foreach ($grouped as $vendorId => $vendorHoardings) {
@@ -812,14 +812,14 @@ class VendorHoardingController extends Controller
             if ($vendor->fcm_token && $fcmTitle && $fcmType) {
                 try {
                     $count = $vendorHoardings->count();
-                    $body  = str_replace('{count}', $count, $fcmBody ?? "{$count} hoardings {$action}.");
+                    $body = str_replace('{count}', $count, $fcmBody ?? "{$count} hoardings {$action}.");
 
                     send($vendor->fcm_token, $fcmTitle, $body, [
-                        'type'         => $fcmType,
+                        'type' => $fcmType,
                         'hoarding_ids' => $vendorHoardings->pluck('id')->toArray(),
-                        'count'        => $count,
-                        'action'       => $action,
-                        'reason'       => $reason,
+                        'count' => $count,
+                        'action' => $action,
+                        'reason' => $reason,
                     ]);
                 } catch (\Throwable $e) {
                     Log::error("Bulk FCM (reject) exception for vendor {$vendor->id}", ['error' => $e->getMessage()]);
@@ -851,8 +851,8 @@ class VendorHoardingController extends Controller
                     )
                 );
 
-                // ✅ Additional emails pe bhi bhejo - service se
-                $vendorProfile    = $hoarding->vendor->vendorProfile;
+                
+                $vendorProfile = $hoarding->vendor->vendorProfile;
                 $additionalEmails = $vendorProfile->additional_emails ?? [];
                 $emailPreferences = $vendorProfile->email_preferences ?? [];
 
@@ -890,11 +890,11 @@ class VendorHoardingController extends Controller
                         'Hoarding Suspended ⏸️',
                         'Your hoarding "' . ($hoarding->title ?? $hoarding->name ?? 'N/A') . '" has been suspended.',
                         [
-                            'type'          => 'vendor_hoarding_suspended',
-                            'hoarding_id'   => $hoarding->id,
+                            'type' => 'vendor_hoarding_suspended',
+                            'hoarding_id' => $hoarding->id,
                             'hoarding_type' => strtoupper($hoarding->hoarding_type),
-                            'status'        => 'suspended',
-                            'action'        => 'suspended'
+                            'status' => 'suspended',
+                            'action' => 'suspended'
                         ]
                     );
 
@@ -905,9 +905,9 @@ class VendorHoardingController extends Controller
                     }
                 } catch (\Throwable $e) {
                     Log::error("Failed to send push notification to vendor on hoarding suspension", [
-                        'vendor_id'   => $hoarding->vendor->id,
+                        'vendor_id' => $hoarding->vendor->id,
                         'hoarding_id' => $hoarding->id,
-                        'error'       => $e->getMessage()
+                        'error' => $e->getMessage()
                     ]);
                 }
             }
@@ -1002,7 +1002,7 @@ class VendorHoardingController extends Controller
             } catch (\Throwable $e) {
                 Log::error("Bulk hoarding email failed for vendor {$vendor->id}", [
                     'action' => $action,
-                    'error'  => $e->getMessage()
+                    'error' => $e->getMessage()
                 ]);
             }
 
@@ -1010,7 +1010,7 @@ class VendorHoardingController extends Controller
             if ($vendor->fcm_token && $fcmTitle && $fcmType) {
                 try {
                     $count = $vendorHoardings->count();
-                    $body  = $fcmBodyTemplate
+                    $body = $fcmBodyTemplate
                         ? str_replace('{count}', $count, $fcmBodyTemplate)
                         : "{$count} " . Str::plural('hoarding', $count) . " have been {$action}.";
 
@@ -1019,10 +1019,10 @@ class VendorHoardingController extends Controller
                         $fcmTitle,
                         $body,
                         [
-                            'type'         => $fcmType,
+                            'type' => $fcmType,
                             'hoarding_ids' => $vendorHoardings->pluck('id')->toArray(),
-                            'count'        => $count,
-                            'action'       => $action,
+                            'count' => $count,
+                            'action' => $action,
                         ]
                     );
 
@@ -1031,7 +1031,7 @@ class VendorHoardingController extends Controller
                     }
                 } catch (\Throwable $e) {
                     Log::error("Bulk FCM exception for vendor {$vendor->id}", [
-                        'error'  => $e->getMessage(),
+                        'error' => $e->getMessage(),
                         'action' => $action,
                     ]);
                 }

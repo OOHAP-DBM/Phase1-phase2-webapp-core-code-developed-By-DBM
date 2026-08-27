@@ -55,9 +55,9 @@
                     @if(auth()->user()->avatar)
                         <img src="{{ route('view-avatar', auth()->user()->id) }}?v={{ auth()->user()->updated_at->timestamp }}"
                             alt="Profile Image" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="
-                                        this.style.display='none';
-                                        this.nextElementSibling.style.display='block';
-                                    ">
+                                            this.style.display='none';
+                                            this.nextElementSibling.style.display='block';
+                                        ">
                         <svg style="display:none; width:36px; height:36px;" fill="none"
                             stroke="{{ request()->routeIs('vendor.profile.*') ? '#ffffff' : '#9ca3af' }}"
                             viewBox="0 0 24 24">
@@ -129,7 +129,7 @@
             $sidebarVendor?->state,
         ];
         $sidebarProfileCompletion = count($sidebarProfileFields) > 0
-            ? round((count(array_filter($sidebarProfileFields, fn ($value) => !is_null($value) && $value !== '')) / count($sidebarProfileFields)) * 100)
+            ? round((count(array_filter($sidebarProfileFields, fn($value) => !is_null($value) && $value !== '')) / count($sidebarProfileFields)) * 100)
             : 0;
         $sidebarProfileBarColor = $sidebarProfileCompletion >= 100
             ? 'bg-green-500'
@@ -389,7 +389,7 @@
                     @if(auth()->user() && auth()->user()->hasRole('vendor'))
                         <a href="{{ route('vendor.hoardings.add') }}"
                             class="block px-6 py-1 text-sm rounded-md transition
-                                {{ request()->routeIs('vendor.hoardings.add') || request()->is('vendor/hoardings/add') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                                    {{ request()->routeIs('vendor.hoardings.add') || request()->is('vendor/hoardings/add') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                             <span class="inline-flex items-center gap-2">- Add Hoardings</span>
                         </a>
                     @endif
@@ -479,115 +479,14 @@
                     </a>
                     <a href="{{ route('vendor.pos.my-customers') }}" class="block px-6 py-1 text-sm rounded-md transition
                         {{ request()->routeIs('vendor.pos.my-customers')
-                        ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
-                        : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+    ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
+    : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                         - My Customers
                     </a>
                 </div>
             </div>
 
-            {{-- Logs Dropdown --}}
-<div
-    x-data="{ open: {{ request()->routeIs('vendor.logs.*') ? 'true' : 'false' }} }"
-    class="space-y-1"
->
 
-    {{-- Parent --}}
-    <button
-        type="button"
-        @click="open = !open"
-        class="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg
-        {{ request()->routeIs('vendor.logs.*')
-            ? 'bg-green-600 text-white'
-            : 'text-gray-700 hover:bg-gray-50' }}"
-    >
-
-        <div class="flex items-center gap-3">
-
-            <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-            >
-                <path
-                    d="M4 4H20V20H4V4ZM8 8H16M8 12H16M8 16H13"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                />
-            </svg>
-
-            Logs
-
-        </div>
-
-        <svg
-            class="w-4 h-4 transition-transform flex-shrink-0"
-            :class="{ 'rotate-180': open }"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-        >
-            <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-            />
-        </svg>
-
-    </button>
-
-
-    {{-- Children --}}
-    <div
-        x-show="open"
-        x-collapse
-        x-cloak
-        class="space-y-1 pl-3 mt-1"
-    >
-
-        {{-- Activity Logs --}}
-        <a
-            href="{{ route('vendor.logs.activity.index') }}"
-            class="block px-6 py-1 text-sm rounded-md transition
-            {{ request()->routeIs('vendor.logs.activity.*')
-                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
-                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
-        >
-            Activity Logs
-        </a>
-
-
-        {{-- Audit Logs --}}
-        <a
-            href="#"
-            class="block px-6 py-1 text-sm rounded-md transition
-            {{ request()->routeIs('vendor.logs.audit.*')
-                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
-                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
-        >
-            Audit Logs
-        </a>
-
-
-        {{-- Session Logs --}}
-        <a
-            href="{{ route('vendor.logs.session.index') }}"
-            class="block px-6 py-1 text-sm rounded-md transition
-            {{ request()->routeIs('vendor.logs.session.*')
-                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
-                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
-        >
-            Session Logs
-        </a>
-
-    </div>
-
-</div>
 
             <a href="{{ route('vendor.commission.index') }}"
                 class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg {{ request()->routeIs('vendor.commission.*') ? 'bg-[#00995c] text-white' : 'text-gray-700 hover:bg-gray-50' }}">
@@ -602,6 +501,70 @@
                 </span>
                 <span class="sb-nav-text">Commission</span>
             </a>
+
+            {{-- Logs Dropdown --}}
+            <div x-data="{ open: {{ request()->routeIs('vendor.logs.*') ? 'true' : 'false' }} }" class="space-y-1">
+
+                {{-- Parent --}}
+                <button type="button" @click="open = !open" class="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg
+        {{ request()->routeIs('vendor.logs.*')
+    ? 'bg-green-600 text-white'
+    : 'text-gray-700 hover:bg-gray-50' }}">
+
+                    <div class="flex items-center gap-3">
+
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 4H20V20H4V4ZM8 8H16M8 12H16M8 16H13" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+
+                        Logs
+
+                    </div>
+
+                    <svg class="w-4 h-4 transition-transform flex-shrink-0" :class="{ 'rotate-180': open }" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+
+                </button>
+
+
+                {{-- Children --}}
+                <div x-show="open" x-collapse x-cloak class="space-y-1 pl-3 mt-1">
+
+                    {{-- Activity Logs --}}
+                    <a href="{{ route('vendor.logs.activity.index') }}" class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('vendor.logs.activity.*')
+    ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+    : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                        Activity Logs
+                    </a>
+
+
+                    {{-- Audit Logs --}}
+                    <!-- <a
+            href="#"
+            class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('vendor.logs.audit.*')
+                ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+                : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}"
+        >
+            Audit Logs
+        </a> -->
+
+
+                    {{-- Session Logs --}}
+                    <a href="{{ route('vendor.logs.session.index') }}" class="block px-6 py-1 text-sm rounded-md transition
+            {{ request()->routeIs('vendor.logs.session.*')
+    ? 'bg-emerald-50 text-gray-900 pl-5 font-semibold border-[#00995c]'
+    : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                        Session Logs
+                    </a>
+
+                </div>
+
+            </div>
 
             <div class="space-y-1">
                 <a href="{{ route('vendor.email-settings') }}"
