@@ -48,7 +48,7 @@ class DirectEnquiryController extends Controller
         $role = $user->active_role ?? null;
 
 
-            $query = DirectEnquiry::where('user_id', $user->id)->with('assignedVendors')->latest();
+            $query = DirectEnquiry::where('user_id', $user->id)->latest();
 
 
         // Optional filters
