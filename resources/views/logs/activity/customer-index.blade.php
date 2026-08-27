@@ -250,7 +250,7 @@
 
             </div>
 
-           
+
             @if($logs->hasPages())
 
                 <div class="border-t border-gray-200 px-5 py-4">
@@ -259,7 +259,7 @@
 
             @endif
 
-            
+
 
         </div>
 

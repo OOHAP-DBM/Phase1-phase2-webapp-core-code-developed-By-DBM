@@ -452,6 +452,15 @@ class DirectEnquiryController extends Controller
                         'phone' => $user->phone,
                     ]
                 );
+                app(\App\Services\LoggingService::class)->created(
+                    $user,
+                    'customer',
+                    'Customer account created automatically from direct enquiry.',
+                    [
+                        'source' => 'direct_enquiry',
+                        'registration_type' => 'automatic',
+                    ]
+                );
             } else {
 
                 \Log::info(
@@ -496,6 +505,19 @@ class DirectEnquiryController extends Controller
 
                 'source' => 'website',
             ]);
+
+            app(\App\Services\LoggingService::class)->created(
+                $enquiry,
+                'direct_enquiry',
+                'Direct enquiry created successfully.',
+                [
+                    'source' => 'website',
+                    'customer_id' => $user->id,
+                    'status' => 'new',
+                    'city' => $normalizedCity,
+                    'hoarding_type' => $data['hoarding_type'],
+                ]
+            );
 
             ActivityLog::record(
                 action: 'direct_enquiry_submitted',
@@ -626,20 +648,51 @@ class DirectEnquiryController extends Controller
             }
 
 
-            // =====================================================
-            // CUSTOMER ENQUIRY CONFIRMATION EMAIL
-            // =====================================================
 
-            Mail::to($enquiry->email)->queue(
-                new UserDirectEnquiryConfirmation(
-                    $enquiry
-                )
-            );
+            try {
+
+                $email = app(\App\Services\EmailTemplateService::class)->render(
+                    'customer_enquiry_confirmation',
+                    [
+                        'customer_name' => $enquiry->name,
+                        'customer_email' => $enquiry->email,
+                        'enquiry_number' => $enquiry->enquiry_number,
+                        'app_name' => config('app.name', 'OOHAPP'),
+                        'login_url' => route('customer.dashboard'),
+                        'support_email' => config('mail.from.address'),
+                    ]
+                );
+
+                Mail::to($enquiry->email)->queue(
+                    new \App\Mail\DynamicEmail(
+                        subject: $email['subject'],
+                        body: $email['body']
+                    )
+                );
+
+                \Log::info(
+                    'Dynamic customer enquiry email queued',
+                    [
+                        'enquiry_id' => $enquiry->id,
+                        'customer_email' => $enquiry->email,
+                        'template_key' => 'customer_enquiry_confirmation',
+                    ]
+                );
+
+            } catch (\Throwable $e) {
+
+                \Log::error(
+                    'Dynamic customer enquiry email failed',
+                    [
+                        'enquiry_id' => $enquiry->id,
+                        'customer_email' => $enquiry->email,
+                        'error' => $e->getMessage(),
+                    ]
+                );
+
+            }
 
 
-            // =====================================================
-            // NEW CUSTOMER WELCOME + LOGIN CREDENTIALS
-            // =====================================================
 
             if ($isNewCustomer && $password) {
 
@@ -748,16 +801,8 @@ class DirectEnquiryController extends Controller
             }
 
 
-            // =====================================================
-            // COMMIT TRANSACTION
-            // =====================================================
-
+            
             DB::commit();
-
-
-            // =====================================================
-            // CLEANUP OTP
-            // =====================================================
 
             DB::table('guest_user_otps')
                 ->where(
@@ -771,7 +816,7 @@ class DirectEnquiryController extends Controller
                 ->delete();
 
 
-            // Clear captcha
+            
             session()->forget('captcha_answer');
 
             ActivityLog::record(
@@ -786,9 +831,7 @@ class DirectEnquiryController extends Controller
                     'city' => $normalizedCity,
                 ]
             );
-            // =====================================================
-            // SUCCESS LOG
-            // =====================================================
+            
 
             \Log::info(
                 'Direct enquiry created successfully',
