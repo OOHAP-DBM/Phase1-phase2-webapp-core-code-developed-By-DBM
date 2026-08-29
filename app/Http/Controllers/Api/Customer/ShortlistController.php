@@ -34,7 +34,7 @@ class ShortlistController extends Controller
                     ->whereNull('deleted_at');
                 })
                 ->with([
-                    'hoarding:id,title,city,hoarding_type,category,monthly_price,base_monthly_price',
+                    'hoarding:id,vendor_id,title,city,hoarding_type,category,monthly_price,base_monthly_price',
                     'hoarding.ooh:id,hoarding_id,width,height,measurement_unit',
                     'hoarding.doohScreen:id,hoarding_id,width,height,measurement_unit,price_per_slot',
                     'hoarding.hoardingMedia:id,hoarding_id,file_path,is_primary',
@@ -121,7 +121,7 @@ class ShortlistController extends Controller
             $result = Wishlist::toggle(auth()->id(), $hoardingId);
             return response()->json([
                 'success'      => true,
-                'action'       => $result['action'], 
+                'action'       => $result['action'],
                 'isWishlisted' => $result['action'] === 'added',
                 'count'        => $result['count'],
             ]);
@@ -140,7 +140,7 @@ class ShortlistController extends Controller
     {
         return response()->json(['success' => true, 'count' => Wishlist::getCount(auth()->id())]);
     }
-    
+
     public function check(int $hoardingId): JsonResponse
     {
         return response()->json([
