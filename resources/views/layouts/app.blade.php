@@ -254,7 +254,7 @@
             const vendorId = btn.dataset.vendorId;
             const inCart = btn.dataset.inCart === '1';
 
-            /* ─── GUEST — LocalStorage with vendor validation ─── */
+            /* ─── GUEST — LocalStorage (multi-vendor support enabled) ─── */
             if (!isAuth) {
                 let saved = JSON.parse(localStorage.getItem('guest_cart') || '[]');
 
@@ -280,38 +280,37 @@
 
                     Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Removed from shortlist', showConfirmButton: false, timer: 1400 });
                 } else {
-                    // ADD - Check for vendor conflict
-                    if (saved.length > 0 && saved[0].vendorId && String(saved[0].vendorId) !== String(vendorId)) {
-                        // VENDOR CONFLICT in guest mode
-                        Swal.fire({
-                            title: 'Different Vendor Hoardings',
-                            html: '<p>Your cart already contains hoardings from a different vendor.</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#3085d6',
-                            cancelButtonColor: '#d33',
-                            confirmButtonText: 'Yes, Remove & Add',
-                            cancelButtonText: 'Keep Existing Cart'
-                        }).then(function (result) {
-                            if (result.isConfirmed) {
-                                // Clear cart and add new hoarding
-                                saved = [{ hoardingId: String(hoardingId), vendorId: String(vendorId) }];
-                                localStorage.setItem('guest_cart', JSON.stringify(saved));
-                                applyCartUI(btn, true);
+                    /*
+                     * FEATURE: single-vendor restriction can be re-enabled later.
+                     * Keeping this legacy logic commented so the cart can support
+                     * multiple vendors without triggering the old "different vendor"
+                     * confirmation flow.
+                     */
+                    // if (saved.length > 0 && saved[0].vendorId && String(saved[0].vendorId) !== String(vendorId)) {
+                    //     Swal.fire({
+                    //         title: 'Different Vendor Hoardings',
+                    //         html: '<p>Your cart already contains hoardings from a different vendor.</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
+                    //         icon: 'warning',
+                    //         showCancelButton: true,
+                    //         confirmButtonColor: '#3085d6',
+                    //         cancelButtonColor: '#d33',
+                    //         confirmButtonText: 'Yes, Remove & Add',
+                    //         cancelButtonText: 'Keep Existing Cart'
+                    //     }).then(function (result) {
+                    //         if (result.isConfirmed) {
+                    //             saved = [{ hoardingId: String(hoardingId), vendorId: String(vendorId) }];
+                    //             localStorage.setItem('guest_cart', JSON.stringify(saved));
+                    //             applyCartUI(btn, true);
+                    //             document.querySelectorAll('.cart-count').forEach(function (b) {
+                    //                 b.textContent = saved.length;
+                    //                 b.style.display = saved.length > 0 ? 'flex' : 'none';
+                    //             });
+                    //             Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Added to shortlist', showConfirmButton: false, timer: 1400 });
+                    //         }
+                    //     });
+                    //     return;
+                    // }
 
-                                // Update header badge
-                                document.querySelectorAll('.cart-count').forEach(function (b) {
-                                    b.textContent = saved.length;
-                                    b.style.display = saved.length > 0 ? 'flex' : 'none';
-                                });
-
-                                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Added to shortlist', showConfirmButton: false, timer: 1400 });
-                            }
-                        });
-                        return;
-                    }
-
-                    // No conflict - add the hoarding
                     saved.push({ hoardingId: String(hoardingId), vendorId: String(vendorId) });
                     applyCartUI(btn, true);
                     Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Added to shortlist', showConfirmButton: false, timer: 1400 });
@@ -327,7 +326,7 @@
                 return;
             }
 
-            /* ─── LOGGED IN — DB with vendor validation ─── */
+            /* ─── LOGGED IN — DB (multi-vendor support enabled) ─── */
             const url = inCart
                 ? "{{ route('cart.remove') }}"
                 : "{{ route('cart.add') }}";
@@ -357,62 +356,64 @@
                 .then(function (data) {
                     if (!data) return;
 
-                    // ─── VENDOR CONFLICT DETECTED ─────────────────────
-                    if (data.status === 'vendor_conflict') {
-                        Swal.fire({
-                            title: 'Different Vendor Hoardings',
-                            html: '<p>' + data.message + '</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#3085d6',
-                            cancelButtonColor: '#d33',
-                            confirmButtonText: 'Yes, Remove & Add',
-                            cancelButtonText: 'Keep Existing Cart'
-                        }).then(function (result) {
-                            if (result.isConfirmed) {
-                                // Clear cart and then add new hoarding
-                                fetch("{{ route('cart.clear') }}", {
-                                    method: 'POST',
-                                    headers: {
-                                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                        'Accept': 'application/json',
-                                        'Content-Type': 'application/json'
-                                    }
-                                })
-                                    .then(res => res.json())
-                                    .then(() => {
-                                        // Now add the new hoarding
-                                        fetch("{{ route('cart.add') }}", {
-                                            method: 'POST',
-                                            headers: {
-                                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                                'Accept': 'application/json',
-                                                'Content-Type': 'application/json'
-                                            },
-                                            body: JSON.stringify({ hoarding_id: hoardingId, vendor_id: vendorId })
-                                        })
-                                            .then(res => res.json())
-                                            .then(addData => {
-                                                if (addData.status === 'added') {
-                                                    applyCartUI(btn, true);
-                                                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Hoarding added to cart', showConfirmButton: false, timer: 1400 });
-                                                    setTimeout(function () { location.reload(); }, 800);
-                                                }
-                                            })
-                                            .catch(() => {
-                                                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to add hoarding', showConfirmButton: false, timer: 2000 });
-                                            });
-                                    })
-                                    .catch(() => {
-                                        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to clear cart', showConfirmButton: false, timer: 2000 });
-                                    })
-                                    .finally(function () { btn.disabled = false; });
-                            } else {
-                                btn.disabled = false;
-                            }
-                        });
-                        return;
-                    }
+                    /*
+                     * FEATURE: legacy single-vendor restriction kept here for future use.
+                     * Multi-vendor cart behaviour is active, so the old vendor-conflict
+                     * modal is intentionally disabled.
+                     */
+                    // if (data.status === 'vendor_conflict') {
+                    //     Swal.fire({
+                    //         title: 'Different Vendor Hoardings',
+                    //         html: '<p>' + data.message + '</p><p class="text-sm text-gray-600 mt-2">Would you like to remove the existing items and add this hoarding instead?</p>',
+                    //         icon: 'warning',
+                    //         showCancelButton: true,
+                    //         confirmButtonColor: '#3085d6',
+                    //         cancelButtonColor: '#d33',
+                    //         confirmButtonText: 'Yes, Remove & Add',
+                    //         cancelButtonText: 'Keep Existing Cart'
+                    //     }).then(function (result) {
+                    //         if (result.isConfirmed) {
+                    //             fetch("{{ route('cart.clear') }}", {
+                    //                 method: 'POST',
+                    //                 headers: {
+                    //                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    //                     'Accept': 'application/json',
+                    //                     'Content-Type': 'application/json'
+                    //                 }
+                    //             })
+                    //                 .then(res => res.json())
+                    //                 .then(() => {
+                    //                     fetch("{{ route('cart.add') }}", {
+                    //                         method: 'POST',
+                    //                         headers: {
+                    //                             'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    //                             'Accept': 'application/json',
+                    //                             'Content-Type': 'application/json'
+                    //                         },
+                    //                         body: JSON.stringify({ hoarding_id: hoardingId, vendor_id: vendorId })
+                    //                     })
+                    //                         .then(res => res.json())
+                    //                         .then(addData => {
+                    //                             if (addData.status === 'added') {
+                    //                                 applyCartUI(btn, true);
+                    //                                 Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Hoarding added to cart', showConfirmButton: false, timer: 1400 });
+                    //                                 setTimeout(function () { location.reload(); }, 800);
+                    //                             }
+                    //                         })
+                    //                         .catch(() => {
+                    //                             Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to add hoarding', showConfirmButton: false, timer: 2000 });
+                    //                         });
+                    //                 })
+                    //                 .catch(() => {
+                    //                     Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Failed to clear cart', showConfirmButton: false, timer: 2000 });
+                    //                 })
+                    //                 .finally(function () { btn.disabled = false; });
+                    //         } else {
+                    //             btn.disabled = false;
+                    //         }
+                    //     });
+                    //     return;
+                    // }
 
                     // ─── VENDOR MISMATCH ERROR ──────────────────────
                     if (data.status === 'vendor_mismatch') {
