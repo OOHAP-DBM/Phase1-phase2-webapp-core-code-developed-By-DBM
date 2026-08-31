@@ -177,11 +177,7 @@ class ActivityLogController extends Controller
         }
 
 
-        // ---------------------------------------------------------
-        // Role-wise View
-        // ---------------------------------------------------------
 
-        // Admin Activity Logs
         if (
             $user &&
             method_exists($user, 'hasAnyRole') &&
@@ -200,7 +196,7 @@ class ActivityLogController extends Controller
         }
 
 
-        // Vendor Activity Logs
+
         if (
             $user &&
             method_exists($user, 'hasRole') &&
@@ -215,7 +211,6 @@ class ActivityLogController extends Controller
         }
 
 
-        // Customer Activity Logs
         if (
             $user &&
             method_exists($user, 'hasRole') &&
@@ -229,8 +224,6 @@ class ActivityLogController extends Controller
             ));
         }
 
-
-        // Fallback
         abort(403, 'User does not have the right roles.');
     }
 }

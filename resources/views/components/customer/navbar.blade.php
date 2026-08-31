@@ -123,7 +123,7 @@
 
 
                         @php
-                            // Logged in → DB se count
+                           
                             // Guest → 0 rakho, JS LocalStorage se update karega
                             $cartCount = auth()->check()
                                 ? \Illuminate\Support\Facades\DB::table('carts')

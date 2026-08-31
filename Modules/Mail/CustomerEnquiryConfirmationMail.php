@@ -2,17 +2,13 @@
 
 namespace Modules\Mail;
 
+use App\Models\EmailTemplate;
 use App\Models\User;
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\SerializesModels;
 use Modules\Enquiries\Models\Enquiry;
 
-class CustomerEnquiryConfirmationMail extends Mailable implements ShouldQueue
+class CustomerEnquiryConfirmationMail extends Mailable
 {
-    use Queueable, SerializesModels;
-
     public $enquiry;
     public $customer;
 
@@ -24,7 +20,45 @@ class CustomerEnquiryConfirmationMail extends Mailable implements ShouldQueue
 
     public function build()
     {
-        return $this->subject('Enquiry Confirmation - Your Campaign Details')
-            ->view('emails.customer-enquiry-confirmation');
+        $template = EmailTemplate::where(
+            'key',
+            'customer_enquiry_confirmation'
+        )
+            ->where('is_active', true)
+            ->first();
+
+        // Fallback: agar template inactive/missing ho
+        if (!$template) {
+            return $this
+                ->subject('Enquiry Confirmation - Your Campaign Details')
+                ->view('emails.customer-enquiry-confirmation');
+        }
+
+        $variables = [
+            '{{customer_name}}'  => $this->customer->name ?? '',
+            '{{customer_email}}' => $this->customer->email ?? '',
+            '{{enquiry_number}}' => $this->enquiry->enquiry_number
+                ?? $this->enquiry->id
+                ?? '',
+            '{{app_name}}'       => config('app.name', 'OOHAPP'),
+            '{{login_url}}'      => url('/login'),
+            '{{support_email}}'  => config('mail.from.address', ''),
+        ];
+
+        $subject = str_replace(
+            array_keys($variables),
+            array_values($variables),
+            $template->subject
+        );
+
+        $body = str_replace(
+            array_keys($variables),
+            array_values($variables),
+            $template->body
+        );
+
+        return $this
+            ->subject($subject)
+            ->html($body);
     }
 }
