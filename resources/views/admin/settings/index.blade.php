@@ -429,6 +429,11 @@
                                     <label class="form-label" for="sms_msg91_base_url">API URL</label>
                                     <input type="text" class="form-control setting-input" id="sms_msg91_base_url" name="settings[sms_msg91_base_url]" value="{{ $settingValue('sms_msg91_base_url', 'https://api.msg91.com/api/v2/sendsms') }}">
                                 </div>
+                                <div class="sms-field-row">
+                                    <label class="form-label" for="sms_msg91_template_id">Template / Flow ID</label>
+                                    <input type="text" class="form-control setting-input" id="sms_msg91_template_id" name="settings[sms_msg91_template_id]" value="{{ $settingValue('sms_msg91_template_id', '') }}">
+                                    <small class="text-muted">Optional MSG91 template or flow ID to send templated messages.</small>
+                                </div>
                             </div>
 
                             <div class="mt-3">
