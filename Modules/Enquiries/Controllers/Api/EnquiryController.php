@@ -299,27 +299,20 @@ class EnquiryController extends Controller
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
-                    // Send FCM notification after enquiry is successfully created
-                    if (!empty($user->fcm_token)) {
-                    \Log::warning("FCM notification failed for user ID {$user->id}, enquiry ID {$enquiry->id}"
-                            );
-                        $sent = send(
-                            $user->fcm_token,
-                            'Enquiry Submitted',
-                            'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
-                            [
-                                'type'       => 'enquiry_created',
-                                'enquiry_id' => (string) $enquiry->id,
-                                'user_id'    => (string) $user->id,
-                            ]
-                        );
+                             if ($user->fcm_token) {
+                $sent = send(
+                    $user->fcm_token,
+                    'Enquiry Submitted',
+                    'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                    ['type' => 'Enquiry', 'user_id' => $user->id]
+                );
 
-                        if (!$sent) {
-                            \Log::warning(
-                                "FCM notification failed for user ID {$user->id}, enquiry ID {$enquiry->id}"
-                            );
-                        }
-                    }
+
+                if (!$sent) {
+                    // Optional: Log or handle failure
+                    \Log::warning("FCM notification failed for user ID {$user->id}");
+                }
+            }
 
 
                 return response()->json([
