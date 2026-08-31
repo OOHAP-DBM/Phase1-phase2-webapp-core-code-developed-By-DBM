@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Vendor;
 
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -24,16 +25,16 @@ class ProfileController extends Controller
         // ENUM values (DB ke according)
         $businessTypes = [
             'proprietorship' => 'Proprietorship',
-            'partnership'    => 'Partnership',
-            'private_limited'=> 'Private Limited',
+            'partnership' => 'Partnership',
+            'private_limited' => 'Private Limited',
             'public_limited' => 'Public Limited',
-            'llp'            => 'LLP',
-            'other'          => 'Other',
+            'llp' => 'LLP',
+            'other' => 'Other',
         ];
 
         return view('vendor.profile.edit', [
-            'user'          => $user,
-            'vendor'        => $user->vendorProfile,
+            'user' => $user,
+            'vendor' => $user->vendorProfile,
             'businessTypes' => $businessTypes,
         ]);
     }
@@ -42,42 +43,78 @@ class ProfileController extends Controller
     {
         $section = $request->input('section');
 
+        \Log::info('VENDOR PROFILE UPDATE STARTED', [
+            'user_id' => Auth::id(),
+            'section' => $section,
+            'request_data' => $request->except([
+                'password',
+                'password_confirmation',
+                'current_password',
+            ]),
+            'timestamp' => now()->toDateTimeString(),
+        ]);
+
         if ($section === 'delete') {
+            \Log::info('VENDOR PROFILE DELETE REQUEST', [
+                'user_id' => Auth::id(),
+            ]);
+
             return $this->deleteAccount($request);
         }
 
         $response = match ($section) {
             'personal' => $this->updatePersonal($request, Auth::user()),
             'business' => $this->updateBusiness($request, Auth::user()->vendorProfile),
-            'pan'      => $this->updatePAN($request, Auth::user()->vendorProfile),
-            'bank'     => $this->updateBank($request, Auth::user()->vendorProfile),
-            'address'  => $this->updateAddress($request, Auth::user()->vendorProfile),
+            'pan' => $this->updatePAN($request, Auth::user()->vendorProfile),
+            'bank' => $this->updateBank($request, Auth::user()->vendorProfile),
+            'address' => $this->updateAddress($request, Auth::user()->vendorProfile),
             'password' => $this->updatePassword($request, Auth::user()),
             'remove-avatar' => $this->removeAvatar(Auth::user()),
-            default    => abort(400, 'Invalid profile section'),
+            default => abort(400, 'Invalid profile section'),
         };
+
+        $user = Auth::user();
+
+        $activity = ActivityLog::record(
+            action: 'profile_updated',
+            description: 'Vendor updated profile section: ' . $section,
+            module: 'vendor_profile',
+            subject: $user,
+            metadata: [
+                'section' => $section,
+                'vendor_profile_id' => $user->vendorProfile?->id,
+            ]
+        );
+
+        \Log::info('VENDOR ACTIVITY LOG CREATED', [
+            'activity_log_id' => $activity?->id,
+            'user_id' => $user?->id,
+            'user_role' => $activity?->user_role,
+            'section' => $section,
+        ]);
 
         if ($response instanceof \Illuminate\Http\RedirectResponse) {
             return $response;
         }
 
-        return back()->with('success', 'Profile updated successfully');
+        return back()->with(
+            'success',
+            'Profile updated successfully'
+        );
     }
 
 
-    /* ======================
-     | PERSONAL (USER)
-     ====================== */
+
     protected function updatePersonal(Request $request, $user)
     {
         $data = $request->validate([
-            'name'   => 'required|string|max:255',
-            'email'  => 'nullable|required_without:phone|email|unique:users,email,' . $user->id,
-            'phone'  => 'nullable|required_without:email|string|max:20',
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|required_without:phone|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|required_without:email|string|max:20',
             'avatar' => 'nullable|image|mimes:jpeg,jpg,png,gif|max:5120',
         ]);
-        if($request->filled('email')){
-            if($request->email !== $user->email && is_null($user->email_verified_at)){
+        if ($request->filled('email')) {
+            if ($request->email !== $user->email && is_null($user->email_verified_at)) {
                 return back()
                     ->withInput()
                     ->with('reopen_personal_modal', true)
@@ -86,10 +123,10 @@ class ProfileController extends Controller
                     ], 'personalUpdate');
             }
         }
-        if($request->filled('phone')){
-            $phone = preg_replace('/[^0-9]/','',$request->phone);
+        if ($request->filled('phone')) {
+            $phone = preg_replace('/[^0-9]/', '', $request->phone);
 
-            if($phone !== $user->phone && is_null($user->phone_verified_at)){
+            if ($phone !== $user->phone && is_null($user->phone_verified_at)) {
                 return back()
                     ->withInput()
                     ->with('reopen_personal_modal', true)
@@ -106,7 +143,7 @@ class ProfileController extends Controller
                 }
 
                 // Create bucket directory (00, 01, 02... based on user ID)
-                $bucket = str_pad((int)($user->id / 100), 2, '0', STR_PAD_LEFT);
+                $bucket = str_pad((int) ($user->id / 100), 2, '0', STR_PAD_LEFT);
                 $avatarPath = "media/users/avatars/{$bucket}/{$user->id}";
 
                 // Store the file
@@ -142,9 +179,7 @@ class ProfileController extends Controller
         }
     }
 
-    /* ======================
-     | BUSINESS (VENDOR)
-     ====================== */
+
     protected function updateBusiness(Request $request, $vendor)
     {
         $user = Auth::user();
@@ -152,8 +187,8 @@ class ProfileController extends Controller
         $data = $request->validate([
             'company_name' => 'required|string|max:255',
             'company_type' => 'required|string',
-            'gstin'        => 'required|string|max:50',
-            'pan'          => 'nullable|string|max:10',
+            'gstin' => 'required|string|max:50',
+            'pan' => 'nullable|string|max:10',
             'pan_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
 
@@ -169,7 +204,7 @@ class ProfileController extends Controller
                 Storage::disk('private')->delete($vendor->pan_card_document);
             }
 
-            $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
+            $bucket = str_pad((int) ($vendor->id / 100), 2, '0', STR_PAD_LEFT);
             $vendor->pan_card_document = $request->file('pan_file')
                 ->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
         }
@@ -180,8 +215,8 @@ class ProfileController extends Controller
         $vendor->update([
             'company_name' => $data['company_name'],
             'company_type' => $data['company_type'],
-            'gstin'        => $data['gstin'],
-            'pan'          => $data['pan'],
+            'gstin' => $data['gstin'],
+            'pan' => $data['pan'],
         ]);
     }
 
@@ -192,7 +227,7 @@ class ProfileController extends Controller
     protected function updatePAN(Request $request, $vendor)
     {
         $request->validate([
-            'pan'      => 'required|string|max:20',
+            'pan' => 'required|string|max:20',
             'pan_file' => 'required|image|max:2048',
         ]);
 
@@ -200,14 +235,14 @@ class ProfileController extends Controller
             Storage::disk('private')->delete($vendor->pan_card_document);
         }
 
-        $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
+        $bucket = str_pad((int) ($vendor->id / 100), 2, '0', STR_PAD_LEFT);
         $path = $request->file('pan_file')->store(
             "media/vendors/documents/{$bucket}/{$vendor->id}",
             'private'
         );
 
         $vendor->update([
-            'pan'               => $request->pan,
+            'pan' => $request->pan,
             'pan_card_document' => $path,
         ]);
     }
@@ -218,10 +253,10 @@ class ProfileController extends Controller
     protected function updateBank(Request $request, $vendor)
     {
         $data = $request->validate([
-            'bank_name'           => 'required|string|max:100',
+            'bank_name' => 'required|string|max:100',
             'account_holder_name' => 'required|string|max:255',
-            'account_number'      => 'required|string|max:30',
-            'ifsc_code'           => 'required|string|max:20',
+            'account_number' => 'required|string|max:30',
+            'ifsc_code' => 'required|string|max:20',
         ]);
 
         $vendor->update($data);
@@ -236,10 +271,10 @@ class ProfileController extends Controller
 
         $data = $request->validate([
             'registered_address' => 'required|string',
-            'city'               => 'required|string',
-            'state'              => 'required|string',
-            'pincode'            => 'required|string',
-            'country'            => 'required|string',
+            'city' => 'required|string',
+            'state' => 'required|string',
+            'pincode' => 'required|string',
+            'country' => 'required|string',
         ]);
 
         // Country is stored on users table
@@ -250,9 +285,9 @@ class ProfileController extends Controller
         // Rest of the address data is stored on vendor profile
         $vendor->update([
             'registered_address' => $data['registered_address'],
-            'city'               => $data['city'],
-            'state'              => $data['state'],
-            'pincode'            => $data['pincode'],
+            'city' => $data['city'],
+            'state' => $data['state'],
+            'pincode' => $data['pincode'],
         ]);
     }
 
@@ -279,19 +314,19 @@ class ProfileController extends Controller
 
         // ✅ EMAIL OTP CHECK
         if ($emailOtp) {
-            $cached = Cache::get('delete_email_otp_'.$user->id);
+            $cached = Cache::get('delete_email_otp_' . $user->id);
             if ($cached && $cached == $emailOtp) {
                 $emailVerified = true;
-                Cache::forget('delete_email_otp_'.$user->id);
+                Cache::forget('delete_email_otp_' . $user->id);
             }
         }
 
         // ✅ PHONE OTP CHECK
         if ($phoneOtp) {
-            $cached = Cache::get('delete_phone_otp_'.$user->id);
+            $cached = Cache::get('delete_phone_otp_' . $user->id);
             if ($cached && $cached == $phoneOtp) {
                 $phoneVerified = true;
-                Cache::forget('delete_phone_otp_'.$user->id);
+                Cache::forget('delete_phone_otp_' . $user->id);
             }
         }
 
@@ -325,7 +360,7 @@ class ProfileController extends Controller
     {
         $request->validate([
             'current_password' => 'required|string|min:4',
-            'password'         => 'required|string|min:4|confirmed',
+            'password' => 'required|string|min:4|confirmed',
         ]);
 
         // Verify current password
@@ -399,7 +434,7 @@ class ProfileController extends Controller
 
             if ($request->type === 'email') {
                 Cache::put(
-                    'delete_email_otp_'.$user->id,
+                    'delete_email_otp_' . $user->id,
                     $otp,
                     now()->addMinutes(2)
                 );
@@ -409,7 +444,7 @@ class ProfileController extends Controller
             if ($request->type === 'phone') {
 
                 Cache::put(
-                    'delete_phone_otp_'.$user->id,
+                    'delete_phone_otp_' . $user->id,
                     $otp,
                     now()->addMinutes(2)
                 );
@@ -421,7 +456,7 @@ class ProfileController extends Controller
                 );
 
                 $twilio->messages->create(
-                    '+91'.$user->phone,
+                    '+91' . $user->phone,
                     [
                         'from' => env('TWILIO_FROM'),
                         'body' => "Your OOHAPP Delete Account OTP is {$otp}. Valid for 2 minutes."
@@ -449,7 +484,7 @@ class ProfileController extends Controller
     {
         $user = auth()->user();
 
-        $type  = $request->input('type');
+        $type = $request->input('type');
         $value = trim($request->input('value'));
 
         if (!$type || !$value) {
@@ -485,9 +520,7 @@ class ProfileController extends Controller
             $purpose = 'profile_email';
         }
 
-        /* ---------------- PHONE ---------------- */
-
-        elseif ($type === 'phone') {
+        /* ---------------- PHONE ---------------- */ elseif ($type === 'phone') {
 
             $value = preg_replace('/[^0-9]/', '', $value);
 
@@ -511,9 +544,7 @@ class ProfileController extends Controller
             }
 
             $purpose = 'profile_phone';
-        }
-
-        else {
+        } else {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid type'
@@ -539,9 +570,9 @@ class ProfileController extends Controller
 
             Log::error('PROFILE OTP SEND FAILED', [
                 'user_id' => $user->id,
-                'type'    => $type,
-                'value'   => $value,
-                'error'   => $e->getMessage()
+                'type' => $type,
+                'value' => $value,
+                'error' => $e->getMessage()
             ]);
 
             return response()->json([
@@ -554,9 +585,9 @@ class ProfileController extends Controller
     {
         $user = auth()->user();
 
-        $type  = $request->input('type');
+        $type = $request->input('type');
         $value = trim($request->input('value'));
-        $otp   = trim($request->input('otp'));
+        $otp = trim($request->input('otp'));
 
         if (!$type || !$value || !$otp) {
             return response()->json([
@@ -613,7 +644,7 @@ class ProfileController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => ucfirst($type).' verified successfully'
+                'message' => ucfirst($type) . ' verified successfully'
             ], 200, [], JSON_UNESCAPED_UNICODE);
 
 

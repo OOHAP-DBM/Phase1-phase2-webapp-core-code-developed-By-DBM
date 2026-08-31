@@ -199,6 +199,8 @@ class RegisterController extends Controller
 
 
 
+
+
                 $vendorProfile = VendorProfile::create([
 
                     'user_id' => $user->id,
@@ -224,7 +226,7 @@ class RegisterController extends Controller
                     'Vendor account automatically approved by system.'
                 );
 
-                ActivityLog::record(
+                $activity = ActivityLog::record(
                     action: 'vendor_registered',
                     description: 'New vendor account registered successfully.',
                     module: 'registration',
@@ -235,6 +237,12 @@ class RegisterController extends Controller
                         'auto_approved' => (bool) $autoApproval,
                     ]
                 );
+
+                \Log::info('VENDOR ACTIVITY LOG RESULT', [
+                    'result' => $activity?->id,
+                    'user_id' => $user->id,
+                    'vendor_profile_id' => $vendorProfile->id,
+                ]);
 
 
 

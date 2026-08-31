@@ -38,13 +38,13 @@
                     @forelse(auth()->user()->notifications->take(5) as $notification)
                         <a href="{{ route('notifications.open', $notification->id) }}"
                             class="group block px-4 py-3 border-b border-gray-100 transition-all duration-200
-                                                                                                                                      {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }} hover:bg-gray-50">
+                                                                                                                                              {{ $notification->read_at ? 'bg-white' : 'bg-blue-50/70' }} hover:bg-gray-50">
 
                             <div class="flex gap-3 items-start">
                                 <div class="mt-1">
                                     <div
                                         class="w-9 h-9 rounded-full flex items-center justify-center
-                                                                                                                                                    {{ $notification->read_at ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600' }}">
+                                                                                                                                                            {{ $notification->read_at ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600' }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
                                             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -103,8 +103,8 @@
             <div id="user" class="relative text-gray-400">
 
                 <button id="profileMenuBtn" type="button" class="flex items-center justify-center p-1.5 rounded-full
-                                   hover:bg-gray-100 transition cursor-pointer
-                                   focus:outline-none" aria-label="User menu" aria-expanded="false">
+                                           hover:bg-gray-100 transition cursor-pointer
+                                           focus:outline-none" aria-label="User menu" aria-expanded="false">
                     <svg width="20" height="19" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd"
                             d="M3.5 4.25C3.5 3.69188 3.60993 3.13923 3.82351 2.6236C4.03709 2.10796 4.35015 1.63945 4.7448 1.2448C5.13944 0.850147 5.60796 0.537094 6.1236 0.323512C6.63923 0.109929 7.19188 0 7.75 0C8.30812 0 8.86077 0.109929 9.3764 0.323512C9.89204 0.537094 10.3606 0.850147 10.7552 1.2448C11.1499 1.63945 11.4629 2.10796 11.6765 2.6236C11.8901 3.13923 12 3.69188 12 4.25C12 5.37717 11.5522 6.45817 10.7552 7.2552C9.95817 8.05223 8.87717 8.5 7.75 8.5C6.62283 8.5 5.54183 8.05223 4.7448 7.2552C3.94777 6.45817 3.5 5.37717 3.5 4.25ZM7.75 1.5C7.02065 1.5 6.32118 1.78973 5.80546 2.30546C5.28973 2.82118 5 3.52065 5 4.25C5 4.97935 5.28973 5.67882 5.80546 6.19454C6.32118 6.71027 7.02065 7 7.75 7C8.47935 7 9.17882 6.71027 9.69454 6.19454C10.2103 6.71027 10.5 5.37717 10.5 4.25C10.5 3.52065 10.2103 2.82118 9.17882 2.30546C9.17882 2.82118 9.17882 3.52065 9.17882 3.52065 7.75 1.5Z"
@@ -118,8 +118,8 @@
 
 
                 <div id="profileDropdown" class="hidden absolute right-0 top-full mt-2 w-52
-                                   bg-white rounded-xl border border-gray-200
-                                   shadow-xl overflow-hidden z-[9999]">
+                                           bg-white rounded-xl border border-gray-200
+                                           shadow-xl overflow-hidden z-[9999]">
 
                     <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
                         <p class="text-sm font-semibold text-gray-800 truncate">
@@ -133,9 +133,9 @@
 
 
                     <a href="{{ url('customer/profile') }}" class="flex items-center gap-3 px-4 py-3
-                                       text-sm text-gray-700
-                                       hover:bg-gray-50 hover:text-[#00995c]
-                                       transition">
+                                               text-sm text-gray-700
+                                               hover:bg-gray-50 hover:text-[#00995c]
+                                               transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                 d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0" />
@@ -151,9 +151,9 @@
                             @csrf
 
                             <button type="submit" class="w-full flex items-center gap-3 px-4 py-3
-                                               text-sm text-gray-700
-                                               hover:bg-red-50 hover:text-red-600
-                                               transition cursor-pointer">
+                                                       text-sm text-gray-700
+                                                       hover:bg-red-50 hover:text-red-600
+                                                       transition cursor-pointer">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                         d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H3" />
@@ -197,7 +197,7 @@
 </header>
 
 <script>
-    
+
 </script>
 
 <script>
@@ -604,5 +604,3 @@
             });
     }
 </script>
-
-    
