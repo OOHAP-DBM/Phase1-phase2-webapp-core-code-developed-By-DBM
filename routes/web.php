@@ -1571,6 +1571,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
+// email templating logs
 Route::middleware(['auth', 'role:admin'])
     ->prefix('email-templates')
     ->name('email_templates.')
