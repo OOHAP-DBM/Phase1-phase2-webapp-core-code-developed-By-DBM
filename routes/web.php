@@ -509,6 +509,29 @@ Route::middleware('auth')->group(function () {
     Route::get('/myHoarding/enquiries', [\App\Http\Controllers\Vendor\EnquiryController::class, 'index'])->name('vendor.enquiries.index');
     Route::get('/myHoarding/enquiries/{id}', [\App\Http\Controllers\Vendor\EnquiryController::class, 'show'])->name('vendor.enquiries.show');
     Route::post('/myHoarding/enquiries/{id}/respond', [\App\Http\Controllers\Vendor\EnquiryController::class, 'respond'])->name('vendor.enquiries.respond');
+
+    Route::get('/myHoarding/direct-enquiries', [
+        \App\Http\Controllers\Vendor\EnquiryController::class,
+        'myDirectEnquiries'
+    ])->name('vendor.direct-enquiries.index');
+
+    // Vendor's own direct enquiry details
+    Route::get('/myHoarding/direct-enquiries/{id}', [
+        \App\Http\Controllers\Vendor\EnquiryController::class,
+        'showMyDirectEnquiry'
+    ])->name('vendor.direct-enquiries.show');
+});
+
+Route::middleware('auth')->group(function () {
+
+    // Vendor - My Direct Enquiries
+    Route::get('/my-direct-enquiries', [DirectEnquiryController::class, 'myDirectEnquiries'])
+        ->name('vendor.my-direct-enquiries');
+
+    Route::get('/my-direct-enquiries/{enquiryId}', [DirectEnquiryController::class, 'myDirectEnquiryShow'])
+        ->name('vendor.my-direct-enquiry.show');
+    ;
+
 });
 
 Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer.')->group(function () {
