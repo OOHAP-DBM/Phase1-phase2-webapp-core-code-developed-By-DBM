@@ -147,7 +147,7 @@
                             </th> --}}
 
                             <th class="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 text-xs uppercase whitespace-nowrap">
-                                Created
+                                Enquiried On
                             </th>
 
                             <th class="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 text-xs uppercase whitespace-nowrap text-center">

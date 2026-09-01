@@ -19,6 +19,8 @@ use App\Notifications\AdminDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\VendorDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification;
 use App\Models\User;
+use App\Models\ActivityLog;
+use App\Mail\CustomerWelcomeMail;
 
 class DirectEnquiryApiController extends Controller
 {
@@ -243,26 +245,30 @@ class DirectEnquiryApiController extends Controller
      *     )
      * )
      */
-    public function store(Request $request): JsonResponse
-    {
-        $request->validate([
-            'name'                   => 'required|string|min:3|max:255',
-            'email'                  => 'required|email|max:255',
-            'phone'                  => ['required', 'digits:10', 'regex:/^[6-9][0-9]{9}$/'],
-            'hoarding_type'          => 'required|array|min:1',
-            'hoarding_type.*'        => 'in:DOOH,OOH',
-            'location_city'          => 'required|string|max:255',
-            'preferred_locations'    => 'nullable|array',
-            'preferred_locations.*'  => 'nullable|string|max:255',
-            'remarks'                => 'required|string|min:10|max:2000',
-            'preferred_modes'        => 'nullable|array',
-            'preferred_modes.*'      => 'in:Call,WhatsApp,Email',
 
-            // Mobile sends this flag after calling verifyOtp successfully
-            'phone_verified'         => 'required|accepted',
-        ], [
-            'phone_verified.accepted' => 'Phone number must be verified via OTP before submitting.',
-        ]);
+public function store(Request $request): JsonResponse
+{
+    $request->validate([
+        'name' => 'required|string|min:3|max:255',
+        'email' => 'required|email|max:255',
+        'phone' => [
+            'required',
+            'digits:10',
+            'regex:/^[6-9][0-9]{9}$/'
+        ],
+        'hoarding_type' => 'required|array|min:1',
+        'hoarding_type.*' => 'in:DOOH,OOH',
+        'location_city' => 'required|string|max:255',
+        'preferred_locations' => 'nullable|array',
+        'preferred_locations.*' => 'nullable|string|max:255',
+        'remarks' => 'required|string|min:10|max:2000',
+        'preferred_modes' => 'nullable|array',
+        'preferred_modes.*' => 'in:Call,WhatsApp,Email',
+        'phone_verified' => 'required|accepted',
+    ], [
+        'phone_verified.accepted' =>
+            'Phone number must be verified via OTP before submitting.',
+    ]);
 
         // Confirm OTP was actually verified in DB (not just a flag from client)
         $phoneVerified = DB::table('guest_user_otps')
@@ -407,9 +413,14 @@ class DirectEnquiryApiController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->error('Failed to submit enquiry. Please try again.', 500);
-        }
+        return $this->error(
+            'Failed to submit enquiry. Please try again.',
+            500
+        );
     }
+}
+ 
+
 
     // =========================================================================
     // GET /api/v1/vendor/enquiries
