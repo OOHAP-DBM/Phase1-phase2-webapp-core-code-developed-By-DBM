@@ -1,4 +1,4 @@
- blade
+
 @php
     $user = auth()->user();
 
@@ -142,9 +142,9 @@
                                 Preferred Modes
                             </th>
 
-                            <th class="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 text-xs uppercase whitespace-nowrap">
+                            {{-- <th class="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 text-xs uppercase whitespace-nowrap">
                                 Status
-                            </th>
+                            </th> --}}
 
                             <th class="px-3 sm:px-4 py-2 sm:py-3 font-semibold text-gray-600 text-xs uppercase whitespace-nowrap">
                                 Created
@@ -307,7 +307,7 @@
 
 
                                 {{-- STATUS --}}
-                                <td class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                                {{-- <td class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
 
                                     @php
 
@@ -332,7 +332,7 @@
 
                                     </div>
 
-                                </td>
+                                </td> --}}
 
 
                                 {{-- CREATED --}}
@@ -533,4 +533,4 @@
 </div>
 
 @endsection
- 
+
