@@ -19,6 +19,8 @@ use App\Notifications\AdminDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\VendorDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification;
 use App\Models\User;
+use App\Models\ActivityLog;
+use App\Mail\CustomerWelcomeMail;
 
 class DirectEnquiryApiController extends Controller
 {
@@ -243,7 +245,7 @@ class DirectEnquiryApiController extends Controller
      *     )
      * )
      */
-    php
+
 public function store(Request $request): JsonResponse
 {
     $request->validate([
@@ -632,7 +634,7 @@ public function store(Request $request): JsonResponse
         );
     }
 }
- 
+
 
 
     // =========================================================================
