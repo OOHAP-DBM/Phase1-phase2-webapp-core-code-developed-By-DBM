@@ -26,7 +26,7 @@ class CustomerEnquiryConfirmationMail extends Mailable
         )
             ->where('is_active', true)
             ->first();
-       
+
         if (!$template) {
             return $this
                 ->subject('Enquiry Confirmation - Your Campaign Details')
@@ -34,7 +34,7 @@ class CustomerEnquiryConfirmationMail extends Mailable
         }
 
         $variables = [
-            '{{customer_name}}'  => $this->customer->name ?? '',    
+            '{{customer_name}}'  => $this->customer->name ?? '',
             '{{customer_email}}' => $this->customer->email ?? '',
             '{{enquiry_number}}' => $this->enquiry->enquiry_number
                 ?? $this->enquiry->id
@@ -58,6 +58,6 @@ class CustomerEnquiryConfirmationMail extends Mailable
 
         return $this
             ->subject($subject)
-            ->html($body);pnavbafr
+            ->html($body);
     }
 }
