@@ -177,7 +177,7 @@
             </script>
 
             {{-- My Order --}}
-            <div x-data="{ open: {{ request()->routeIs('customer.enquiries.*') ? 'true' : 'false' }} }"
+            <div x-data="{ open: @if( request()->routeIs('customer.enquiries.*')  || request()->routeIs('vendor.my-direct-enquiries*')) true @else false @endif }"
                 class="space-y-1">
                 <button type="button" @click="open = !open"
                     class="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg
@@ -203,18 +203,18 @@
                     <a href="{{ route('customer.enquiries.index') }}"
                         class="block px-6 py-1 text-sm rounded-md transition
                         {{ request()->routeIs('customer.enquiries.*') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
-                        - Enquiries & Offers
+                        - My Enquiries
                     </a>
 
                    <a href="{{ route('vendor.my-direct-enquiries') }}"
-    class="block px-6 py-1 text-sm rounded-md transition
-    {{ request()->routeIs('vendor.my-direct-enquiries*')
-        ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
-        : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                        class="block px-6 py-1 text-sm rounded-md transition
+                        {{ request()->routeIs('vendor.my-direct-enquiries*')
+                            ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
+                            : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
 
-    - My Direct Enquiries
+                        - My Direct Enquiries
 
-</a>
+                    </a>
                 </div>
             </div>
 
