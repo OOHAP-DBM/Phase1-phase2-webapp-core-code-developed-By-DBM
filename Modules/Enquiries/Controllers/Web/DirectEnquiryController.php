@@ -20,7 +20,7 @@ use Modules\Enquiries\Notifications\VendorDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification;
 use App\Models\User;
 use App\Mail\CustomerWelcomeMail;
-use App\Models\Hoarding; // Adjust namespace based on your structure
+use App\Models\Hoarding;
 use Carbon\Carbon;
 use App\Models\ActivityLog;
 
@@ -1091,7 +1091,7 @@ class DirectEnquiryController extends Controller
         return $vendors;
     }
 
-    
+
     private function getFuzzyPattern(string $text): string
     {
         // Add % between each character for fuzzy matching
