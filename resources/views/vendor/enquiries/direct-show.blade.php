@@ -1,4 +1,4 @@
-blade
+
 @php
     $user = auth()->user();
 
@@ -464,3 +464,4 @@ blade
     </div>
 
 @endsection
+ 
