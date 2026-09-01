@@ -34,14 +34,14 @@ class CustomerEnquiryConfirmationMail extends Mailable
         }
 
         $variables = [
-            '{{customer_name}}'  => $this->customer->name ?? '',
+            '{{customer_name}}' => $this->customer->name ?? '',
             '{{customer_email}}' => $this->customer->email ?? '',
             '{{enquiry_number}}' => $this->enquiry->enquiry_number
                 ?? $this->enquiry->id
                 ?? '',
-            '{{app_name}}'       => config('app.name', 'OOHAPP'),
-            '{{login_url}}'      => url('/login'),
-            '{{support_email}}'  => config('mail.from.address', ''),
+            '{{app_name}}' => config('app.name', 'OOHAPP'),
+            '{{login_url}}' => url('/login'),
+            '{{support_email}}' => config('mail.from.address', ''),
         ];
 
         $subject = str_replace(

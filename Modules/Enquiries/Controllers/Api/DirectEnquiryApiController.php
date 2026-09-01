@@ -243,173 +243,397 @@ class DirectEnquiryApiController extends Controller
      *     )
      * )
      */
-    public function store(Request $request): JsonResponse
-    {
-        $request->validate([
-            'name'                   => 'required|string|min:3|max:255',
-            'email'                  => 'required|email|max:255',
-            'phone'                  => ['required', 'digits:10', 'regex:/^[6-9][0-9]{9}$/'],
-            'hoarding_type'          => 'required|array|min:1',
-            'hoarding_type.*'        => 'in:DOOH,OOH',
-            'location_city'          => 'required|string|max:255',
-            'preferred_locations'    => 'nullable|array',
-            'preferred_locations.*'  => 'nullable|string|max:255',
-            'remarks'                => 'required|string|min:10|max:2000',
-            'preferred_modes'        => 'nullable|array',
-            'preferred_modes.*'      => 'in:Call,WhatsApp,Email',
+    php
+public function store(Request $request): JsonResponse
+{
+    $request->validate([
+        'name' => 'required|string|min:3|max:255',
+        'email' => 'required|email|max:255',
+        'phone' => [
+            'required',
+            'digits:10',
+            'regex:/^[6-9][0-9]{9}$/'
+        ],
+        'hoarding_type' => 'required|array|min:1',
+        'hoarding_type.*' => 'in:DOOH,OOH',
+        'location_city' => 'required|string|max:255',
+        'preferred_locations' => 'nullable|array',
+        'preferred_locations.*' => 'nullable|string|max:255',
+        'remarks' => 'required|string|min:10|max:2000',
+        'preferred_modes' => 'nullable|array',
+        'preferred_modes.*' => 'in:Call,WhatsApp,Email',
+        'phone_verified' => 'required|accepted',
+    ], [
+        'phone_verified.accepted' =>
+            'Phone number must be verified via OTP before submitting.',
+    ]);
 
-            // Mobile sends this flag after calling verifyOtp successfully
-            'phone_verified'         => 'required|accepted',
-        ], [
-            'phone_verified.accepted' => 'Phone number must be verified via OTP before submitting.',
-        ]);
+    $phoneVerified = DB::table('guest_user_otps')
+        ->where('identifier', $request->phone)
+        ->where('purpose', 'direct_enquiry')
+        ->whereNotNull('verified_at')
+        ->where('created_at', '>', now()->subMinutes(20))
+        ->exists();
 
-        // Confirm OTP was actually verified in DB (not just a flag from client)
-        $phoneVerified = DB::table('guest_user_otps')
-            ->where('identifier', $request->phone)
-            ->where('purpose', 'direct_enquiry')
-            ->whereNotNull('verified_at')
-            ->where('created_at', '>', now()->subMinutes(20))
-            ->exists();
+    if (!$phoneVerified) {
+        return $this->error(
+            'Phone verification expired or not completed. Please verify your phone again.',
+            422,
+            ['phone' => ['Phone verification is required.']]
+        );
+    }
 
-        if (!$phoneVerified) {
-            return $this->error(
-                'Phone verification expired or not completed. Please verify your phone again.',
-                422,
-                ['phone' => ['Phone verification is required.']]
+    try {
+
+        DB::beginTransaction();
+
+        $normalizedCity = $this->normalizeCityName(
+            $request->location_city
+        );
+
+        $preferredLocations = $this->cleanLocations(
+            $request->preferred_locations ?? []
+        );
+
+        $normalizedLocalities = array_map(
+            fn($loc) => $this->normalizeLocalityName(
+                $loc,
+                $normalizedCity
+            ),
+            $preferredLocations
+        );
+
+        // Find or create customer
+
+        $user = User::where(function ($query) use ($request) {
+            $query->where('email', $request->email)
+                ->orWhere('phone', $request->phone);
+        })->first();
+
+        $password = null;
+        $isNewCustomer = false;
+
+        if (!$user) {
+
+            $password = \Illuminate\Support\Str::random(10);
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'password' => $password,
+                'status' => 'active',
+                'active_role' => 'customer',
+            ]);
+
+            $user->assignRole('customer');
+
+            $isNewCustomer = true;
+
+            ActivityLog::record(
+                action: 'customer_auto_created',
+                description: 'Customer account was automatically created from a mobile direct enquiry.',
+                module: 'customer',
+                subject: $user,
+                metadata: [
+                    'source' => 'mobile_app',
+                    'registration_type' => 'automatic',
+                ]
+            );
+
+            Log::info(
+                'Customer automatically created from mobile direct enquiry',
+                [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ]
+            );
+
+            app(\App\Services\LoggingService::class)->created(
+                $user,
+                'customer',
+                'Customer account created automatically from mobile direct enquiry.',
+                [
+                    'source' => 'mobile_app',
+                    'registration_type' => 'automatic',
+                ]
+            );
+
+        } else {
+
+            Log::info(
+                'Existing customer/user found for mobile direct enquiry',
+                [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ]
             );
         }
 
-        try {
-            DB::beginTransaction();
+        $enquiry = DirectEnquiry::create([
+            'user_id' => $user->id,
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'hoarding_type' => implode(',', $request->hoarding_type),
+            'location_city' => $normalizedCity,
+            'preferred_locations' => $normalizedLocalities,
+            'remarks' => $request->remarks,
+            'preferred_modes' => $request->preferred_modes
+                ?? ['Call', 'Email'],
+            'is_phone_verified' => true,
+            'status' => 'new',
+            'source' => 'mobile_app',
+        ]);
 
-            $normalizedCity       = $this->normalizeCityName($request->location_city);
-            $preferredLocations   = $this->cleanLocations($request->preferred_locations ?? []);
-            $normalizedLocalities = array_map(
-                fn($loc) => $this->normalizeLocalityName($loc, $normalizedCity),
-                $preferredLocations
+        app(\App\Services\LoggingService::class)->created(
+            $enquiry,
+            'direct_enquiry',
+            'Direct enquiry created successfully from mobile app.',
+            [
+                'source' => 'mobile_app',
+                'customer_id' => $user->id,
+                'status' => 'new',
+                'city' => $normalizedCity,
+                'hoarding_type' => $request->hoarding_type,
+            ]
+        );
+
+        ActivityLog::record(
+            action: 'direct_enquiry_submitted',
+            description: 'Customer submitted a direct hoarding enquiry from mobile app.',
+            module: 'direct_enquiry',
+            subject: $enquiry,
+            metadata: [
+                'source' => 'mobile_app',
+                'customer_id' => $user->id,
+                'city' => $normalizedCity,
+                'hoarding_type' => $request->hoarding_type,
+                'preferred_modes' => $request->preferred_modes
+                    ?? ['Call', 'Email'],
+                'phone_verified' => true,
+            ]
+        );
+
+        $vendors = $this->findRelevantVendors(
+            $normalizedCity,
+            $normalizedLocalities,
+            $request->hoarding_type
+        );
+
+        if ($vendors->isNotEmpty()) {
+
+            $enquiry->assignedVendors()
+                ->attach($vendors->pluck('id'));
+
+            ActivityLog::record(
+                action: 'direct_enquiry_assigned_to_vendors',
+                description: 'Direct enquiry was assigned to matching vendors.',
+                module: 'direct_enquiry',
+                subject: $enquiry,
+                metadata: [
+                    'vendor_count' => $vendors->count(),
+                    'city' => $normalizedCity,
+                    'hoarding_type' => $request->hoarding_type,
+                ]
             );
 
-            $enquiry = DirectEnquiry::create([
-                'name'                => $request->name,
-                'email'               => $request->email,
-                'phone'               => $request->phone,
-                'hoarding_type'       => implode(',', $request->hoarding_type),
-                'location_city'       => $normalizedCity,
-                'preferred_locations' => $normalizedLocalities,
-                'remarks'             => $request->remarks,
-                'preferred_modes'     => $request->preferred_modes ?? ['Call', 'Email'],
-                'is_phone_verified'   => true,
-                'status'              => 'new',
-                'source'              => 'mobile_app',
-            ]);
+            foreach ($vendors as $vendor) {
 
-            // Find matching vendors and notify them
-            $vendors = $this->findRelevantVendors(
-                $normalizedCity,
-                $normalizedLocalities,
-                $request->hoarding_type
-            );
+                Mail::to($vendor->email)->queue(
+                    new VendorDirectEnquiryMail(
+                        $enquiry,
+                        $vendor
+                    )
+                );
 
-            if ($vendors->isNotEmpty()) {
-                $enquiry->assignedVendors()->attach($vendors->pluck('id'));
+                $vendor->notify(
+                    new VendorDirectEnquiryNotification(
+                        $enquiry
+                    )
+                );
 
-                // Notify vendors with push and in-app notifications
-                foreach ($vendors as $vendor) {
-                    Mail::to($vendor->email)->queue(new VendorDirectEnquiryMail($enquiry, $vendor));
+                $hoardingTypes = implode(
+                    ', ',
+                    array_map(
+                        'strtoupper',
+                        $request->hoarding_type
+                    )
+                );
 
-                    // In-app notification
-                    $vendor->notify(new VendorDirectEnquiryNotification($enquiry));
-
-                    // Push notification with hoarding details
-                    $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
-                    send(
-                        $vendor,
-                        'New Hoarding Enquiry Received',
-                        "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
-                        [
-                            'type'           => 'vendor_direct_enquiry',
-                            'enquiry_id'     => $enquiry->id,
-                            'customer_name'  => $enquiry->name,
-                            'hoarding_type'  => implode(',', $request->hoarding_type),
-                            'city'           => $normalizedCity,
-                            'source'         => 'mobile_app'
-                        ]
-                    );
-                }
-            }
-
-            // Customer confirmation email
-            Mail::to($enquiry->email)->queue(new UserDirectEnquiryConfirmation($enquiry));
-
-            // Send in-app notification to customer
-            // Note: Customer is not yet a registered user, so we'll store this for when they login
-            // or for guest notification display via email link
-
-            // Attempt to notify if customer exists in system by email
-            $existingCustomer = User::where('email', $enquiry->email)
-                ->where('active_role', 'customer')
-                ->first();
-
-            if ($existingCustomer) {
-                // In-app notification for registered customer
-                $existingCustomer->notify(new \Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification($enquiry));
-
-                // Push notification to customer
-                $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
                 send(
-                    $existingCustomer,
-                    'Enquiry Submitted Successfully',
-                    "Your {$hoardingTypes} hoarding enquiry for {$normalizedCity} has been submitted.",
+                    $vendor,
+                    'New Hoarding Enquiry Received',
+                    "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
                     [
-                        'type'           => 'customer_direct_enquiry',
-                        'enquiry_id'     => $enquiry->id,
-                        'hoarding_type'  => implode(',', $request->hoarding_type),
-                        'city'           => $normalizedCity,
-                        'status'         => 'submitted'
+                        'type' => 'vendor_direct_enquiry',
+                        'enquiry_id' => $enquiry->id,
+                        'customer_name' => $enquiry->name,
+                        'hoarding_type' => implode(
+                            ',',
+                            $request->hoarding_type
+                        ),
+                        'city' => $normalizedCity,
+                        'source' => 'mobile_app',
+                    ]
+                );
+
+                Log::info(
+                    'Vendor notified of mobile direct enquiry',
+                    [
+                        'vendor_id' => $vendor->id,
+                        'enquiry_id' => $enquiry->id,
                     ]
                 );
             }
+        }
 
-            // Notify admins
-            $admins = User::whereIn('active_role', ['admin', 'superadmin'])
-                ->where('status', 'active')
-                ->get();
+        Mail::to($enquiry->email)->queue(
+            new UserDirectEnquiryConfirmation($enquiry)
+        );
 
-            foreach ($admins as $admin) {
-                Mail::to($admin->email)->queue(new AdminDirectEnquiryMail($enquiry, $vendors));
-                $admin->notify(new AdminDirectEnquiryNotification($enquiry));
-            }
+        if ($isNewCustomer && $password) {
 
-            DB::commit();
-            // Cleanup OTP records
-            DB::table('guest_user_otps')
-                ->where('identifier', $request->phone)
-                ->where('purpose', 'direct_enquiry')
-                ->delete();
-
-            Log::info('Direct enquiry submitted via mobile', [
-                'enquiry_id'       => $enquiry->id,
-                'city'             => $normalizedCity,
-                'vendors_notified' => $vendors->count(),
-            ]);
-
-            return $this->success(
-                'Enquiry submitted successfully! You will receive quotes within 24-48 hours.',
-                ['enquiry_id' => $enquiry->id],
-                201
+            Mail::to($user->email)->queue(
+                new CustomerWelcomeMail(
+                    $user,
+                    $password
+                )
             );
-        } catch (\Throwable $e) {
-            DB::rollBack();
 
-            Log::error('Mobile enquiry submission failed', [
+            Log::info(
+                'New mobile customer welcome mail queued',
+                [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]
+            );
+        }
+
+        $user->notify(
+            new \Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification(
+                $enquiry
+            )
+        );
+
+        $hoardingTypes = implode(
+            ', ',
+            array_map(
+                'strtoupper',
+                $request->hoarding_type
+            )
+        );
+
+        send(
+            $user,
+            'Enquiry Submitted Successfully',
+            "Your {$hoardingTypes} hoarding enquiry for {$normalizedCity} has been submitted.",
+            [
+                'type' => 'customer_direct_enquiry',
+                'enquiry_id' => $enquiry->id,
+                'hoarding_type' => implode(
+                    ',',
+                    $request->hoarding_type
+                ),
+                'city' => $normalizedCity,
+                'status' => 'submitted',
+            ]
+        );
+
+        Log::info(
+            'Customer notified of mobile direct enquiry submission',
+            [
+                'customer_id' => $user->id,
+                'enquiry_id' => $enquiry->id,
+            ]
+        );
+
+        $admins = User::whereIn(
+            'active_role',
+            ['admin', 'superadmin']
+        )
+            ->where('status', 'active')
+            ->get();
+
+        foreach ($admins as $admin) {
+
+            Mail::to($admin->email)->queue(
+                new AdminDirectEnquiryMail(
+                    $enquiry,
+                    $vendors
+                )
+            );
+
+            $admin->notify(
+                new AdminDirectEnquiryNotification(
+                    $enquiry
+                )
+            );
+        }
+
+        DB::commit();
+
+        DB::table('guest_user_otps')
+            ->where('identifier', $request->phone)
+            ->where('purpose', 'direct_enquiry')
+            ->delete();
+
+        ActivityLog::record(
+            action: 'direct_enquiry_completed',
+            description: 'Mobile direct enquiry submission completed successfully and relevant parties were notified.',
+            module: 'direct_enquiry',
+            subject: $enquiry,
+            metadata: [
+                'customer_id' => $user->id,
+                'new_customer_created' => $isNewCustomer,
+                'vendors_notified' => $vendors->count(),
+                'city' => $normalizedCity,
+                'source' => 'mobile_app',
+            ]
+        );
+
+        Log::info(
+            'Mobile direct enquiry created successfully',
+            [
+                'enquiry_id' => $enquiry->id,
+                'user_id' => $user->id,
+                'new_customer_created' => $isNewCustomer,
+                'city' => $normalizedCity,
+                'vendors_notified' => $vendors->count(),
+            ]
+        );
+
+        return $this->success(
+            'Enquiry submitted successfully! You will receive quotes within 24-48 hours.',
+            [
+                'enquiry_id' => $enquiry->id,
+                'user_id' => $user->id,
+            ],
+            201
+        );
+
+    } catch (\Throwable $e) {
+
+        DB::rollBack();
+
+        Log::error(
+            'Mobile enquiry submission failed',
+            [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-            ]);
+            ]
+        );
 
-            return $this->error('Failed to submit enquiry. Please try again.', 500);
-        }
+        return $this->error(
+            'Failed to submit enquiry. Please try again.',
+            500
+        );
     }
+}
+ 
+
 
     // =========================================================================
     // GET /api/v1/vendor/enquiries
