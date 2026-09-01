@@ -413,9 +413,7 @@ class DirectEnquiryController extends Controller
             $isNewCustomer = false;
 
 
-            // =====================================================
-            // CREATE CUSTOMER IF NOT EXISTS
-            // =====================================================
+
 
             if (!$user) {
 
@@ -1093,9 +1091,7 @@ class DirectEnquiryController extends Controller
         return $vendors;
     }
 
-    /**
-     * Generate fuzzy pattern for SQL LIKE query
-     */
+    
     private function getFuzzyPattern(string $text): string
     {
         // Add % between each character for fuzzy matching
@@ -1104,9 +1100,7 @@ class DirectEnquiryController extends Controller
         return $pattern;
     }
 
-    /**
-     * Show a single direct enquiry for the vendor panel
-     */
+
     public function vendorShow($enquiryId)
     {
         $vendor = auth()->user();
@@ -1454,17 +1448,17 @@ class DirectEnquiryController extends Controller
      * Vendor - View Direct Enquiry
      */
     public function vendorDirectShow($id)
-{
-    $vendor = Auth::user();
+    {
+        $vendor = Auth::user();
 
-    $enquiry = DirectEnquiry::query()
-        ->where('id', $id)
-        ->where('user_id', $vendor->id)
-        ->firstOrFail();
+        $enquiry = DirectEnquiry::query()
+            ->where('id', $id)
+            ->where('user_id', $vendor->id)
+            ->firstOrFail();
 
-    return view(
-        'vendor.enquiries.direct-show',
-        compact('enquiry')
-    );
-}
+        return view(
+            'vendor.enquiries.direct-show',
+            compact('enquiry')
+        );
+    }
 }
