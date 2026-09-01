@@ -55,9 +55,9 @@
                     @if(auth()->user()->avatar)
                         <img src="{{ route('view-avatar', auth()->user()->id) }}?v={{ auth()->user()->updated_at->timestamp }}"
                             alt="Profile Image" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="
-                                            this.style.display='none';
-                                            this.nextElementSibling.style.display='block';
-                                        ">
+                                                    this.style.display='none';
+                                                    this.nextElementSibling.style.display='block';
+                                                ">
                         <svg style="display:none; width:36px; height:36px;" fill="none"
                             stroke="{{ request()->routeIs('vendor.profile.*') ? '#ffffff' : '#9ca3af' }}"
                             viewBox="0 0 24 24">
@@ -205,6 +205,16 @@
                         {{ request()->routeIs('customer.enquiries.*') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                         - Enquiries & Offers
                     </a>
+
+                   <a href="{{ route('vendor.my-direct-enquiries') }}"
+    class="block px-6 py-1 text-sm rounded-md transition
+    {{ request()->routeIs('vendor.my-direct-enquiries*')
+        ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold'
+        : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+
+    - My Direct Enquiries
+
+</a>
                 </div>
             </div>
 
@@ -389,7 +399,7 @@
                     @if(auth()->user() && auth()->user()->hasRole('vendor'))
                         <a href="{{ route('vendor.hoardings.add') }}"
                             class="block px-6 py-1 text-sm rounded-md transition
-                                    {{ request()->routeIs('vendor.hoardings.add') || request()->is('vendor/hoardings/add') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
+                                            {{ request()->routeIs('vendor.hoardings.add') || request()->is('vendor/hoardings/add') ? 'bg-emerald-50 text-gray-900 border-[#00995c] pl-5 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:pl-5 border-transparent' }}">
                             <span class="inline-flex items-center gap-2">- Add Hoardings</span>
                         </a>
                     @endif

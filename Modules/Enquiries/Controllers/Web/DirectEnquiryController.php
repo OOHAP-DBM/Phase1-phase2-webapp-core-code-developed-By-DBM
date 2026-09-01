@@ -801,7 +801,7 @@ class DirectEnquiryController extends Controller
             }
 
 
-            
+
             DB::commit();
 
             DB::table('guest_user_otps')
@@ -816,7 +816,7 @@ class DirectEnquiryController extends Controller
                 ->delete();
 
 
-            
+
             session()->forget('captcha_answer');
 
             ActivityLog::record(
@@ -831,7 +831,7 @@ class DirectEnquiryController extends Controller
                     'city' => $normalizedCity,
                 ]
             );
-            
+
 
             \Log::info(
                 'Direct enquiry created successfully',
@@ -1409,4 +1409,62 @@ class DirectEnquiryController extends Controller
 
         return view('customer.enquiries.direct-show', compact('enquiry'));
     }
+
+
+
+    public function myDirectEnquiries(Request $request)
+    {
+        $vendor = Auth::user();
+
+        $query = DirectEnquiry::query()
+            ->where('user_id', $vendor->id);
+
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('location_city', 'like', "%{$search}%")
+                    ->orWhere('hoarding_type', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+
+        $enquiries = $query
+            ->paginate(10)
+            ->withQueryString();
+
+        return view(
+            'vendor.enquiries.direct-index',
+            compact('enquiries')
+        );
+    }
+
+
+
+
+    /**
+     * Vendor - View Direct Enquiry
+     */
+    public function vendorDirectShow($id)
+{
+    $vendor = Auth::user();
+
+    $enquiry = DirectEnquiry::query()
+        ->where('id', $id)
+        ->where('user_id', $vendor->id)
+        ->firstOrFail();
+
+    return view(
+        'vendor.enquiries.direct-show',
+        compact('enquiry')
+    );
+}
 }
