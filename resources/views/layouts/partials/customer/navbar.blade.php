@@ -555,13 +555,11 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-
         const button = document.getElementById('profileMenuBtn');
         const dropdown = document.getElementById('profileDropdown');
         const user = document.getElementById('user');
 
         if (!button || !dropdown || !user) {
-            console.error('Profile menu elements not found');
             return;
         }
 
@@ -569,11 +567,13 @@
             e.preventDefault();
             e.stopPropagation();
 
+            const isHidden = dropdown.classList.contains('hidden');
+
             dropdown.classList.toggle('hidden');
 
             button.setAttribute(
                 'aria-expanded',
-                !dropdown.classList.contains('hidden')
+                isHidden ? 'true' : 'false'
             );
         });
 
@@ -585,7 +585,6 @@
             dropdown.classList.add('hidden');
             button.setAttribute('aria-expanded', 'false');
         });
-
     });
 </script>
 <script>

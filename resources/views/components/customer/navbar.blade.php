@@ -29,86 +29,62 @@
                 <div class="flex items-center space-x-4 lg:space-x-5">
 
                     <!-- USER ICON with Dropdown -->
-                    <!-- <div class="relative inline-block" id="userDropdownWrapper">
-                        <a href="javascript:void(0)"
-                            id="userDropdownBtn"
-                            class="text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Login">
-                            <svg width="20" height="19" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M3.5 4.25C3.5 3.69188 3.60993 3.13923 3.82351 2.6236C4.03709 2.10796 4.35015 1.63945 4.7448 1.2448C5.13944 0.850147 5.60796 0.537094 6.1236 0.323512C6.63923 0.109929 7.19188 0 7.75 0C8.30812 0 8.86077 0.109929 9.3764 0.323512C9.89204 0.537094 10.3606 0.850147 10.7552 1.2448C11.1499 1.63945 11.4629 2.10796 11.6765 2.6236C11.8901 3.13923 12 3.69188 12 4.25C12 5.37717 11.5522 6.45817 10.7552 7.2552C9.95817 8.05223 8.87717 8.5 7.75 8.5C6.62283 8.5 5.54183 8.05223 4.7448 7.2552C3.94777 6.45817 3.5 5.37717 3.5 4.25ZM7.75 1.5C7.02065 1.5 6.32118 1.78973 5.80546 2.30546C5.28973 2.82118 5 3.52065 5 4.25C5 4.97935 5.28973 5.67882 5.80546 6.19454C6.32118 6.71027 7.02065 7 7.75 7C8.47935 7 9.17882 6.71027 9.69454 6.19454C10.2103 5.67882 10.5 4.97935 10.5 4.25C10.5 3.52065 10.2103 2.82118 9.69454 2.30546C9.17882 1.78973 8.47935 1.5 7.75 1.5ZM3.75 11.5C3.15326 11.5 2.58097 11.7371 2.15901 12.159C1.73705 12.581 1.5 13.1533 1.5 13.75V14.938C1.5 14.956 1.513 14.972 1.531 14.975C5.65 15.647 9.851 15.647 13.969 14.975C13.9775 14.9731 13.9851 14.9684 13.9907 14.9617C13.9963 14.955 13.9996 14.9467 14 14.938V13.75C14 13.1533 13.7629 12.581 13.341 12.159C12.919 11.7371 12.3467 11.5 11.75 11.5H11.41C11.3832 11.5005 11.3567 11.5045 11.331 11.512L10.466 11.795C8.70118 12.3713 6.79882 12.3713 5.034 11.795L4.168 11.512C4.14296 11.5047 4.11708 11.5006 4.091 11.5H3.75ZM0 13.75C0 12.7554 0.395088 11.8016 1.09835 11.0983C1.80161 10.3951 2.75544 10 3.75 10H4.09C4.27667 10.0007 4.458 10.0293 4.634 10.086L5.5 10.369C6.96203 10.8463 8.53797 10.8463 10 10.369L10.866 10.086C11.041 10.029 11.225 10 11.409 10H11.75C12.7446 10 13.6984 10.3951 14.4017 11.0983C15.1049 11.8016 15.5 12.7554 15.5 13.75V14.938C15.5 15.692 14.954 16.334 14.21 16.455C9.93164 17.1534 5.56836 17.1534 1.29 16.455C0.930184 16.3958 0.603047 16.2108 0.366821 15.9331C0.130596 15.6553 0.000609175 15.3027 0 14.938V13.75Z" fill="#6E6E6E"/>
-                            </svg>
-                        </a>
+                    @auth
+                        <div class="relative inline-block" id="userDropdownWrapper">
 
+                            <button type="button" id="userDropdownBtn"
+                                class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer" title="Profile">
 
-                        <div id="userDropdown"
-                            class="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg hidden z-50">
+                                <svg width="20" height="21" viewBox="0 0 16 17" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path fill-rule="evenodd" clip-rule="evenodd"
+                                        d="M3.5 4.25C3.5 3.69188 3.60993 3.13923 3.82351 2.6236C4.03709 2.10796 4.35015 1.63945 4.7448 1.2448C5.13944 0.850147 5.60796 0.537094 6.1236 0.323512C6.63923 0.109929 7.19188 0 7.75 0C8.30812 0 8.86077 0.109929 9.3764 0.323512C9.89204 0.537094 10.3606 0.850147 10.7552 1.2448C11.1499 1.63945 11.4629 2.10796 11.6765 2.6236C11.8901 3.13923 12 3.69188 12 4.25C12 5.37717 11.5522 6.45817 10.7552 7.2552C9.95817 8.05223 8.87717 8.5 7.75 8.5C6.62283 8.5 5.54183 8.05223 4.7448 7.2552C3.94777 6.45817 3.5 5.37717 3.5 4.25ZM7.75 1.5C7.02065 1.5 6.32118 1.78973 5.80546 2.30546C5.28973 2.82118 5 3.52065 5 4.25C5 4.97935 5.28973 5.67882 5.67882 6.19454C6.32118 6.71027 7.02065 7 7.75 7C8.47935 7 9.17882 6.71027 9.69454 6.19454C10.2103 6.71027 10.5 4.97935 10.5 4.25C10.5 3.52065 10.2103 2.82118 9.89204 2.30546C9.3764 1.78973 8.47935 1.5 7.75 1.5ZM3.75 11.5C3.15326 11.5 2.58097 11.737 2.15901 12.159C1.73705 12.581 1.5 13.1533 1.5 13.75V14.938C1.5 14.956 1.513 14.972 1.531 14.975C5.65 15.647 9.851 15.647 13.969 14.975C13.9775 14.9731 13.9851 14.9684 13.9907 14.9617C13.9963 14.955 13.9996 14.9467 14 14.938V13.75C14 13.1533 13.7629 12.581 13.341 12.159C12.919 11.737 12.3467 11.5 11.75 11.5H11.41C11.3832 11.5005 11.3567 11.5045 11.331 11.512L10.466 11.795C8.70118 12.3713 6.79882 12.3713 5.034 11.795L4.168 11.512C4.14296 11.5047 4.11708 11.5006 4.091 11.5H3.75Z"
+                                        fill="#6E6E6E" />
+                                </svg>
+                            </button>
 
-                            <div class="p-4 border-b">
-                                @guest
-                                    <p class="font-semibold text-gray-900">Welcome</p>
-                                    <p class="text-sm text-gray-500">
-                                        To access account and manage bookings.
-                                    </p>
-                                    <button class="mt-3 w-full bg-black text-white rounded-md py-2 text-sm font-medium">
-                                        <a href="{{ route('login') }}" class="mt-3 text-center rounded-md py-2 text-sm font-medium">
-                                            Login /
-                                        </a>
-                                        <a href="{{ route('register.role-selection') }}" class="mt-2 text-center rounded-md py-2 text-sm font-medium">
-                                            Signup
-                                        </a>
-                                    </button>
-                                @endguest
+                            <div id="userDropdown"
+                                class="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg hidden z-[100]">
 
-                                @auth
-                                    @php
-                                        $dashboardUrl = '#';
-                                        $profileUrl   = '#';
-                                        if(auth()->check()) {
-                                            if(auth()->user()->hasRole('admin')) {
-                                                $dashboardUrl = route('admin.dashboard');
-                                                $profileUrl   = $dashboardUrl;
-                                            } elseif(auth()->user()->hasRole('vendor')) {
-                                                $dashboardUrl = route('vendor.dashboard');
-                                                $profileUrl   = route('vendor.profile.edit');
-                                            } else {
-                                                $dashboardUrl = route('customer.dashboard');
-                                                $profileUrl   = route('customer.profile.index');
-                                            }
-                                        }
-
-                                    @endphp
+                                <div class="p-4 border-b">
                                     <a href="{{ $profileUrl }}" class="block">
                                         <div class="bg-black text-white rounded-md px-3 py-2 hover:bg-gray-900 transition">
-                                            <p class="text-sm font-semibold">{{ auth()->user()->name }}</p>
+                                            <p class="text-sm font-semibold">
+                                                {{ auth()->user()->name }}
+                                            </p>
+
                                             @if(!empty(auth()->user()->phone))
-                                                <p class="text-xs opacity-80">+91{{ auth()->user()->phone }}</p>
+                                                <p class="text-xs opacity-80">
+                                                    +91{{ auth()->user()->phone }}
+                                                </p>
                                             @endif
                                         </div>
                                     </a>
-                                @endauth
-                            </div>
+                                </div>
 
-                            @auth
                                 <a href="{{ $dashboardUrl }}"
-                                class="flex items-center font-semibold justify-between px-4 pt-2 text-gray-700 hover:bg-gray-100">
+                                    class="block px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-100">
                                     Dashboard
                                 </a>
-                            @endauth
 
-                            <div class="py-2 text-sm">
-                                @auth
-                                    <button
-                                        onclick="openLogoutModal()"
-                                        class="w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100">
-                                        Logout
-                                    </button>
-                                @endauth
+                                <a href="{{ $profileUrl }}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-100">
+                                    My Profile
+                                </a>
+
+                                <div class="border-t">
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+
+                                        <button type="submit"
+                                            class="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-gray-100">
+                                            Logout
+                                        </button>
+                                    </form>
+                                </div>
+
                             </div>
                         </div>
-                    </div> -->
-
-
-
+                    @endauth
 
 
                     <!-- Cart Icon -->
@@ -123,7 +99,7 @@
 
 
                         @php
-                           
+
                             // Guest → 0 rakho, JS LocalStorage se update karega
                             $cartCount = auth()->check()
                                 ? \Illuminate\Support\Facades\DB::table('carts')
@@ -667,18 +643,30 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+
             const btn = document.getElementById('userDropdownBtn');
             const menu = document.getElementById('userDropdown');
+            const wrapper = document.getElementById('userDropdownWrapper');
+
+            if (!btn || !menu || !wrapper) {
+                return;
+            }
 
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
+
                 menu.classList.toggle('hidden');
+            });
+
+            menu.addEventListener('click', function (e) {
+                e.stopPropagation();
             });
 
             document.addEventListener('click', function () {
                 menu.classList.add('hidden');
             });
+
         });
     </script>
 
