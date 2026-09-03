@@ -158,7 +158,7 @@ class EmailTemplateController extends Controller
                 'required',
                 'string',
                 'max:255',
-                'regex:/^[a-z0-9_]+$/', 
+                'regex:/^[a-z0-9_]+$/',
                 Rule::unique('email_templates', 'key')
                     ->ignore($emailTemplate->id),
             ],
@@ -207,41 +207,40 @@ class EmailTemplateController extends Controller
     {
         $body = $emailTemplate->body;
 
-
-
         $sampleVariables = [
-            'customer_name' => 'Saurabh',
-            'customer_email' => 'customer@example.com',
+            'customer_name' => 'Saurabh Pandey',
+            'customer_email' => 'dbm.laraveldeveloper5@gmail.com',
+            'customer_phone' => '+91 9876543210',
 
             'vendor_name' => 'Demo Vendor',
             'vendor_email' => 'vendor@example.com',
 
             'enquiry_number' => 'ENQ-1001',
+
+            'hoarding_type' => 'Unipole',
+            'city' => 'Delhi',
+            'preferred_locations' => 'Connaught Place, Rajouri Garden',
+            'preferred_contact_mode' => 'Phone',
+            'client_message' => 'Looking for hoardings for 30 days.',
+
             'quotation_number' => 'QUO-1001',
+            'preferred_start_date' => '15 September 2026',
 
             'app_name' => config('app.name', 'OOHAPP'),
-
             'login_url' => url('/login'),
-
             'support_email' => config(
                 'mail.from.address',
                 'support@example.com'
             ),
         ];
 
-
         foreach ($sampleVariables as $key => $value) {
-
-            $body = str_replace(
-                [
-                    '{{' . $key . '}}',
-                    '{{ ' . $key . ' }}',
-                ],
-                $value,
+            $body = preg_replace(
+                '/\{\{\s*' . preg_quote($key, '/') . '\s*\}\}/',
+                e($value),
                 $body
             );
         }
-
 
         return view(
             'admin.email_templates.preview',

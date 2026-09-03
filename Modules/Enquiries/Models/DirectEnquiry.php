@@ -158,17 +158,13 @@ class DirectEnquiry extends Model
         return $query->where('location_city', 'like', "%{$city}%");
     }
 
-    /**
-     * Scope: Filter by status
-     */
+
     public function scopeByStatus($query, string $status)
     {
         return $query->where('status', $status);
     }
 
-    /**
-     * Scope: Search enquiries
-     */
+
     public function scopeSearch($query, string $search)
     {
         return $query->where(function ($q) use ($search) {
@@ -179,9 +175,7 @@ class DirectEnquiry extends Model
         });
     }
 
-    /**
-     * Mark as contacted
-     */
+
     public function markAsContacted(): void
     {
         $this->update([
@@ -190,9 +184,7 @@ class DirectEnquiry extends Model
         ]);
     }
 
-    /**
-     * Mark quote as sent
-     */
+
     public function markQuoteSent(): void
     {
         $this->update([
