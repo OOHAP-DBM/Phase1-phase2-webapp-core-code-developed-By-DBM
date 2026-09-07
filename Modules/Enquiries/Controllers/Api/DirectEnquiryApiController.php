@@ -324,20 +324,61 @@ class DirectEnquiryApiController extends Controller
 
                     $vendor->notify(new VendorDirectEnquiryNotification($enquiry));
 
-                    $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
-                    send(
-                        $vendor,
-                        'New Hoarding Enquiry Received',
-                        "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
-                        [
-                            'type' => 'vendor_direct_enquiry',
-                            'enquiry_id' => $enquiry->id,
-                            'customer_name' => $enquiry->name,
-                            'hoarding_type' => implode(',', $request->hoarding_type),
-                            'city' => $normalizedCity,
-                            'source' => 'mobile_app'
-                        ]
-                    );
+                    // $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
+                    // send(
+                    //     $vendor,
+                    //     'New Hoarding Enquiry Received',
+                    //     "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
+                    //     [
+                    //         'type' => 'vendor_direct_enquiry',
+                    //         'enquiry_id' => $enquiry->id,
+                    //         'customer_name' => $enquiry->name,
+                    //         'hoarding_type' => implode(',', $request->hoarding_type),
+                    //         'city' => $normalizedCity,
+                    //         'source' => 'mobile_app'
+                    //     ]
+                    // );
+                     if (!empty($vendor->fcm_token)) {
+
+            $hoardingTypes = implode(
+                ', ',
+                array_map(
+                    'strtoupper',
+                    $request->hoarding_type
+                )
+            );
+
+            $sent = send(
+                $vendor->fcm_token,
+                'New Hoarding Enquiry Received',
+                "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
+                [
+                    'type' => 'vendor_direct_enquiry',
+                    'enquiry_id' => (string) $enquiry->id,
+                    'customer_name' => $enquiry->name,
+                    'hoarding_type' => implode(',', $request->hoarding_type),
+                    'city' => $normalizedCity,
+                    'source' => 'mobile_app',
+                ]
+            );
+
+            if (!$sent) {
+                Log::warning(
+                    "FCM notification failed for vendor ID {$vendor->id}",
+                    [
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
+            }
+        } else {
+                Log::warning(
+                    "Vendor has no FCM token",
+                    [
+                        'vendor_id' => $vendor->id,
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
+              }
                 }
             }
 
@@ -394,6 +435,19 @@ class DirectEnquiryApiController extends Controller
                 ['enquiry_id' => $enquiry->id],
                 201
             );
+            if ($user->fcm_token) {
+                $sent = send(
+                $user->fcm_token,
+                'Enquiry Submitted',
+                'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                ['type' => 'Enquiry', 'user_id' => $user->id]
+                );
+
+
+                if (!$sent) {
+                \Log::warning("FCM notification failed for user ID {$user->id}");
+                }
+                }
         } catch (\Throwable $e) {
             DB::rollBack();
 
