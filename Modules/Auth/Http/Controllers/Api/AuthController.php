@@ -441,6 +441,8 @@ class AuthController extends Controller
 
         $user->update([
             'active_role' => $requestedRole,
+            'fcm_token' => $request->input('fcm_token'),
+
         ]);
 
         $user->updateLastLogin();

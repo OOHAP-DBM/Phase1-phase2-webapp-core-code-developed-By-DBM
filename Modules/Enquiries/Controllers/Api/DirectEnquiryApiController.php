@@ -294,8 +294,92 @@ class DirectEnquiryApiController extends Controller
                 fn($loc) => $this->normalizeLocalityName($loc, $normalizedCity),
                 $preferredLocations
             );
+              // =====================================================
+                    // FIND OR CREATE CUSTOMER
+                    // =====================================================
+
+                    $user = User::where(function ($query) use ($request) {
+
+                    $query->where('email', $request->email)
+                    ->orWhere('phone', $request->phone);
+
+                    })->first();
+
+
+                    $password = null;
+                    $isNewCustomer = false;
+
+
+                    // =====================================================
+                    // CREATE NEW CUSTOMER
+                    // =====================================================
+
+                    if (!$user) {
+
+                    // Generate temporary/random password
+                    $password = \Illuminate\Support\Str::random(10);
+
+
+                    $user = User::create([
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                    'password' => $password,
+                    'status' => 'active',
+                    'active_role' => 'customer',
+                    ]);
+
+
+                    // Assign customer role
+                    $user->assignRole('customer');
+
+
+                    $isNewCustomer = true;
+
+
+                    // Log customer creation
+                    Log::info(
+                    'Customer automatically created from mobile direct enquiry',
+                    [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    ]
+                    );
+
+
+                    // Optional activity log
+                    if (class_exists(\App\Models\ActivityLog::class)) {
+
+                    ActivityLog::record(
+                    action: 'customer_auto_created',
+                    description:
+                    'Customer account was automatically created from a mobile direct enquiry.',
+                    module: 'customer',
+                    subject: $user,
+                    metadata: [
+                    'source' => 'mobile_app',
+                    'registration_type' => 'automatic',
+                    ]
+                    );
+                    }
+
+
+                    } else {
+
+                    // Existing user
+                Log::info(
+                'Existing customer/user found for mobile direct enquiry',
+                [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                ]
+                );
+                }
 
             $enquiry = DirectEnquiry::create([
+                'user_id' => $user->id,
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
@@ -308,6 +392,29 @@ class DirectEnquiryApiController extends Controller
                 'status' => 'new',
                 'source' => 'mobile_app',
             ]);
+                             // =====================================================
+                            // SEND WELCOME EMAIL
+                            // ONLY FOR NEW CUSTOMER
+                            // =====================================================
+
+                            if ($isNewCustomer && $password) {
+
+                            Mail::to($user->email)->queue(
+                            new CustomerWelcomeMail(
+                            $user,
+                            $password
+                            )
+                            );
+
+
+                            Log::info(
+                            'New customer welcome mail queued from mobile direct enquiry',
+                            [
+                            'user_id' => $user->id,
+                            'email' => $user->email,
+                            ]
+                            );
+                            }
 
 
             $vendors = $this->findRelevantVendors(
@@ -324,20 +431,61 @@ class DirectEnquiryApiController extends Controller
 
                     $vendor->notify(new VendorDirectEnquiryNotification($enquiry));
 
-                    $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
-                    send(
-                        $vendor,
-                        'New Hoarding Enquiry Received',
-                        "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
-                        [
-                            'type' => 'vendor_direct_enquiry',
-                            'enquiry_id' => $enquiry->id,
-                            'customer_name' => $enquiry->name,
-                            'hoarding_type' => implode(',', $request->hoarding_type),
-                            'city' => $normalizedCity,
-                            'source' => 'mobile_app'
-                        ]
-                    );
+                    // $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
+                    // send(
+                    //     $vendor,
+                    //     'New Hoarding Enquiry Received',
+                    //     "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
+                    //     [
+                    //         'type' => 'vendor_direct_enquiry',
+                    //         'enquiry_id' => $enquiry->id,
+                    //         'customer_name' => $enquiry->name,
+                    //         'hoarding_type' => implode(',', $request->hoarding_type),
+                    //         'city' => $normalizedCity,
+                    //         'source' => 'mobile_app'
+                    //     ]
+                    // );
+                     if (!empty($vendor->fcm_token)) {
+
+            $hoardingTypes = implode(
+                ', ',
+                array_map(
+                    'strtoupper',
+                    $request->hoarding_type
+                )
+            );
+
+            $sent = send(
+                $vendor->fcm_token,
+                'New Hoarding Enquiry Received',
+                "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
+                [
+                    'type' => 'vendor_direct_enquiry',
+                    'enquiry_id' => (string) $enquiry->id,
+                    'customer_name' => $enquiry->name,
+                    'hoarding_type' => implode(',', $request->hoarding_type),
+                    'city' => $normalizedCity,
+                    'source' => 'mobile_app',
+                ]
+            );
+
+            if (!$sent) {
+                Log::warning(
+                    "FCM notification failed for vendor ID {$vendor->id}",
+                    [
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
+            }
+        } else {
+                Log::warning(
+                    "Vendor has no FCM token",
+                    [
+                        'vendor_id' => $vendor->id,
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
+              }
                 }
             }
 
@@ -394,6 +542,19 @@ class DirectEnquiryApiController extends Controller
                 ['enquiry_id' => $enquiry->id],
                 201
             );
+            if ($user->fcm_token) {
+                $sent = send(
+                $user->fcm_token,
+                'Enquiry Submitted',
+                'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                ['type' => 'Enquiry', 'user_id' => $user->id]
+                );
+
+
+                if (!$sent) {
+                \Log::warning("FCM notification failed for user ID {$user->id}");
+                }
+                }
         } catch (\Throwable $e) {
             DB::rollBack();
 

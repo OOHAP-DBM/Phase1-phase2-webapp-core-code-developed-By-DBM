@@ -64,9 +64,9 @@
                                 Verified
                             </th>
 
-                            <th class="px-4 py-3 text-center">
+                            {{-- <th class="px-4 py-3 text-center">
                                 Status
-                            </th>
+                            </th> --}}
 
 
                             <th class="px-4 py-3 text-center">
@@ -208,7 +208,7 @@
 
 
                                             {{-- STATUS --}}
-                                            <td class="px-4 py-3 text-center">
+                                            {{-- <td class="px-4 py-3 text-center">
 
                                                 @php
                                                     $statusClasses = match ($enquiry->status) {
@@ -226,7 +226,7 @@
 
                                                 </span>
 
-                                            </td>
+                                            </td> --}}
 
                                             <td class="px-4 py-3 text-center">
                                                 <a href="{{ route('customer.direct.enquiries.show', $enquiry->id) }}"
