@@ -48,10 +48,10 @@ class DirectEnquiryController extends Controller
         $role = $user->active_role ?? null;
 
 
-            $query = DirectEnquiry::where('user_id', $user->id)->latest();
+        $query = DirectEnquiry::where('user_id', $user->id)->latest();
 
 
-        // Optional filters
+
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -63,7 +63,7 @@ class DirectEnquiryController extends Controller
             });
         }
 
-        // Return all results (no pagination) as requested
+
         $enquiries = $query->get();
 
         return response()->json($enquiries);
@@ -96,7 +96,7 @@ class DirectEnquiryController extends Controller
                 $q->where('vendor_id', $user->id);
             })->with('assignedVendors')->first();
         } else {
-            // admin or other roles - allow access
+
             $enquiry = DirectEnquiry::where('id', $enquiryId)->with('assignedVendors')->first();
         }
 
@@ -133,12 +133,14 @@ class DirectEnquiryController extends Controller
         ];
 
         foreach ($cityMappings as $standard => $variations) {
-            if (in_array($city, $variations)) return ucwords($standard);
+            if (in_array($city, $variations))
+                return ucwords($standard);
         }
 
         foreach ($cityMappings as $standard => $variations) {
             foreach ($variations as $variation) {
-                if (levenshtein($city, $variation) <= 2) return ucwords($standard);
+                if (levenshtein($city, $variation) <= 2)
+                    return ucwords($standard);
             }
         }
 
@@ -147,7 +149,8 @@ class DirectEnquiryController extends Controller
 
     private function normalizeLocalityName(string $locality, string $city): string
     {
-        if ($locality === 'To be discussed') return $locality;
+        if ($locality === 'To be discussed')
+            return $locality;
         $locality = trim(strtolower($locality));
         $city = strtolower($city);
 
@@ -164,9 +167,11 @@ class DirectEnquiryController extends Controller
 
         if (isset($localityMappings[$city])) {
             foreach ($localityMappings[$city] as $standard => $variations) {
-                if (in_array($locality, $variations)) return ucwords($standard);
+                if (in_array($locality, $variations))
+                    return ucwords($standard);
                 foreach ($variations as $variation) {
-                    if (levenshtein($locality, $variation) <= 2) return ucwords($standard);
+                    if (levenshtein($locality, $variation) <= 2)
+                        return ucwords($standard);
                 }
             }
         }

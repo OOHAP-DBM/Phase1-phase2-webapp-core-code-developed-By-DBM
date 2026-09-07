@@ -17,7 +17,7 @@ use Modules\Enquiries\Models\EnquiryItem;
 use Modules\Enquiries\Http\Resources\Api\EnquiryResource;
 use Modules\Enquiries\Http\Resources\Api\EnquiryItemResource;
 use Symfony\Component\HttpFoundation\Response;
-
+use App\Models\ActivityLog;
 class EnquiryController extends Controller
 {
     protected EnquiryService $service;
@@ -153,7 +153,7 @@ class EnquiryController extends Controller
      */
     public function store(Request $request)
     {
-        // 1. Basic Validation
+
         $validator = Validator::make($request->all(), [
             'customer_name' => 'required|string|max:255',
             'customer_mobile' => 'nullable|string',
@@ -166,7 +166,7 @@ class EnquiryController extends Controller
             'items.*.duration_value' => 'required|integer|min:1',
         ]);
 
-        // 2. Custom Validation (Grace Period Check)
+
         $validator->after(function ($validator) use ($request) {
             foreach ($request->items as $index => $item) {
                 $hoarding = Hoarding::find($item['hoarding_id']);
@@ -175,12 +175,12 @@ class EnquiryController extends Controller
                     continue;
                 }
 
-                // Optional: Check if the hoarding is marked as active in your DB
+
                 if (isset($hoarding->status) && $hoarding->status !== 'active') {
                     $validator->errors()->add("items.$index.hoarding_id", "Hoarding #{$hoarding->id} is currently unavailable for booking.");
                 }
-               $this->gracePeriodService->addValidationRule(
-                $validator,
+                $this->gracePeriodService->addValidationRule(
+                    $validator,
                     "items.$index.preferred_start_date",
                     $hoarding
                 );
@@ -200,7 +200,6 @@ class EnquiryController extends Controller
                 $user = Auth::user();
                 $itemsData = $request->items;
 
-                // Restrict vendors from creating enquiries for their own hoardings
                 if ($user->hasRole('vendor')) {
                     foreach ($itemsData as $item) {
                         $hoarding = Hoarding::find($item['hoarding_id']);
@@ -213,21 +212,31 @@ class EnquiryController extends Controller
                     }
                 }
 
-                // 3. Create Enquiry Header
                 $enquiry = Enquiry::create([
-                    'customer_id'    => $user->id,
-                    'enquiry_type'   => count($itemsData) > 1 ? 'multiple' : 'single',
-                    'source'         => $user->role ?? 'user',
-                    'status'         => 'submitted',
-                    'customer_note'  => $request->message,
+                    'customer_id' => $user->id,
+                    'enquiry_type' => count($itemsData) > 1 ? 'multiple' : 'single',
+                    'source' => $user->role ?? 'user',
+                    'status' => 'submitted',
+                    'customer_note' => $request->message,
                     'contact_number' => $request->customer_mobile,
                 ]);
 
+                ActivityLog::record(
+                    'created',
+                    'Customer submitted a new enquiry.',
+                    'Enquiries',
+                    $enquiry,
+                    [
+                        'enquiry_id' => $enquiry->id,
+                        'enquiry_number' => $enquiry->id,
+                        'customer_id' => auth()->id(),
+                    ]
+                );
                 foreach ($itemsData as $item) {
                     $hoarding = Hoarding::with('doohScreen')->findOrFail($item['hoarding_id']);
                     $startDate = Carbon::parse($item['preferred_start_date']);
-                    // 4. Resolve Duration and Package
-                    $unit = $item['duration_unit']; // days, weeks, months
+
+                    $unit = $item['duration_unit'];
                     $value = (int) $item['duration_value'];
                     $packageId = $item['package_id'] ?? null;
                     $package = null;
@@ -240,14 +249,14 @@ class EnquiryController extends Controller
                         } else {
                             $package = \Modules\Hoardings\Models\HoardingPackage::find($packageId);
                         }
-                        // If package exists, it might override the duration value (assuming packages are months)
+
                         if ($package && isset($package->min_booking_duration)) {
                             $value = $package->min_booking_duration;
                             $unit = 'months';
                         }
                     }
 
-                    // Dynamic End Date Calculation
+
                     $endDate = (clone $startDate);
                     switch ($unit) {
                         case 'days':
@@ -262,57 +271,53 @@ class EnquiryController extends Controller
                             break;
                     }
 
-                    // 5. Build Meta Data
                     $meta = [
-                        'customer_name'   => $request->customer_name,
+                        'customer_name' => $request->customer_name,
                         'customer_mobile' => $request->customer_mobile,
-                        'duration_unit'   => $unit,
-                        'duration_value'  => $value,
-                        'package_label'   => $package ? $package->package_name : 'Base Price',
+                        'duration_unit' => $unit,
+                        'duration_value' => $value,
+                        'package_label' => $package ? $package->package_name : 'Base Price',
                     ];
 
                     if ($hoarding->hoarding_type === 'dooh') {
                         $meta['dooh_specs'] = [
                             'video_duration' => $item['video_duration'] ?? 15,
-                            'slots_per_day'  => $item['slots_count'] ?? 120,
-                            'loop_interval'  => $item['slot'] ?? 'Standard',
+                            'slots_per_day' => $item['slots_count'] ?? 120,
+                            'loop_interval' => $item['slot'] ?? 'Standard',
                         ];
                     }
 
-                    // 6. Create Enquiry Item
                     EnquiryItem::create([
-                        'enquiry_id'           => $enquiry->id,
-                        'hoarding_id'          => $hoarding->id,
-                        'hoarding_type'        => str_contains($hoarding->hoarding_type, 'dooh') ? 'dooh' : 'ooh',
-                        'package_id'           => $packageId,
-                        'package_type'         => $packageType,
+                        'enquiry_id' => $enquiry->id,
+                        'hoarding_id' => $hoarding->id,
+                        'hoarding_type' => str_contains($hoarding->hoarding_type, 'dooh') ? 'dooh' : 'ooh',
+                        'package_id' => $packageId,
+                        'package_type' => $packageType,
                         'preferred_start_date' => $startDate,
-                        'preferred_end_date'   => $endDate,
-                        'expected_duration'    => "$value-$unit",
-                        'meta'                 => $meta,
-                        'status'               => 'new',
+                        'preferred_end_date' => $endDate,
+                        'expected_duration' => "$value-$unit",
+                        'meta' => $meta,
+                        'status' => 'new',
                     ]);
 
-                    // 7. Cleanup Cart
                     DB::table('carts')
                         ->where('user_id', $user->id)
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
-                             if ($user->fcm_token) {
-                $sent = send(
-                    $user->fcm_token,
-                    'Enquiry Submitted',
-                    'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
-                    ['type' => 'Enquiry', 'user_id' => $user->id]
-                );
+                if ($user->fcm_token) {
+                    $sent = send(
+                        $user->fcm_token,
+                        'Enquiry Submitted',
+                        'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                        ['type' => 'Enquiry', 'user_id' => $user->id]
+                    );
 
 
-                if (!$sent) {
-                    // Optional: Log or handle failure
-                    \Log::warning("FCM notification failed for user ID {$user->id}");
+                    if (!$sent) {
+                        \Log::warning("FCM notification failed for user ID {$user->id}");
+                    }
                 }
-            }
 
 
                 return response()->json([
@@ -331,9 +336,7 @@ class EnquiryController extends Controller
         }
     }
 
-   /* =====================================================
-     | INDEX — with search + filters (mirrors web controller)
-     ===================================================== */
+
 
     /**
      * @OA\Get(
@@ -436,40 +439,40 @@ class EnquiryController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        // ── Validate query params ──────────────────────────────────────────
+
         $validator = Validator::make($request->all(), [
-            'status'      => 'nullable|string|in:submitted,pending,accepted,rejected,cancelled',
-            'search'      => 'nullable|string|max:50',
+            'status' => 'nullable|string|in:submitted,pending,accepted,rejected,cancelled',
+            'search' => 'nullable|string|max:50',
             'date_filter' => 'nullable|string|in:last_week,last_month,last_year,custom',
-            'from_date'   => 'nullable|date|required_if:date_filter,custom',
-            'to_date'     => 'nullable|date|required_if:date_filter,custom|after_or_equal:from_date',
-            'per_page'    => 'nullable|integer|min:1|max:100',
+            'from_date' => 'nullable|date|required_if:date_filter,custom',
+            'to_date' => 'nullable|date|required_if:date_filter,custom|after_or_equal:from_date',
+            'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors'  => $validator->errors(),
+                'errors' => $validator->errors(),
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // ── Build query (mirrors web controller exactly) ───────────────────
+
         $query = Enquiry::where('customer_id', Auth::id())
-    ->with([
-        'items.hoarding',
-        'offers.currentVersion',
-        'offers',
-    ]);
-        // Filter: status
+            ->with([
+                'items.hoarding',
+                'offers.currentVersion',
+                'offers',
+            ]);
+
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // Filter: search by enquiry ID
+
         $searchId = null;
         if ($request->filled('search')) {
-            $raw      = trim($request->search);
-            $searchId = preg_replace('/\D/', '', $raw); // strip non-digits
+            $raw = trim($request->search);
+            $searchId = preg_replace('/\D/', '', $raw);
 
             if ($searchId !== '') {
                 $query->where('id', (int) $searchId);
@@ -519,18 +522,18 @@ class EnquiryController extends Controller
         // Default sort
         $query->orderBy('created_at', 'desc');
 
-        $perPage    = (int) $request->input('per_page', 10);
-        $enquiries  = $query->paginate($perPage)->withQueryString();
+        $perPage = (int) $request->input('per_page', 10);
+        $enquiries = $query->paginate($perPage)->withQueryString();
 
         return response()->json([
             'success' => true,
-            'data'    => EnquiryResource::collection($enquiries),
-            'meta'    => [
+            'data' => EnquiryResource::collection($enquiries),
+            'meta' => [
                 'current_page' => $enquiries->currentPage(),
-                'last_page'    => $enquiries->lastPage(),
-                'per_page'     => $enquiries->perPage(),
-                'total'        => $enquiries->total(),
-                'search_id'    => $searchId !== '' ? (int) $searchId : null,
+                'last_page' => $enquiries->lastPage(),
+                'per_page' => $enquiries->perPage(),
+                'total' => $enquiries->total(),
+                'search_id' => $searchId !== '' ? (int) $searchId : null,
             ],
         ]);
     }
@@ -593,19 +596,19 @@ class EnquiryController extends Controller
      * )
      */
     public function show(int $id)
-{
-    $user = Auth::user();
+    {
+        $user = Auth::user();
 
-    // Must be authenticated
-    if (!$user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthenticated'
-        ], Response::HTTP_UNAUTHORIZED);
-    }
+        // Must be authenticated
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated'
+            ], Response::HTTP_UNAUTHORIZED);
+        }
 
-    // First check ownership + existence
-    $enquiry = Enquiry::with([
+        // First check ownership + existence
+        $enquiry = Enquiry::with([
             'customer',
             'items.hoarding.vendor',
             'items.hoarding.ooh',
@@ -614,29 +617,25 @@ class EnquiryController extends Controller
             'offers',
             'items.package'
         ])
-        ->where('id', $id)
-        ->where('customer_id', $user->id)
-        ->withVendorCount()
-        ->first();
+            ->where('id', $id)
+            ->where('customer_id', $user->id)
+            ->withVendorCount()
+            ->first();
 
-    if (! $enquiry) {
+        if (!$enquiry) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enquiry not found or access denied'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Then display
         return response()->json([
-            'success' => false,
-            'message' => 'Enquiry not found or access denied'
-        ], Response::HTTP_NOT_FOUND);
+            'success' => true,
+            'data' => new EnquiryItemResource($enquiry),
+        ]);
     }
 
-    // Then display
-    return response()->json([
-        'success' => true,
-        'data' => new EnquiryItemResource($enquiry),
-    ]);
-}
-
-    /**
-     * Update enquiry status
-     * PATCH /enquiries/{id}/status
-     */
     public function updateStatus(Request $request, int $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -686,7 +685,7 @@ class EnquiryController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Enquiry status updated',
-                'data'    => new EnquiryResource($enquiry),
+                'data' => new EnquiryResource($enquiry),
             ]);
         } catch (\Exception $e) {
             return response()->json([

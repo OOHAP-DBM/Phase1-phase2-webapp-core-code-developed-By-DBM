@@ -13,9 +13,6 @@ class DynamicEmail extends Mailable
     public string $emailSubject;
     public string $body;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
         string $subject,
         string $body
@@ -24,13 +21,13 @@ class DynamicEmail extends Mailable
         $this->body = $body;
     }
 
-    /**
-     * Build the message.
-     */
     public function build()
     {
         return $this
             ->subject($this->emailSubject)
-            ->view('emails.dynamic');
+            ->view('emails.dynamic', [
+                'emailSubject' => $this->emailSubject,
+                'body' => $this->body,
+            ]);
     }
 }

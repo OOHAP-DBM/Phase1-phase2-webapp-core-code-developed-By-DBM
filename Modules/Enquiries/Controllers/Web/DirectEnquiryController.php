@@ -20,7 +20,7 @@ use Modules\Enquiries\Notifications\VendorDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification;
 use App\Models\User;
 use App\Mail\CustomerWelcomeMail;
-use App\Models\Hoarding; // Adjust namespace based on your structure
+use App\Models\Hoarding;
 use Carbon\Carbon;
 use App\Models\ActivityLog;
 
@@ -654,7 +654,20 @@ class DirectEnquiryController extends Controller
                     [
                         'customer_name' => $enquiry->name,
                         'customer_email' => $enquiry->email,
-                        'enquiry_number' => $enquiry->enquiry_number,
+                        'customer_phone' => $enquiry->phone,
+
+                        'enquiry_number' => $enquiry->id,
+
+                        'hoarding_type' => $enquiry->hoarding_type,
+                        'city' => $enquiry->location_city,
+
+                        'preferred_locations' => $enquiry->preferred_locations ?? [],
+                        'preferred_modes' => $enquiry->preferred_modes ?? [],
+
+                        'remarks' => $enquiry->remarks,
+
+                        'preferred_start_date' => '',
+
                         'app_name' => config('app.name', 'OOHAPP'),
                         'login_url' => route('customer.dashboard'),
                         'support_email' => config('mail.from.address'),
@@ -687,7 +700,6 @@ class DirectEnquiryController extends Controller
                         'error' => $e->getMessage(),
                     ]
                 );
-
             }
 
 
@@ -1091,7 +1103,7 @@ class DirectEnquiryController extends Controller
         return $vendors;
     }
 
-    
+
     private function getFuzzyPattern(string $text): string
     {
         // Add % between each character for fuzzy matching

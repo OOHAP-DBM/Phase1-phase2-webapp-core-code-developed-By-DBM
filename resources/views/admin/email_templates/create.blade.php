@@ -303,8 +303,20 @@
 
                                                         <div class="h-6 w-11 rounded-full bg-gray-200 transition peer-checked:bg-[#00995c]"></div>
 
-                                                        <div class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full border border-gray-300 bg-white shadow-sm transition peer-checked:translate-x-5 peer-checked:border-white"></div>
-
+                                                         <div
+        class="
+            pointer-events-none
+            absolute left-0.5 top-0.5
+            h-5 w-5
+            rounded-full
+            border border-gray-300
+            bg-white
+            shadow-sm
+            transition-[left] duration-200
+            peer-checked:left-[22px]
+            peer-checked:border-white
+        "
+    ></div>
                                                     </div>
 
                                                 </label>

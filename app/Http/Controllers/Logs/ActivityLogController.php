@@ -14,20 +14,10 @@ class ActivityLogController extends Controller
     {
         $user = Auth::user();
 
-        // ---------------------------------------------------------
-        // Base Query
-        // ---------------------------------------------------------
 
         $query = ActivityLog::query()
             ->with('user')
             ->latest('created_at');
-
-
-        // ---------------------------------------------------------
-        // Role-wise Data Restriction
-        // ---------------------------------------------------------
-
-        // Admin → Can see all activity logs
         if (
             $user &&
             method_exists($user, 'hasAnyRole') &&
@@ -37,41 +27,26 @@ class ActivityLogController extends Controller
                 'super_admin',
             ])
         ) {
-            // No restriction
-        }
 
-        // Vendor → Only own activity logs
-        elseif (
+        } elseif (
             $user &&
             method_exists($user, 'hasRole') &&
             $user->hasRole('vendor')
         ) {
             $query->where('user_id', $user->id)
                 ->where('user_role', 'vendor');
-        }
-
-        // Customer → ONLY own Direct Enquiry activity logs
-        elseif (
+        } elseif (
             $user &&
             method_exists($user, 'hasRole') &&
             $user->hasRole('customer')
         ) {
             $query->where('user_id', $user->id)
-                ->where('user_role', 'customer')
-                ->where('module', 'direct_enquiry');
-        }
+                ->where('user_role', 'customer');
 
-        // Unknown role
-        else {
+        } else {
             abort(403, 'User does not have the right roles.');
         }
 
-
-        // ---------------------------------------------------------
-        // Filters
-        // ---------------------------------------------------------
-
-        // Admin role filter only
         if (
             $request->filled('user_role') &&
             $user->hasAnyRole([
@@ -83,15 +58,10 @@ class ActivityLogController extends Controller
             $query->where('user_role', $request->user_role);
         }
 
-
-        // Action filter
         if ($request->filled('action')) {
             $query->where('action', $request->action);
         }
 
-
-        // Module filter
-        // Customer already restricted to direct_enquiry
         if (
             $request->filled('module') &&
             $user->hasAnyRole([
@@ -104,30 +74,21 @@ class ActivityLogController extends Controller
         }
 
 
-        // From date
+
         if ($request->filled('from')) {
             $query->whereDate('created_at', '>=', $request->from);
         }
 
 
-        // To date
         if ($request->filled('to')) {
             $query->whereDate('created_at', '<=', $request->to);
         }
 
 
-        // ---------------------------------------------------------
-        // Logs
-        // ---------------------------------------------------------
-
         $logs = $query
             ->paginate(10)
             ->withQueryString();
 
-
-        // ---------------------------------------------------------
-        // Filter Dropdown Data
-        // ---------------------------------------------------------
 
         if (
             $user->hasAnyRole([
@@ -156,8 +117,6 @@ class ActivityLogController extends Controller
                 ->pluck('module');
 
         } else {
-
-            // Vendor / Customer → dropdowns only from their own logs
 
             $actions = (clone $query)
                 ->reorder()
