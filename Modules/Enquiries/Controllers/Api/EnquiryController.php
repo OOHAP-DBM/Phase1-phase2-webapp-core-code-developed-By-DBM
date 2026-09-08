@@ -19,6 +19,8 @@ use Modules\Enquiries\Http\Resources\Api\EnquiryItemResource;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\ActivityLog;
 use App\Models\User;
+use Modules\Enquiries\Notifications\CustomerEnquirySubmittedNotification;
+use Modules\Enquiries\Notifications\VendorEnquiryReceivedNotification;
 class EnquiryController extends Controller
 {
     protected EnquiryService $service;
@@ -311,6 +313,8 @@ class EnquiryController extends Controller
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
+                $user->notify(new CustomerEnquirySubmittedNotification($enquiry->id));
+
                 if ($user->fcm_token) {
                     $sent = send(
                     $user->fcm_token,
@@ -320,12 +324,19 @@ class EnquiryController extends Controller
                     );
                     }
                 foreach (User::whereIn('id', array_keys($vendorEnquiries))->get() as $vendor) {
-                    if (!empty($vendor->fcm_token)) {
                         $hoardingTypes = implode(', ', array_unique($vendorEnquiries[$vendor->id]['types']));
                         $cities = array_filter(array_unique($vendorEnquiries[$vendor->id]['cities']));
                         $city = implode(', ', $cities);
 
-                        $sent = send(
+                        $vendor->notify(new VendorEnquiryReceivedNotification(
+                            $enquiry->id,
+                            $request->customer_name,
+                            $hoardingTypes,
+                            $city
+                        ));
+
+                        if (!empty($vendor->fcm_token)) {
+                            $sent = send(
                             $vendor->fcm_token,
                             'New Hoarding Enquiry Received',
                             "New {$hoardingTypes} enquiry from {$request->customer_name}" .
