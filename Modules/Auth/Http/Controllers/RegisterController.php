@@ -102,6 +102,7 @@ class RegisterController extends Controller
         $role = session('signup_role');
 
         DB::beginTransaction();
+        $password = $request->password;
 
         try {
             \Log::debug('RegisterController@register: request', $request->all());
@@ -138,7 +139,7 @@ class RegisterController extends Controller
                 if (!empty($user->email)) {
                     Mail::to($user->email)->send(
                         $role === 'vendor'
-                        ? new \Modules\Mail\VendorWelcomeMail($user)
+                        ? new \Modules\Mail\VendorWelcomeMail($user, $password)
                         : new \Modules\Mail\CustomerWelcomeMail($user)
                     );
                 }
