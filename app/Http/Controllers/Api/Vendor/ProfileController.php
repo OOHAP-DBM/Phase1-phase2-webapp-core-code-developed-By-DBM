@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 use App\Services\ProfileService;
+use App\Notifications\ProfileUpdatedNotification;
+
 
 class ProfileController extends Controller
 {
@@ -267,6 +269,7 @@ class ProfileController extends Controller
             default:
                 abort(400, 'Invalid profile section');
         }
+         $user->notify(new ProfileUpdatedNotification());
 
     if (!empty($user->fcm_token)) {
 
