@@ -114,9 +114,22 @@ class ProfileController extends Controller
         ]);
 
         // Empty GSTIN ko NULL bana do
-        $data['gstin'] = filled($request->gstin)
-            ? strtoupper(trim($request->gstin))
-            : null;
+        // $data['gstin'] = filled($request->gstin)
+        //     ? strtoupper(trim($request->gstin))
+        //     : null;
+          if ($request->has('gstin')) {
+
+        $gstin = trim((string) $request->input('gstin'));
+
+        if ($gstin === '') {
+            $data['gstin'] = null;
+        } else {
+            $data['gstin'] = strtoupper($gstin);
+        }
+    } else {
+        // Don't change existing GSTIN if it wasn't sent
+        unset($data['gstin']);
+    }
 
         if ($request->hasFile('avatar')) {
             $data['avatar'] = $service->updateAvatar($user, $request->file('avatar'));
