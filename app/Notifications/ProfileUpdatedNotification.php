@@ -16,7 +16,7 @@ class ProfileUpdatedNotification extends Notification
         return [
             'type' => 'profile_update',
             'title' => 'Profile Updated',
-            'body' => 'Your profile details have been updated successfully.',
+            'message' => 'Your profile details have been updated successfully.',
             'user_id' => $notifiable->id,
             'created_at' => now(),
         ];
