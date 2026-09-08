@@ -14,6 +14,7 @@ use App\Services\ProfileService;
 use Illuminate\Validation\Rule;
 use Throwable;
 use App\Models\User;
+use App\Notifications\ProfileUpdatedNotification;
 
 
 
@@ -136,6 +137,7 @@ class ProfileController extends Controller
         }
 
         $user->update($data);
+        $user->notify(new ProfileUpdatedNotification());
 
         // send(
         //     $user,
