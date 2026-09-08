@@ -14,6 +14,7 @@ use App\Services\ProfileService;
 use Illuminate\Validation\Rule;
 use Throwable;
 use App\Models\User;
+use App\Notifications\ProfileUpdatedNotification;
 
 
 
@@ -114,24 +115,72 @@ class ProfileController extends Controller
         ]);
 
         // Empty GSTIN ko NULL bana do
-        $data['gstin'] = filled($request->gstin)
-            ? strtoupper(trim($request->gstin))
-            : null;
+        // $data['gstin'] = filled($request->gstin)
+        //     ? strtoupper(trim($request->gstin))
+        //     : null;
+          if ($request->has('gstin')) {
+
+        $gstin = trim((string) $request->input('gstin'));
+
+        if ($gstin === '') {
+            $data['gstin'] = null;
+        } else {
+            $data['gstin'] = strtoupper($gstin);
+        }
+    } else {
+        // Don't change existing GSTIN if it wasn't sent
+        unset($data['gstin']);
+    }
 
         if ($request->hasFile('avatar')) {
             $data['avatar'] = $service->updateAvatar($user, $request->file('avatar'));
         }
 
         $user->update($data);
+        $user->notify(new ProfileUpdatedNotification());
 
-        send(
-            $user,
-            'Profile Updated Successfully',
+        // send(
+        //     $user,
+        //     'Profile Updated Successfully',
+        //     'Your profile details have been updated successfully.',
+        //     [
+        //         'type' => 'profile_update'
+        //     ]
+        // );
+
+          if (!empty($user->fcm_token)) {
+
+        $sent = send(
+            $user->fcm_token,
+            'Profile Updated',
             'Your profile details have been updated successfully.',
             [
-                'type' => 'profile_update'
+                'type' => 'profile_update',
+                'user_id' => (string) $user->id,
+
             ]
         );
+
+        if (!$sent) {
+
+            Log::warning(
+                "FCM notification failed for user ID {$user->id}",
+                [
+                    // 'section' => $section
+                ]
+            );
+        }
+
+    } else {
+
+        Log::warning(
+            "User has no FCM token",
+            [
+                'user_id' => $user->id,
+                // 'section' => $section
+            ]
+        );
+    }
 
         return response()->json([
             'success' => true,

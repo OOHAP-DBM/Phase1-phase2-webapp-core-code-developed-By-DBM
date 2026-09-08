@@ -18,6 +18,9 @@ use Modules\Enquiries\Http\Resources\Api\EnquiryResource;
 use Modules\Enquiries\Http\Resources\Api\EnquiryItemResource;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\ActivityLog;
+use App\Models\User;
+use Modules\Enquiries\Notifications\CustomerEnquirySubmittedNotification;
+use Modules\Enquiries\Notifications\VendorEnquiryReceivedNotification;
 class EnquiryController extends Controller
 {
     protected EnquiryService $service;
@@ -220,6 +223,7 @@ class EnquiryController extends Controller
                     'customer_note' => $request->message,
                     'contact_number' => $request->customer_mobile,
                 ]);
+                $vendorEnquiries = [];
 
                 ActivityLog::record(
                     'created',
@@ -234,6 +238,10 @@ class EnquiryController extends Controller
                 );
                 foreach ($itemsData as $item) {
                     $hoarding = Hoarding::with('doohScreen')->findOrFail($item['hoarding_id']);
+                    if ($hoarding->vendor_id) {
+                        $vendorEnquiries[$hoarding->vendor_id]['types'][] = strtoupper($hoarding->hoarding_type);
+                        $vendorEnquiries[$hoarding->vendor_id]['cities'][] = $hoarding->city;
+                    }
                     $startDate = Carbon::parse($item['preferred_start_date']);
 
                     $unit = $item['duration_unit'];
@@ -305,17 +313,54 @@ class EnquiryController extends Controller
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
+                $user->notify(new CustomerEnquirySubmittedNotification($enquiry->id));
+
                 if ($user->fcm_token) {
                     $sent = send(
-                        $user->fcm_token,
-                        'Enquiry Submitted',
-                        'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
-                        ['type' => 'Enquiry', 'user_id' => $user->id]
+                    $user->fcm_token,
+                    'Enquiry Submitted',
+                    'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                    ['type' => 'Enquiry', 'user_id' => $user->id]
                     );
+                    }
+                foreach (User::whereIn('id', array_keys($vendorEnquiries))->get() as $vendor) {
+                        $hoardingTypes = implode(', ', array_unique($vendorEnquiries[$vendor->id]['types']));
+                        $cities = array_filter(array_unique($vendorEnquiries[$vendor->id]['cities']));
+                        $city = implode(', ', $cities);
 
+                        $vendor->notify(new VendorEnquiryReceivedNotification(
+                            $enquiry->id,
+                            $request->customer_name,
+                            $hoardingTypes,
+                            $city
+                        ));
 
-                    if (!$sent) {
-                        \Log::warning("FCM notification failed for user ID {$user->id}");
+                        if (!empty($vendor->fcm_token)) {
+                            $sent = send(
+                            $vendor->fcm_token,
+                            'New Hoarding Enquiry Received',
+                            "New {$hoardingTypes} enquiry from {$request->customer_name}" .
+                                ($city !== '' ? " in {$city}" : ''),
+                            [
+                                'type' => 'vendor_direct_enquiry',
+                                'enquiry_id' => (string) $enquiry->id,
+                                'customer_name' => $request->customer_name,
+                                'hoarding_type' => implode(',', array_unique($vendorEnquiries[$vendor->id]['types'])),
+                                'city' => $city,
+                                'source' => 'mobile_app',
+                            ]
+                        );
+
+                        if (!$sent) {
+                            \Log::warning("FCM notification failed for vendor ID {$vendor->id}", [
+                                'enquiry_id' => $enquiry->id,
+                            ]);
+                        }
+                    } else {
+                        \Log::warning('Vendor has no FCM token', [
+                            'vendor_id' => $vendor->id,
+                            'enquiry_id' => $enquiry->id,
+                        ]);
                     }
                 }
 

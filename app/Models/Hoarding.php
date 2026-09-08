@@ -371,7 +371,6 @@ class Hoarding extends Model implements HasMedia
         $this->addMediaCollection('hero_image')
             ->singleFile()
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
-            ->maxFilesize(10 * 1024 * 1024) // 10MB
             ->registerMediaConversions(function () {
                 $this->addMediaConversion('thumb')
                     ->width(300)
@@ -396,7 +395,6 @@ class Hoarding extends Model implements HasMedia
         $this->addMediaCollection('night_image')
             ->singleFile()
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
-            ->maxFilesize(10 * 1024 * 1024)
             ->registerMediaConversions(function () {
                 $this->addMediaConversion('thumb')
                     ->width(300)
@@ -414,7 +412,6 @@ class Hoarding extends Model implements HasMedia
         // Gallery/Angle Photos - Multiple files
         $this->addMediaCollection('gallery')
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
-            ->maxFilesize(10 * 1024 * 1024)
             ->registerMediaConversions(function () {
                 $this->addMediaConversion('thumb')
                     ->width(300)
@@ -433,7 +430,6 @@ class Hoarding extends Model implements HasMedia
         $this->addMediaCollection('size_overlay')
             ->singleFile()
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/svg+xml'])
-            ->maxFilesize(5 * 1024 * 1024)
             ->registerMediaConversions(function () {
                 $this->addMediaConversion('thumb')
                     ->width(300)
