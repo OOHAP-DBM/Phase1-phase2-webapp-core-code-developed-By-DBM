@@ -207,12 +207,12 @@ class ProfileController extends Controller
                 $user->fill($data);
                 $user->save();
                 // ✅ Push
-                send(
-                    $user,
-                    'Profile Updated',
-                    'Your personal profile details have been updated successfully.',
-                    ['type' => 'profile_update']
-                );
+                // send(
+                //     $user,
+                //     'Profile Updated',
+                //     'Your personal profile details have been updated successfully.',
+                //     ['type' => 'profile_update']
+                // );
                 break;
             case 'business':
                 $data = $request->only(['company_name', 'company_type', 'gstin', 'pan', 'pan_file']);
@@ -267,6 +267,41 @@ class ProfileController extends Controller
             default:
                 abort(400, 'Invalid profile section');
         }
+
+    if (!empty($user->fcm_token)) {
+
+        $sent = send(
+            $user->fcm_token,
+            'Profile Updated',
+            'Your profile details have been updated successfully.',
+            [
+                'type' => 'profile_update',
+                'user_id' => (string) $user->id,
+                'section' => (string) $section,
+            ]
+        );
+
+        if (!$sent) {
+
+            Log::warning(
+                "FCM notification failed for user ID {$user->id}",
+                [
+                    'section' => $section
+                ]
+            );
+        }
+
+    } else {
+
+        Log::warning(
+            "User has no FCM token",
+            [
+                'user_id' => $user->id,
+                'section' => $section
+            ]
+        );
+    }
+
 
         return response()->json(['message' => 'Profile updated successfully']);
     }
