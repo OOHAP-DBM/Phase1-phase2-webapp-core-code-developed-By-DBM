@@ -311,6 +311,14 @@ class EnquiryController extends Controller
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
+                if ($user->fcm_token) {
+                    $sent = send(
+                    $user->fcm_token,
+                    'Enquiry Submitted',
+                    'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                    ['type' => 'Enquiry', 'user_id' => $user->id]
+                    );
+                    }
                 foreach (User::whereIn('id', array_keys($vendorEnquiries))->get() as $vendor) {
                     if (!empty($vendor->fcm_token)) {
                         $hoardingTypes = implode(', ', array_unique($vendorEnquiries[$vendor->id]['types']));
