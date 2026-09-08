@@ -40,20 +40,11 @@ class HoardingBulkStatusNotification extends Notification implements ShouldQueue
         $baseUrl = config('app.url');
 
         return [
-            'type'         => 'vendor_hoarding_bulk_' . $this->action,
-            'title'        => $this->action === 'approved'
-                ? 'Hoardings Approved'
-                : 'Hoardings Rejected',
             'message'      => "{$count} " . Str::plural('hoarding', $count) . " {$action} by {$this->adminName}",
             'hoarding_ids' => $ids,
             'action'       => $this->action,
             'action_url'   => rtrim($baseUrl, '/') . route('vendor.hoardings.myHoardings', [], false),
             'count'        => $count,
         ];
-    }
-
-    public function toDatabase($notifiable): array
-    {
-        return $this->toArray($notifiable);
     }
 }
