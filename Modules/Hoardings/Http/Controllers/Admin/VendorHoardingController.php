@@ -814,20 +814,13 @@ class VendorHoardingController extends Controller
                     $count = $vendorHoardings->count();
                     $body = str_replace('{count}', $count, $fcmBody ?? "{$count} hoardings {$action}.");
 
-                    $sent = send($vendor->fcm_token, $fcmTitle, $body, [
+                    send($vendor->fcm_token, $fcmTitle, $body, [
                         'type' => $fcmType,
                         'hoarding_ids' => $vendorHoardings->pluck('id')->toArray(),
                         'count' => $count,
                         'action' => $action,
                         'reason' => $reason,
                     ]);
-
-                    if (!$sent) {
-                        Log::warning("Bulk FCM notification failed for vendor {$vendor->id}", [
-                            'hoarding_ids' => $vendorHoardings->pluck('id')->toArray(),
-                            'action' => $action,
-                        ]);
-                    }
                 } catch (\Throwable $e) {
                     Log::error("Bulk FCM (reject) exception for vendor {$vendor->id}", ['error' => $e->getMessage()]);
                 }
