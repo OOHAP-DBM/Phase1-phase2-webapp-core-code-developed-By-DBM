@@ -1210,6 +1210,16 @@ class DirectEnquiryController extends Controller
         return view('vendor.enquiries.show', compact('enquiry', 'vendorPivot'));
     }
 
+    public function adminVendorShow(DirectEnquiry $enquiry)
+    {
+        $enquiry->load('assignedVendors');
+
+        return view(
+            'admin.enquiries.adminvendorshow',
+            compact('enquiry')
+        );
+    }
+
     /**
      * Update vendor's response to enquiry
      */

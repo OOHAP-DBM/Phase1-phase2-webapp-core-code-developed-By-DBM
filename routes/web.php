@@ -148,29 +148,36 @@ Route::prefix('enquiry')->name('direct.enquiry.')->group(function () {
         ->name('track');
 });
 
-Route::prefix('admin/direct-enquiries')->name('admin.direct-enquiries.')->middleware(['auth', 'role:admin|superadmin'])->group(function () {
+Route::prefix('admin/direct-enquiries')
+    ->name('admin.direct-enquiries.')
+    ->middleware(['auth', 'role:admin|superadmin'])
+    ->group(function () {
 
-    Route::get('/', [DirectEnquiryController::class, 'index'])
-        ->name('index');
+        Route::get('/', [DirectEnquiryController::class, 'index'])
+            ->name('index');
 
-    Route::get('/{enquiry}', [DirectEnquiryController::class, 'show'])
-        ->name('show');
+        Route::get('/vendors/{enquiry}', [DirectEnquiryController::class, 'adminVendorShow'])
+            ->name('adminvendorshow');
 
-    Route::patch('/{enquiry}/status', [DirectEnquiryController::class, 'updateStatus'])
-        ->name('update.status');
+        Route::get('/{enquiry}', [DirectEnquiryController::class, 'show'])
+            ->name('show');
 
-    Route::patch('/{enquiry}/assign', [DirectEnquiryController::class, 'assignTo'])
-        ->name('assign');
+        Route::patch('/{enquiry}/status', [DirectEnquiryController::class, 'updateStatus'])
+            ->name('update.status');
 
-    Route::patch('/{enquiry}/notes', [DirectEnquiryController::class, 'updateNotes'])
-        ->name('update.notes');
+        Route::patch('/{enquiry}/assign', [DirectEnquiryController::class, 'assignTo'])
+            ->name('assign');
 
-    Route::delete('/{enquiry}', [DirectEnquiryController::class, 'destroy'])
-        ->name('destroy');
+        Route::patch('/{enquiry}/notes', [DirectEnquiryController::class, 'updateNotes'])
+            ->name('update.notes');
 
-    Route::get('/export/csv', [DirectEnquiryController::class, 'exportCsv'])
-        ->name('export.csv');
-});
+        Route::delete('/{enquiry}', [DirectEnquiryController::class, 'destroy'])
+            ->name('destroy');
+
+        Route::get('/export/csv', [DirectEnquiryController::class, 'exportCsv'])
+            ->name('export.csv');
+    });
+
 
 
 Route::prefix('direct-enquiries')
@@ -613,7 +620,6 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\Web\Customer\NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [\App\Http\Controllers\Web\Customer\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
-    // Threads
     Route::get('/threads', [\App\Http\Controllers\Customer\ThreadController::class, 'index'])->name('threads.index');
     Route::get('/threads/{id}', [\App\Http\Controllers\Customer\ThreadController::class, 'show'])->name('threads.show');
     Route::post('/threads/{id}/send-message', [\App\Http\Controllers\Customer\ThreadController::class, 'sendMessage'])->name('threads.send-message');

@@ -752,9 +752,24 @@
         {{-- ================================================================
             QUILL
         ================================================================= --}}
-        @push('scripts')
+       @push('scripts')
+
+            {{-- Quill --}}
+            <link
+                href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css"
+                rel="stylesheet"
+            />
+
+            {{-- Quill Table --}}
+            <link
+                href="https://cdn.jsdelivr.net/npm/quill-table-better@1/dist/quill-table-better.css"
+                rel="stylesheet"
+            />
 
             <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+
+            <script src="https://cdn.jsdelivr.net/npm/quill-table-better@1/dist/quill-table-better.js"></script>
+
 
             <script>
 
@@ -772,6 +787,21 @@
 
                     /*
                     |--------------------------------------------------------------------------
+                    | Register Table Better
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (typeof QuillTableBetter !== 'undefined') {
+
+                        Quill.register({
+                            'modules/table-better': QuillTableBetter
+                        }, true);
+
+                    }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
                     | Initialize Quill
                     |--------------------------------------------------------------------------
                     */
@@ -783,6 +813,8 @@
                         placeholder: 'Start writing your email content...',
 
                         modules: {
+
+                            table: false,
 
                             toolbar: [
 
@@ -832,10 +864,46 @@
                                 ],
 
                                 [
+                                    'table-better'
+                                ],
+
+                                [
+                                    'html-source'
+                                ],
+
+                                [
                                     'clean'
                                 ]
 
-                            ]
+                            ],
+
+                            'table-better': {
+
+                                language: 'en_US',
+
+                                menus: [
+                                    'column',
+                                    'row',
+                                    'merge',
+                                    'table',
+                                    'cell',
+                                    'wrap',
+                                    'copy',
+                                    'delete'
+                                ],
+
+                                toolbarTable: true
+
+                            },
+
+                            keyboard: {
+
+                                bindings:
+                                    typeof QuillTableBetter !== 'undefined'
+                                        ? QuillTableBetter.keyboardBindings
+                                        : {}
+
+                            }
 
                         }
 
@@ -844,7 +912,7 @@
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Global editor
+                    | Global Editor
                     |--------------------------------------------------------------------------
                     */
 
@@ -853,17 +921,104 @@
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Load Old Content
+                    | HTML Source Button
                     |--------------------------------------------------------------------------
                     */
 
-                    const existingContent = bodyInput.value.trim();
+                    setTimeout(function () {
+
+                        const htmlSourceButton =
+                            editorElement
+                                .closest('.email-editor-wrapper')
+                                ?.querySelector('.ql-html-source');
+
+
+                        if (!htmlSourceButton) {
+
+                            console.error(
+                                'HTML source button not found.'
+                            );
+
+                            return;
+
+                        }
+
+
+                        htmlSourceButton.setAttribute(
+                            'type',
+                            'button'
+                        );
+
+                        htmlSourceButton.setAttribute(
+                            'title',
+                            'Edit HTML Source'
+                        );
+
+
+                        htmlSourceButton.addEventListener(
+                            'click',
+                            function (event) {
+
+                                event.preventDefault();
+                                event.stopPropagation();
+
+                                openHtmlSourceModal();
+
+                            }
+                        );
+
+                    }, 100);
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Load Existing Content
+                    |--------------------------------------------------------------------------
+                    */
+
+                    const existingContent =
+                        bodyInput.value.trim();
+
 
                     if (existingContent !== '') {
 
-                        quill.clipboard.dangerouslyPasteHTML(
-                            existingContent
-                        );
+                        try {
+
+                            const delta =
+                                quill.clipboard.convert({
+                                    html: existingContent
+                                });
+
+
+                            quill.setContents(
+                                delta,
+                                'silent'
+                            );
+
+                        } catch (error) {
+
+                            console.error(
+                                'Unable to load existing email content:',
+                                error
+                            );
+
+                            try {
+
+                                quill.clipboard.dangerouslyPasteHTML(
+                                    existingContent,
+                                    'silent'
+                                );
+
+                            } catch (fallbackError) {
+
+                                console.error(
+                                    'Fallback HTML loading failed:',
+                                    fallbackError
+                                );
+
+                            }
+
+                        }
 
                     }
 
@@ -874,11 +1029,15 @@
                     |--------------------------------------------------------------------------
                     */
 
-                    quill.on('text-change', function () {
+                    quill.on(
+                        'text-change',
+                        function () {
 
-                        bodyInput.value = quill.root.innerHTML;
+                            bodyInput.value =
+                                quill.root.innerHTML;
 
-                    });
+                        }
+                    );
 
 
                     /*
@@ -889,13 +1048,480 @@
 
                     if (form) {
 
-                        form.addEventListener('submit', function () {
+                        form.addEventListener(
+                            'submit',
+                            function () {
 
-                            bodyInput.value = quill.root.innerHTML;
+                                try {
 
-                        });
+                                    const tableModule =
+                                        quill.getModule(
+                                            'table-better'
+                                        );
+
+
+                                    if (
+                                        tableModule &&
+                                        typeof tableModule.deleteTableTemporary ===
+                                        'function'
+                                    ) {
+
+                                        tableModule.deleteTableTemporary();
+
+                                    }
+
+                                } catch (error) {
+
+                                    console.warn(
+                                        'Table cleanup skipped:',
+                                        error
+                                    );
+
+                                }
+
+
+                                if (
+                                    typeof quill.getSemanticHTML ===
+                                    'function'
+                                ) {
+
+                                    bodyInput.value =
+                                        quill.getSemanticHTML();
+
+                                } else {
+
+                                    bodyInput.value =
+                                        quill.root.innerHTML;
+
+                                }
+
+                            }
+                        );
 
                     }
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Open HTML Source Modal
+                    |--------------------------------------------------------------------------
+                    */
+
+                    function openHtmlSourceModal() {
+
+                        const oldModal =
+                            document.getElementById(
+                                'htmlSourceModal'
+                            );
+
+
+                        if (oldModal) {
+
+                            oldModal.remove();
+
+                        }
+
+
+                        const currentHtml =
+                            quill.root.innerHTML;
+
+
+                        const overlay =
+                            document.createElement('div');
+
+
+                        overlay.id =
+                            'htmlSourceModal';
+
+
+                       overlay.innerHTML = `
+            <div id="htmlSourceOverlay"
+                 style="
+                    position:fixed;
+                    inset:0;
+                    z-index:999999;
+                    background:rgba(0,0,0,.6);
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    padding:20px;
+                 ">
+
+                <div style="
+                    width:100%;
+                    max-width:900px;
+                    background:#fff;
+                    border-radius:14px;
+                    overflow:hidden;
+                    box-shadow:0 20px 50px rgba(0,0,0,.25);
+                ">
+
+                    <div style="
+                        padding:18px 22px;
+                        border-bottom:1px solid #eee;
+                        display:flex;
+                        justify-content:space-between;
+                        align-items:center;
+                    ">
+
+                        <div>
+                            <strong style="font-size:17px;">
+                                HTML Source
+                            </strong>
+
+                            <div style="
+                                margin-top:4px;
+                                font-size:12px;
+                                color:#888;
+                            ">
+                                Paste your HTML code here
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            id="closeHtmlSource"
+                            style="
+                                border:0;
+                                background:none;
+                                font-size:20px;
+                                cursor:pointer;
+                                color:#777;
+                            "
+                        >
+                            ×
+                        </button>
+
+                    </div>
+
+
+                    <div style="padding:20px;">
+
+                        <textarea
+                            id="htmlSourceTextarea"
+                            spellcheck="false"
+                            style="
+                                width:100%;
+                                height:400px;
+                                resize:vertical;
+                                box-sizing:border-box;
+                                padding:15px;
+                                border:1px solid #ddd;
+                                border-radius:10px;
+                                background:#111827;
+                                color:#86efac;
+                                font-family:monospace;
+                                font-size:13px;
+                                line-height:1.6;
+                                outline:none;
+                            "
+                            placeholder="Paste HTML code here..."
+                        ></textarea>
+
+                    </div>
+
+
+                    <div style="
+                        padding:15px 20px;
+                        border-top:1px solid #eee;
+                        display:flex;
+                        justify-content:flex-end;
+                        gap:10px;
+                        background:#fafafa;
+                    ">
+
+                        <button
+                            type="button"
+                            id="cancelHtmlSource"
+                            style="
+                                padding:9px 18px;
+                                border:1px solid #ddd;
+                                border-radius:8px;
+                                background:#fff;
+                                cursor:pointer;
+                            "
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            id="applyHtmlSource"
+                            style="
+                                padding:9px 20px;
+                                border:0;
+                                border-radius:8px;
+                                background:#00995c;
+                                color:#fff;
+                                cursor:pointer;
+                                font-weight:600;
+                            "
+                        >
+                            Apply HTML
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+
+                        document.body.appendChild(
+                            overlay
+                        );
+
+
+                        const textarea =
+                            document.getElementById(
+                                'htmlSourceTextarea'
+                            );
+
+
+                        textarea.value =
+                            currentHtml;
+
+
+                        textarea.focus();
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Close Modal
+                        |--------------------------------------------------------------------------
+                        */
+
+                        function closeModal() {
+
+                            const modal =
+                                document.getElementById(
+                                    'htmlSourceModal'
+                                );
+
+
+                            if (modal) {
+
+                                modal.remove();
+
+                            }
+
+                        }
+
+
+                        document
+                            .getElementById(
+                                'closeHtmlSource'
+                            )
+                            .addEventListener(
+                                'click',
+                                closeModal
+                            );
+
+
+                        document
+                            .getElementById(
+                                'cancelHtmlSource'
+                            )
+                            .addEventListener(
+                                'click',
+                                closeModal
+                            );
+
+
+                        document
+                            .getElementById(
+                                'htmlSourceOverlay'
+                            )
+                            .addEventListener(
+                                'click',
+                                function (event) {
+
+                                    if (
+                                        event.target ===
+                                        this
+                                    ) {
+
+                                        closeModal();
+
+                                    }
+
+                                }
+                            );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Apply HTML
+                        |--------------------------------------------------------------------------
+                        */
+
+                        document
+                            .getElementById(
+                                'applyHtmlSource'
+                            )
+                            .addEventListener(
+                                'click',
+                                function () {
+
+                                    let html =
+                                        textarea.value.trim();
+
+
+                                    if (!html) {
+
+                                        quill.setText(
+                                            ''
+                                        );
+
+                                        bodyInput.value =
+                                            '';
+
+                                        closeModal();
+
+                                        return;
+
+                                    }
+
+
+                                    /*
+                                    |--------------------------------------------------------------------------
+                                    | Parse Complete HTML Document
+                                    |--------------------------------------------------------------------------
+                                    */
+
+                                    try {
+
+                                        const parser =
+                                            new DOMParser();
+
+
+                                        const doc =
+                                            parser.parseFromString(
+                                                html,
+                                                'text/html'
+                                            );
+
+
+                                        /*
+                                        |--------------------------------------------------------------------------
+                                        | If complete HTML document was pasted
+                                        |--------------------------------------------------------------------------
+                                        */
+
+                                        if (
+                                            /<html[\s>]/i.test(html) ||
+                                            /<body[\s>]/i.test(html)
+                                        ) {
+
+                                            html =
+                                                doc.body
+                                                    ? doc.body.innerHTML
+                                                    : html;
+
+                                        }
+
+
+                                        /*
+                                        |--------------------------------------------------------------------------
+                                        | Convert HTML -> Quill Delta
+                                        |--------------------------------------------------------------------------
+                                        */
+
+                                        const delta =
+                                            quill.clipboard.convert({
+                                                html: html
+                                            });
+
+
+                                        /*
+                                        |--------------------------------------------------------------------------
+                                        | Replace Existing Content
+                                        |--------------------------------------------------------------------------
+                                        */
+
+                                        quill.setContents(
+                                            [],
+                                            'silent'
+                                        );
+
+
+                                        quill.updateContents(
+                                            delta,
+                                            'user'
+                                        );
+
+
+                                        /*
+                                        |--------------------------------------------------------------------------
+                                        | Sync
+                                        |--------------------------------------------------------------------------
+                                        */
+
+                                        bodyInput.value =
+                                            quill.root.innerHTML;
+
+
+                                        /*
+                                        |--------------------------------------------------------------------------
+                                        | Close
+                                        |--------------------------------------------------------------------------
+                                        */
+
+                                        closeModal();
+
+
+                                    } catch (error) {
+
+                                        console.error(
+                                            'HTML parsing failed:',
+                                            error
+                                        );
+
+
+                                        alert(
+                                            'Invalid HTML code. Please check your HTML and try again.'
+                                        );
+
+                                    }
+
+                                }
+                            );
+
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | ESC Key
+                        |--------------------------------------------------------------------------
+                        */
+
+                        function escapeHandler(
+                            event
+                        ) {
+
+                            if (
+                                event.key === 'Escape'
+                            ) {
+
+                                closeModal();
+
+                                document.removeEventListener(
+                                    'keydown',
+                                    escapeHandler
+                                );
+
+                            }
+
+                        }
+
+
+                        document.addEventListener(
+                            'keydown',
+                            escapeHandler
+                        );
+
+                    }
+
 
                 });
 
@@ -908,11 +1534,15 @@
 
                 function insertShortcode(code) {
 
-                    const editor = window.emailBodyEditor;
+                    const editor =
+                        window.emailBodyEditor;
+
 
                     if (!editor) {
 
-                        console.error('Email editor is not initialized.');
+                        console.error(
+                            'Email editor is not initialized.'
+                        );
 
                         return;
 
@@ -928,22 +1558,32 @@
                     |--------------------------------------------------------------------------
                     */
 
-                    let range = editor.getSelection(true);
+                    let range =
+                        editor.getSelection(true);
 
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Fallback to End
+                    | Fallback To End
                     |--------------------------------------------------------------------------
                     */
 
                     if (!range) {
 
-                        const length = editor.getLength();
+                        const length =
+                            editor.getLength();
+
 
                         range = {
-                            index: Math.max(0, length - 1),
+
+                            index:
+                                Math.max(
+                                    0,
+                                    length - 1
+                                ),
+
                             length: 0
+
                         };
 
                     }
@@ -951,7 +1591,7 @@
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Insert
+                    | Insert Shortcode
                     |--------------------------------------------------------------------------
                     */
 
@@ -977,15 +1617,20 @@
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Sync textarea
+                    | Sync
                     |--------------------------------------------------------------------------
                     */
 
-                    const bodyInput = document.getElementById('email_body');
+                    const bodyInput =
+                        document.getElementById(
+                            'email_body'
+                        );
+
 
                     if (bodyInput) {
 
-                        bodyInput.value = editor.root.innerHTML;
+                        bodyInput.value =
+                            editor.root.innerHTML;
 
                     }
 
@@ -995,6 +1640,7 @@
 
 
             {{-- Quill UI Customization --}}
+
             <style>
 
                 /* ============================================================
@@ -1097,6 +1743,75 @@
 
 
                 /* ============================================================
+                   HTML Source Button
+                ============================================================ */
+
+                .email-editor-wrapper .ql-toolbar button.ql-html-source {
+
+                    width: 28px;
+
+                    height: 28px;
+
+                    margin: 0 2px;
+
+                    border-radius: 6px;
+
+                    position: relative;
+
+                }
+
+
+                .email-editor-wrapper .ql-toolbar button.ql-html-source::before {
+
+                    content: "</>";
+
+                    position: absolute;
+
+                    top: 50%;
+
+                    left: 50%;
+
+                    transform: translate(-50%, -50%);
+
+                    font-size: 11px;
+
+                    line-height: 1;
+
+                    font-weight: 700;
+
+                    color: #6b7280;
+
+                }
+
+
+                .email-editor-wrapper .ql-toolbar button.ql-html-source:hover {
+
+                    background: #eeeeee;
+
+                }
+
+
+                .email-editor-wrapper .ql-toolbar button.ql-html-source:hover::before {
+
+                    color: #00995c;
+
+                }
+
+
+                /* ============================================================
+                   Table Better
+                ============================================================ */
+
+                .email-editor-wrapper .ql-table-better {
+
+                    width: 28px;
+
+                    height: 28px;
+
+                }
+
+
+                /* ============================================================
                    Scrollbar
                 ============================================================ */
 
@@ -1131,6 +1846,6 @@
 
             </style>
 
-        @endpush
+    @endpush
 
 @endsection
