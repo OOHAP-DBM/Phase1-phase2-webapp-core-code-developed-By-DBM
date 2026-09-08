@@ -18,6 +18,8 @@ use Modules\Enquiries\Http\Resources\Api\EnquiryResource;
 use Modules\Enquiries\Http\Resources\Api\EnquiryItemResource;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\ActivityLog;
+use App\Models\User;
+use Modules\Enquiries\Notifications\VendorEnquiryNotification;
 class EnquiryController extends Controller
 {
     protected EnquiryService $service;
@@ -220,6 +222,7 @@ class EnquiryController extends Controller
                     'customer_note' => $request->message,
                     'contact_number' => $request->customer_mobile,
                 ]);
+                $vendorGroups = [];
 
                 ActivityLog::record(
                     'created',
@@ -287,7 +290,7 @@ class EnquiryController extends Controller
                         ];
                     }
 
-                    EnquiryItem::create([
+                    $enquiryItem = EnquiryItem::create([
                         'enquiry_id' => $enquiry->id,
                         'hoarding_id' => $hoarding->id,
                         'hoarding_type' => str_contains($hoarding->hoarding_type, 'dooh') ? 'dooh' : 'ooh',
@@ -300,11 +303,43 @@ class EnquiryController extends Controller
                         'status' => 'new',
                     ]);
 
+                    if ($hoarding->vendor_id) {
+                        $vendorGroups[$hoarding->vendor_id][] = $enquiryItem;
+                    }
+
                     DB::table('carts')
                         ->where('user_id', $user->id)
                         ->where('hoarding_id', $hoarding->id)
                         ->delete();
                 }
+
+                foreach ($vendorGroups as $vendorId => $vendorItems) {
+                    $vendor = User::find($vendorId);
+
+                    if (!$vendor) {
+                        \Log::warning('Enquiry vendor notification skipped: vendor not found', [
+                            'vendor_id' => $vendorId,
+                            'enquiry_id' => $enquiry->id,
+                        ]);
+                        continue;
+                    }
+
+                    if ($vendor->notification_push) {
+                        $vendor->notify(new VendorEnquiryNotification($enquiry, $vendorItems));
+                    }
+
+                    send(
+                        $vendor,
+                        'New Enquiry Received - OOHAPP',
+                        'You have received a new enquiry. Please check the app for details.',
+                        [
+                            'type' => 'vendor_enquiry',
+                            'enquiry_id' => (string) $enquiry->id,
+                            'item_count' => (string) count($vendorItems),
+                        ]
+                    );
+                }
+
                 if ($user->fcm_token) {
                     $sent = send(
                         $user->fcm_token,
