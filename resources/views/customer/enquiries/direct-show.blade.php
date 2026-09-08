@@ -42,16 +42,16 @@
 
                     {{-- Status --}}
                     <span class="px-3 py-1 text-xs font-semibold rounded-full
-                            @if($enquiry->status === 'pending')
-                                bg-yellow-100 text-yellow-700
-                            @elseif($enquiry->status === 'approved' || $enquiry->status === 'completed')
-                                bg-green-100 text-green-700
-                            @elseif($enquiry->status === 'rejected' || $enquiry->status === 'cancelled')
-                                bg-red-100 text-red-700
-                            @else
-                                bg-gray-100 text-gray-700
-                            @endif
-                        ">
+                                @if($enquiry->status === 'pending')
+                                    bg-yellow-100 text-yellow-700
+                                @elseif($enquiry->status === 'approved' || $enquiry->status === 'completed')
+                                    bg-green-100 text-green-700
+                                @elseif($enquiry->status === 'rejected' || $enquiry->status === 'cancelled')
+                                    bg-red-100 text-red-700
+                                @else
+                                    bg-gray-100 text-gray-700
+                                @endif
+                            ">
                         {{ ucfirst(str_replace('_', ' ', $enquiry->status ?? 'Pending')) }}
                     </span>
                 </div>
@@ -168,6 +168,130 @@
                     <div class="mt-2 bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700 min-h-[80px]">
                         {{ $enquiry->remarks ?: 'No remarks added.' }}
                     </div>
+
+                </div>
+
+                {{-- Vendors Reached --}}
+                <div class="mt-8 pt-6 border-t border-gray-200">
+
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                Vendors Reached
+                            </p>
+                            <p class="mt-1 text-sm text-gray-500">
+                                Vendors to whom this enquiry was sent.
+                            </p>
+                        </div>
+
+                        <div
+                            class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
+                            <span class="text-xs font-medium text-blue-600">
+                                Total Vendors
+                            </span>
+                            <span class="text-sm font-bold text-blue-700">
+                                {{ $enquiry->assignedVendors->count() }}
+                            </span>
+                        </div>
+                    </div>
+
+                    @if($enquiry->assignedVendors->count())
+
+                        <div class="border border-gray-200 overflow-hidden">
+
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                #
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                Vendor
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                Email
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                Phone
+                                            </th>
+
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                Response
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody class="bg-white divide-y divide-gray-200">
+
+                                        @foreach($enquiry->assignedVendors as $index => $vendor)
+
+                                            <tr class="hover:bg-gray-50 transition">
+
+                                                <td class="px-4 py-4 text-sm text-gray-500">
+                                                    {{ $index + 1 }}
+                                                </td>
+
+                                                <td class="px-4 py-4">
+                                                    <div class="text-sm font-semibold text-gray-900">
+                                                        {{ $vendor->name ?? '—' }}
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-4">
+                                                    <div class="text-sm text-gray-700 break-all">
+                                                        {{ $vendor->email ?? '—' }}
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-4">
+                                                    <div class="text-sm text-gray-700">
+                                                        {{ $vendor->phone ?? '—' }}
+                                                    </div>
+                                                </td>
+
+                                                <td class="px-4 py-4">
+
+                                                    <span
+                                                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                                                        Awaiting Response
+                                                    </span>
+
+                                                </td>
+
+                                            </tr>
+
+                                        @endforeach
+
+                                    </tbody>
+
+                                </table>
+                            </div>
+
+                        </div>
+
+                    @else
+
+                        <div class="border border-gray-200 bg-gray-50 p-6 text-center">
+                            <p class="text-sm font-medium text-gray-600">
+                                No vendors were assigned to this enquiry.
+                            </p>
+
+                            <p class="text-xs text-gray-500 mt-1">
+                                This enquiry has not been sent to any vendor yet.
+                            </p>
+                        </div>
+
+                    @endif
 
                 </div>
 
