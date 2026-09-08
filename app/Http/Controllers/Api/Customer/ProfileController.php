@@ -124,14 +124,48 @@ class ProfileController extends Controller
 
         $user->update($data);
 
-        send(
-            $user,
-            'Profile Updated Successfully',
+        // send(
+        //     $user,
+        //     'Profile Updated Successfully',
+        //     'Your profile details have been updated successfully.',
+        //     [
+        //         'type' => 'profile_update'
+        //     ]
+        // );
+
+          if (!empty($user->fcm_token)) {
+
+        $sent = send(
+            $user->fcm_token,
+            'Profile Updated',
             'Your profile details have been updated successfully.',
             [
-                'type' => 'profile_update'
+                'type' => 'profile_update',
+                'user_id' => (string) $user->id,
+
             ]
         );
+
+        if (!$sent) {
+
+            Log::warning(
+                "FCM notification failed for user ID {$user->id}",
+                [
+                    // 'section' => $section
+                ]
+            );
+        }
+
+    } else {
+
+        Log::warning(
+            "User has no FCM token",
+            [
+                'user_id' => $user->id,
+                // 'section' => $section
+            ]
+        );
+    }
 
         return response()->json([
             'success' => true,
