@@ -335,6 +335,11 @@ class SettingsController extends Controller
                 'type' => Setting::TYPE_STRING,
                 'description' => 'MSG91 API base URL',
             ],
+            'sms_msg91_template_id' => [
+                'value' => '',
+                'type' => Setting::TYPE_STRING,
+                'description' => 'MSG91 template / flow id (optional)',
+            ],
 
             'sms_clickatell_active' => [
                 'value' => false,
@@ -437,6 +442,7 @@ class SettingsController extends Controller
             'sms_msg91_route' => ['nullable', 'max:20'],
             'sms_msg91_country' => ['nullable', 'max:10'],
             'sms_msg91_base_url' => ['nullable', 'max:255'],
+            'sms_msg91_template_id' => ['nullable', 'max:255'],
 
             'sms_clickatell_api_key' => ['nullable', 'max:255'],
             'sms_clickatell_from' => ['nullable', 'max:50'],

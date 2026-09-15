@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
-use Modules\Enquiries\Models\Enquiry;   
+use App\Models\Offer;
+use Modules\Enquiries\Models\Enquiry;
 
 class AdminEnquiryController extends Controller
 {
@@ -82,13 +83,13 @@ class AdminEnquiryController extends Controller
     }
 
 
-  
+
     public function show($id)
     {
         $enquiry = \Modules\Enquiries\Models\Enquiry::with([
             'customer',
             'offers.vendor',
-            'offers.items',
+           // 'offers.items',
             'items.hoarding.vendor',
             'items.hoarding.doohScreen'
         ])->findOrFail($id);

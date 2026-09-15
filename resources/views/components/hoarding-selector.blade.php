@@ -22,8 +22,8 @@
     'subtitle'             => 'Browse and select hoardings.',
     'showFilterModal'      => true,
     'showAvailabilityCheck'=> true,
-    'onChange'             => null,   {{-- JS callback name when selection changes --}}
-    'componentId'          => 'hs',   {{-- unique prefix if used multiple times on same page --}}
+    'onChange'             => null,    
+    'componentId'          => 'hs',   
 ])
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200" id="{{ $componentId }}-panel">
@@ -525,8 +525,19 @@
     };
 
     /* ── INIT ───────────────────────────────────────────────────────── */
-    document.addEventListener('DOMContentLoaded', () => {
-        load();
+    document.addEventListener('DOMContentLoaded', async () => {
+        await load();
+
+        // If the parent page provided an initial selection array using the global window variable
+        // named <ID>InitialSelected (e.g., window.offerInventoryInitialSelected = [1,2,3]), toggle those IDs.
+        try {
+            const initial = window[ID + 'InitialSelected'] || window[ID + 'Initial'] || window[ID + 'InitialSelectedIds'] || window[ID + 'InitialSelectedIds'];
+            if (initial && Array.isArray(initial)) {
+                // toggle only after load rendered hoardings
+                initial.forEach(id => { try { toggle(id); } catch(e) { /* ignore */ } });
+            }
+        } catch(e) { console.error(e); }
+
         el('search')?.addEventListener('input', debounce(e => {
             currentPage = 1;
             const q = e.target.value.trim();

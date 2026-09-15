@@ -11,11 +11,12 @@ use App\Models\User;
 
 class DirectEnquiry extends Model
 {
-   protected $table = 'direct_web_enquiries';
+    protected $table = 'direct_web_enquiries';
 
     use SoftDeletes;
 
     protected $fillable = [
+        'user_id',
         'name',
         'email',
         'phone',
@@ -85,6 +86,11 @@ class DirectEnquiry extends Model
         return $badges[$this->status] ?? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Unknown</span>';
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     /**
      * Get enquiry age in hours
      */
@@ -152,30 +158,24 @@ class DirectEnquiry extends Model
         return $query->where('location_city', 'like', "%{$city}%");
     }
 
-    /**
-     * Scope: Filter by status
-     */
+
     public function scopeByStatus($query, string $status)
     {
         return $query->where('status', $status);
     }
 
-    /**
-     * Scope: Search enquiries
-     */
+
     public function scopeSearch($query, string $search)
     {
         return $query->where(function ($q) use ($search) {
             $q->where('name', 'like', "%{$search}%")
-              ->orWhere('email', 'like', "%{$search}%")
-              ->orWhere('phone', 'like', "%{$search}%")
-              ->orWhere('location_city', 'like', "%{$search}%");
+                ->orWhere('email', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%")
+                ->orWhere('location_city', 'like', "%{$search}%");
         });
     }
 
-    /**
-     * Mark as contacted
-     */
+
     public function markAsContacted(): void
     {
         $this->update([
@@ -184,9 +184,7 @@ class DirectEnquiry extends Model
         ]);
     }
 
-    /**
-     * Mark quote as sent
-     */
+
     public function markQuoteSent(): void
     {
         $this->update([

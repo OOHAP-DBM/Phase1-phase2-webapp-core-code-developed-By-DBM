@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class VendorProfile extends Model
-
 {
     use HasFactory, SoftDeletes;
 
@@ -17,6 +16,7 @@ class VendorProfile extends Model
         'onboarding_status',
         'onboarding_step',
         'onboarding_completed_at',
+        'inventory_setup_completed',
         'approved_at',
         'approved_by',
         'rejection_reason',
@@ -90,6 +90,7 @@ class VendorProfile extends Model
         'commission_percentage' => 'decimal:2',
         'additional_emails' => 'array',
         'email_preferences' => 'array',
+        'inventory_setup_completed' => 'boolean',
     ];
 
 
@@ -192,9 +193,9 @@ class VendorProfile extends Model
      */
     public function isOnboardingComplete(): bool
     {
-        return $this->onboarding_step === 5 && 
-               $this->terms_accepted && 
-               !empty($this->onboarding_completed_at);
+        return $this->onboarding_step === 5 &&
+            $this->terms_accepted &&
+            !empty($this->onboarding_completed_at);
     }
 
     /**
@@ -202,6 +203,7 @@ class VendorProfile extends Model
      */
     public function isApproved(): bool
     {
+
         return $this->onboarding_status === 'approved';
     }
 
@@ -258,7 +260,7 @@ class VendorProfile extends Model
      */
     public function validateCurrentStep(): bool
     {
-        return match($this->onboarding_step) {
+        return match ($this->onboarding_step) {
             1 => $this->validateCompanyDetails(),
             2 => $this->validateBusinessInformation(),
             3 => $this->validateKYCDocuments(),
@@ -274,13 +276,13 @@ class VendorProfile extends Model
     protected function validateCompanyDetails(): bool
     {
         return !empty($this->company_name) &&
-               !empty($this->company_type) &&
-               !empty($this->gstin) &&
-               !empty($this->pan) &&
-               !empty($this->registered_address) &&
-               !empty($this->city) &&
-               !empty($this->state) &&
-               !empty($this->pincode);
+            !empty($this->company_type) &&
+            !empty($this->gstin) &&
+            !empty($this->pan) &&
+            !empty($this->registered_address) &&
+            !empty($this->city) &&
+            !empty($this->state) &&
+            !empty($this->pincode);
     }
 
     /**
@@ -289,11 +291,11 @@ class VendorProfile extends Model
     protected function validateBusinessInformation(): bool
     {
         return !empty($this->year_established) &&
-               !empty($this->service_cities) &&
-               !empty($this->hoarding_types) &&
-               !empty($this->contact_person_name) &&
-               !empty($this->contact_person_phone) &&
-               !empty($this->contact_person_email);
+            !empty($this->service_cities) &&
+            !empty($this->hoarding_types) &&
+            !empty($this->contact_person_name) &&
+            !empty($this->contact_person_phone) &&
+            !empty($this->contact_person_email);
     }
 
     /**
@@ -302,10 +304,10 @@ class VendorProfile extends Model
     protected function validateKYCDocuments(): bool
     {
         return !empty($this->pan_card_document) &&
-               !empty($this->gst_certificate) &&
-               !empty($this->company_registration_certificate) &&
-               !empty($this->address_proof) &&
-               !empty($this->cancelled_cheque);
+            !empty($this->gst_certificate) &&
+            !empty($this->company_registration_certificate) &&
+            !empty($this->address_proof) &&
+            !empty($this->cancelled_cheque);
     }
 
     /**
@@ -314,11 +316,11 @@ class VendorProfile extends Model
     protected function validateBankDetails(): bool
     {
         return !empty($this->bank_name) &&
-               !empty($this->account_holder_name) &&
-               !empty($this->account_number) &&
-               !empty($this->ifsc_code) &&
-               !empty($this->branch_name) &&
-               !empty($this->account_type);
+            !empty($this->account_holder_name) &&
+            !empty($this->account_number) &&
+            !empty($this->ifsc_code) &&
+            !empty($this->branch_name) &&
+            !empty($this->account_type);
     }
 
     /**
@@ -327,7 +329,7 @@ class VendorProfile extends Model
     protected function validateTermsAcceptance(): bool
     {
         return $this->terms_accepted === true &&
-               $this->commission_agreement_accepted === true;
+            $this->commission_agreement_accepted === true;
     }
 
     /**
@@ -338,8 +340,15 @@ class VendorProfile extends Model
         $this->update([
             'onboarding_step' => 5,
             'onboarding_completed_at' => now(),
-            'onboarding_status' => 'pending_approval',
         ]);
+
+        // Only pending vendors should remain pending.
+        // Auto-approved vendors must stay approved.
+        if ($this->onboarding_status !== 'approved') {
+            $this->update([
+                'onboarding_status' => 'pending_approval',
+            ]);
+        }
     }
 
     /**
@@ -352,7 +361,7 @@ class VendorProfile extends Model
             'approved_at' => now(),
             'approved_by' => $admin->id,
         ]);
-        
+
         // Update user status
         $this->user->update(['status' => 'active']);
     }
@@ -384,13 +393,13 @@ class VendorProfile extends Model
     {
         $verified = [];
         $prefs = $this->email_preferences ?? [];
-        
+
         foreach ($this->additional_emails ?? [] as $email) {
             if (!empty($prefs[$email]['verified'])) {
                 $verified[] = $email;
             }
         }
-        
+
         return $verified;
     }
 
@@ -401,13 +410,13 @@ class VendorProfile extends Model
     {
         $notificationEmails = [$this->user->email]; // Always include primary email
         $prefs = $this->email_preferences ?? [];
-        
+
         foreach ($this->additional_emails ?? [] as $email) {
             if (!empty($prefs[$email]['verified']) && !empty($prefs[$email]['notifications'])) {
                 $notificationEmails[] = $email;
             }
         }
-        
+
         return $notificationEmails;
     }
 

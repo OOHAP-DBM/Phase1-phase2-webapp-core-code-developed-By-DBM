@@ -120,6 +120,7 @@
         align-items: center;
         justify-content: center;
         gap: 10px;
+        margin-top: 10px;
 
         border: 1px solid #d1d5db;
         color: inherit;
@@ -183,9 +184,9 @@
                     <div class="alert alert-success border-0 shadow-sm rounded-3 py-3 ps-3 mb-3 position-relative">
                         {{ session('success') }}
                         @if (session('logout_time'))
-                            <div class="small text-muted mt-1">
+                            {{-- <div class="small text-muted mt-1">
                                 Logout Time: {{ \Carbon\Carbon::parse(session('logout_time'))->format('d/m/Y H:i:s') }}
-                            </div>
+                            </div> --}}
                         @endif
 
                         <button type="button"
@@ -270,7 +271,7 @@
                         Continue
                     </button>
 
-                    
+
                     <!-- Remember Me Checkbox -->
                     <div class="mt-4 text-start">
                         <div class="form-check">
@@ -291,13 +292,40 @@
                     Continue with Mobile
                 </a>
 
+                <div class="demo-credentials">
+                    <div class="demo-title">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <strong>Demo Credentials</strong>
+                    </div>
 
-                <!-- <button class="social-btn google-btn">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                        width="18"
-                        class="me-2">
-                    Continue with Google
-                </button> -->
+                    <div class="demo-item">
+                        <strong>Customer</strong>
+                        <span>Email: saurabh@mailinator.com</span>
+                        <span>Password: Vikas@123</span>
+                    </div>
+
+                    <div class="demo-item">
+                        <strong>Vendor</strong>
+                        <span>Email: softwaretester.dbm3@gmail.com</span>
+                        <span>Password: 123456789</span>
+                    </div>
+                </div>
+
+
+
+
+                @php
+                    $googleProvider = \App\Models\OauthProvider::where('provider','google')->first();
+                @endphp
+
+                @if($googleProvider && $googleProvider->active)
+                    <a href="{{ route('oauth.redirect','google') }}" class="social-btn google-btn">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                            width="18"
+                            class="me-2">
+                        Continue with Google
+                    </a>
+                @endif
 
 
                 <div class="footer-text">
@@ -405,3 +433,44 @@
     setTimeout(() => window.location.reload(), 25 * 60 * 1000);
 </script>
 @endpush
+<style>
+.demo-credentials {
+    margin-top: 20px;
+    padding: 12px 15px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    text-align: left;
+    font-size: 12px;
+}
+
+.demo-title {
+    color: #2bb57c;
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.demo-title i {
+    margin-right: 5px;
+}
+
+.demo-item {
+    padding: 8px 10px;
+    margin-top: 7px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #f0f0f0;
+}
+
+.demo-item strong {
+    display: block;
+    color: #374151;
+    margin-bottom: 3px;
+}
+
+.demo-item span {
+    display: block;
+    color: #6b7280;
+    line-height: 1.5;
+}
+</style>

@@ -336,7 +336,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(Booking::class, 'vendor_id');
     }
-  
+
 
     /**
      * Get bookings where user is the customer (PROMPT 48)
@@ -711,6 +711,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
      public function setGstinAttribute($value)
     {
-        $this->attributes['gstin'] = strtoupper($value);
+        $gstin = is_string($value) ? trim($value) : $value;
+
+        $this->attributes['gstin'] = blank($gstin)
+            ? null
+            : strtoupper($gstin);
     }
 }

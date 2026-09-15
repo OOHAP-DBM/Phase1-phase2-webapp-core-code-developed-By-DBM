@@ -60,7 +60,7 @@
                                 <div class="font-medium text-gray-900">
                                     {{ $customer['name'] }}
                                 </div>
-                               
+
                             </td>
 
                             {{-- Contact --}}
@@ -101,7 +101,7 @@
 
                           {{-- Status --}}
                             <td class="px-2 sm:px-3 md:px-4 py-2 sm:py-3 text-center">
-                                @if($customer['profile_status'] === 'active')
+                                @if(($customer['profile_status'] ?? 'inactive') === 'active')
                                     <span class="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                                         Active
                                     </span>

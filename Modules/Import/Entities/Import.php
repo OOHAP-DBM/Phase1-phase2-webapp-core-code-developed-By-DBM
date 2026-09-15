@@ -10,11 +10,7 @@ class Import extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+
     protected $fillable = [
         'user_id',
         'file_path',
@@ -30,91 +26,65 @@ class Import extends Model
         'completed_at',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
+
     protected $casts = [
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
 
-    /**
-     * Get the owning entity of the import (polymorphic).
-     */
+     
     public function importable(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Scope: Get pending imports
-     */
-    public function scopePending($query)
+        public function scopePending($query)
     {
         return $query->where('status', 'pending');
     }
 
-    /**
-     * Scope: Get processing imports
-     */
+     
     public function scopeProcessing($query)
     {
         return $query->where('status', 'processing');
     }
 
-    /**
-     * Scope: Get completed imports
-     */
+    
     public function scopeCompleted($query)
     {
         return $query->where('status', 'completed');
     }
 
-    /**
-     * Scope: Get failed imports
-     */
+    
     public function scopeFailed($query)
     {
         return $query->where('status', 'failed');
     }
 
-    /**
-     * Check if import is pending
-     */
+     
     public function isPending(): bool
     {
         return $this->status === 'pending';
     }
 
-    /**
-     * Check if import is processing
-     */
+    
     public function isProcessing(): bool
     {
         return $this->status === 'processing';
     }
 
-    /**
-     * Check if import is completed
-     */
     public function isCompleted(): bool
     {
         return $this->status === 'completed';
     }
 
-    /**
-     * Check if import failed
-     */
+     
     public function isFailed(): bool
     {
         return $this->status === 'failed';
     }
 
-    /**
-     * Mark import as processing
-     */
+
     public function markAsProcessing(): void
     {
         $this->update([
@@ -123,9 +93,7 @@ class Import extends Model
         ]);
     }
 
-    /**
-     * Mark import as completed
-     */
+    
     public function markAsCompleted(): void
     {
         $this->update([
@@ -134,9 +102,7 @@ class Import extends Model
         ]);
     }
 
-    /**
-     * Mark import as failed
-     */
+     
     public function markAsFailed(string $errorMessage): void
     {
         $this->update([
@@ -146,9 +112,7 @@ class Import extends Model
         ]);
     }
 
-    /**
-     * Update progress
-     */
+     
     public function updateProgress(int $processedRows, int $failedRows = 0): void
     {
         $this->update([

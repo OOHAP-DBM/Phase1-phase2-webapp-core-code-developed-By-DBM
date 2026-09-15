@@ -12,18 +12,16 @@ Route::middleware(['auth:sanctum', 'throttle:authenticated'])->group(function ()
         Route::post('/send-otp', [ProfileController::class, 'sendOtp']);
         Route::post('/verify-otp', [ProfileController::class, 'verifyOtp']);
     });
-    Route::prefix('customer')->group(function () {   
+    Route::prefix('customer')->group(function () {
         Route::get('/show', [ProfileController::class, 'show']);
+        Route::get('/completion', [ProfileController::class, 'completion']);
         Route::post('/update', [ProfileController::class, 'update']);
-       
-        });
+    });
 
-    
-
-
-Route::middleware('auth:sanctum')->prefix('vendor')->group(function () {
-    Route::get('/show', [VendorProfileApiController::class, 'show']);
-    Route::post('/update', [VendorProfileApiController::class, 'update']);
-});
+    Route::middleware('auth:sanctum')->prefix('vendor')->group(function () {
+        Route::get('/show', [VendorProfileApiController::class, 'show']);
+        Route::get('/completion', [VendorProfileApiController::class, 'completion']);
+        Route::post('/update', [VendorProfileApiController::class, 'update']);
+    });
    
 });

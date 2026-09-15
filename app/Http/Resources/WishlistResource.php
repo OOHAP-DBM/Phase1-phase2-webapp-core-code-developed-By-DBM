@@ -28,6 +28,7 @@ class WishlistResource extends JsonResource
         return [
             'wishlist_id'    => $this->id,
             'hoarding_id'    => $hoarding->id,
+            'vendor_id'    => $hoarding->vendor_id,
             'title'          => $hoarding->title,
             'city'           => $hoarding->city,
             'hoarding_type'  => $hoarding->hoarding_type,

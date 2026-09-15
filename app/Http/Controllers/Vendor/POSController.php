@@ -178,8 +178,6 @@ class POSController extends Controller
         ]);
     }
 
-        /**
-     * POS Customers page for OohApp POS system
-     */
+
 
 }

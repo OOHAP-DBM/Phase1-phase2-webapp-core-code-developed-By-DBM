@@ -61,7 +61,11 @@ class EnquiryItemResource extends JsonResource
             'id'              => $this->id,
             'enquiry_no'      => $this->formatted_id,
             'status'          => $this->status,
-            'status_label'    => $this->statusLabel(),
+           // 'status_label'    => $this->statusLabel(),
+            'status_label'    => $this->offers->first()?->status,
+            'wasLastModifiedByCustomer' => $this->offers->first()
+            ? $this->offers->first()->wasLastModifiedByCustomer()
+            : false,
             'requirement'     => $this->customer_note,
             'submitted_on'    => optional($this->created_at)->format('d M Y'),
             'preferred_campaign_start' => $this->enquiryCampaignStartDate(),
@@ -70,6 +74,17 @@ class EnquiryItemResource extends JsonResource
             'total_locations' => $this->items_count,
             'total_vendors'   => $this->vendor_count,
             'customer'        => $this->customerDetails(),
+            'offers'          => $this->offers->map(function ($offer) {
+                    return [
+                        'id'          => $offer->id,
+                        'offer_no'    => $offer->offer_no,
+                        'status'      => $offer->status,
+                        'price'       => $offer->price,
+                        'price_type'  => $offer->price_type,
+                        'valid_until' => optional($offer->valid_until)->format('d M Y'),
+                        'created_at'  => optional($offer->created_at)->format('d M Y'),
+                    ];
+            }),
 
             /* ================= Vendors ================= */
             'vendors' => $this->vendors(),
@@ -161,7 +176,7 @@ class EnquiryItemResource extends JsonResource
     {
         // Get viewer type from additional data, fallback to auto-detection
         $viewerType = $this->additional['viewer_type'] ?? 'user';
-        
+
         return match ($this->status) {
             'submitted' => $viewerType === 'owner' ? 'Enquiry Received' : 'Enquiry Sent: Waiting for Vendor Response',
             'new' => 'Waiting For Vendor Response',
@@ -213,6 +228,6 @@ class EnquiryItemResource extends JsonResource
     /* ================= Media Resolver ==================== */
     /* ===================================================== */
 
-   
+
 }
 

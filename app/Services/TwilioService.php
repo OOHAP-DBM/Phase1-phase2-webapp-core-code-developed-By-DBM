@@ -89,6 +89,7 @@ class TwilioService
         $route = (string) $this->setting('sms_msg91_route', '4');
         $country = (string) $this->setting('sms_msg91_country', '91');
         $baseUrl = (string) $this->setting('sms_msg91_base_url', 'https://api.msg91.com/api/v2/sendsms');
+        $templateId = (string) $this->setting('sms_msg91_template_id', '');
 
         if (!$authKey || !$senderId) {
             Log::error('MSG91 SMS failed: Missing auth key or sender ID.');
@@ -98,10 +99,7 @@ class TwilioService
         $mobile = $this->formatPhoneDigits($to, $country);
 
         try {
-            $response = Http::withHeaders([
-                'authkey' => $authKey,
-                'content-type' => 'application/json',
-            ])->post($baseUrl, [
+            $payload = [
                 'sender' => $senderId,
                 'route' => $route,
                 'country' => $country,
@@ -109,7 +107,16 @@ class TwilioService
                     'message' => $message,
                     'to' => [$mobile],
                 ]],
-            ]);
+            ];
+
+            if ($templateId !== '') {
+                $payload['template_id'] = $templateId;
+            }
+
+            $response = Http::withHeaders([
+                'authkey' => $authKey,
+                'content-type' => 'application/json',
+            ])->post($baseUrl, $payload);
 
             if ($response->successful()) {
                 return true;

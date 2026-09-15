@@ -19,6 +19,8 @@ use App\Notifications\AdminDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\VendorDirectEnquiryNotification;
 use Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification;
 use App\Models\User;
+use App\Models\ActivityLog;
+use App\Mail\CustomerWelcomeMail;
 
 class DirectEnquiryApiController extends Controller
 {
@@ -85,14 +87,14 @@ class DirectEnquiryApiController extends Controller
 
             Log::info('Enquiry OTP sent', [
                 'phone_masked' => $masked,
-                'ip'           => $request->ip(),
+                'ip' => $request->ip(),
             ]);
 
             return $this->success('OTP sent successfully to ' . $masked);
         } catch (\Throwable $e) {
             Log::error('Enquiry OTP send failed', [
                 'phone_masked' => $this->maskPhone($request->phone),
-                'error'        => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return $this->error('Failed to send OTP. Please try again.', 500);
@@ -150,7 +152,7 @@ class DirectEnquiryApiController extends Controller
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[6-9][0-9]{9}$/'],
-            'otp'   => ['required', 'digits:4'],
+            'otp' => ['required', 'digits:4'],
         ]);
 
         try {
@@ -163,7 +165,7 @@ class DirectEnquiryApiController extends Controller
             if (!$verified) {
                 Log::warning('Invalid OTP attempt', [
                     'phone_masked' => $this->maskPhone($request->phone),
-                    'ip'           => $request->ip(),
+                    'ip' => $request->ip(),
                 ]);
 
                 return $this->error('Invalid or expired OTP. Please request a new one.', 422);
@@ -174,13 +176,13 @@ class DirectEnquiryApiController extends Controller
             ]);
 
             return $this->success('Phone verified successfully.', [
-                'phone'    => $request->phone,
+                'phone' => $request->phone,
                 'verified' => true,
             ]);
         } catch (\Throwable $e) {
             Log::error('Enquiry OTP verify failed', [
                 'phone_masked' => $this->maskPhone($request->phone),
-                'error'        => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return $this->error('Verification failed. Please try again.', 500);
@@ -243,28 +245,31 @@ class DirectEnquiryApiController extends Controller
      *     )
      * )
      */
+
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'name'                   => 'required|string|min:3|max:255',
-            'email'                  => 'required|email|max:255',
-            'phone'                  => ['required', 'digits:10', 'regex:/^[6-9][0-9]{9}$/'],
-            'hoarding_type'          => 'required|array|min:1',
-            'hoarding_type.*'        => 'in:DOOH,OOH',
-            'location_city'          => 'required|string|max:255',
-            'preferred_locations'    => 'nullable|array',
-            'preferred_locations.*'  => 'nullable|string|max:255',
-            'remarks'                => 'required|string|min:10|max:2000',
-            'preferred_modes'        => 'nullable|array',
-            'preferred_modes.*'      => 'in:Call,WhatsApp,Email',
-
-            // Mobile sends this flag after calling verifyOtp successfully
-            'phone_verified'         => 'required|accepted',
+            'name' => 'required|string|min:3|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => [
+                'required',
+                'digits:10',
+                'regex:/^[6-9][0-9]{9}$/'
+            ],
+            'hoarding_type' => 'required|array|min:1',
+            'hoarding_type.*' => 'in:DOOH,OOH',
+            'location_city' => 'required|string|max:255',
+            'preferred_locations' => 'nullable|array',
+            'preferred_locations.*' => 'nullable|string|max:255',
+            'remarks' => 'required|string|min:10|max:2000',
+            'preferred_modes' => 'nullable|array',
+            'preferred_modes.*' => 'in:Call,WhatsApp,Email',
+            'phone_verified' => 'required|accepted',
         ], [
-            'phone_verified.accepted' => 'Phone number must be verified via OTP before submitting.',
+            'phone_verified.accepted' =>
+                'Phone number must be verified via OTP before submitting.',
         ]);
 
-        // Confirm OTP was actually verified in DB (not just a flag from client)
         $phoneVerified = DB::table('guest_user_otps')
             ->where('identifier', $request->phone)
             ->where('purpose', 'direct_enquiry')
@@ -283,28 +288,135 @@ class DirectEnquiryApiController extends Controller
         try {
             DB::beginTransaction();
 
-            $normalizedCity       = $this->normalizeCityName($request->location_city);
-            $preferredLocations   = $this->cleanLocations($request->preferred_locations ?? []);
+            $normalizedCity = $this->normalizeCityName($request->location_city);
+            $preferredLocations = $this->cleanLocations($request->preferred_locations ?? []);
             $normalizedLocalities = array_map(
                 fn($loc) => $this->normalizeLocalityName($loc, $normalizedCity),
                 $preferredLocations
             );
+              // =====================================================
+                    // FIND OR CREATE CUSTOMER
+                    // =====================================================
+
+                    $user = User::where(function ($query) use ($request) {
+
+                    $query->where('email', $request->email)
+                    ->orWhere('phone', $request->phone);
+
+                    })->first();
+
+
+                    $password = null;
+                    $isNewCustomer = false;
+
+
+                    // =====================================================
+                    // CREATE NEW CUSTOMER
+                    // =====================================================
+
+                    if (!$user) {
+
+                    // Generate temporary/random password
+                    $password = \Illuminate\Support\Str::random(10);
+
+
+                    $user = User::create([
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                    'password' => $password,
+                    'status' => 'active',
+                    'active_role' => 'customer',
+                    ]);
+
+
+                    // Assign customer role
+                    $user->assignRole('customer');
+
+
+                    $isNewCustomer = true;
+
+
+                    // Log customer creation
+                    Log::info(
+                    'Customer automatically created from mobile direct enquiry',
+                    [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    ]
+                    );
+
+
+                    // Optional activity log
+                    if (class_exists(\App\Models\ActivityLog::class)) {
+
+                    ActivityLog::record(
+                    action: 'customer_auto_created',
+                    description:
+                    'Customer account was automatically created from a mobile direct enquiry.',
+                    module: 'customer',
+                    subject: $user,
+                    metadata: [
+                    'source' => 'mobile_app',
+                    'registration_type' => 'automatic',
+                    ]
+                    );
+                    }
+
+
+                    } else {
+
+                    // Existing user
+                Log::info(
+                'Existing customer/user found for mobile direct enquiry',
+                [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                ]
+                );
+                }
 
             $enquiry = DirectEnquiry::create([
-                'name'                => $request->name,
-                'email'               => $request->email,
-                'phone'               => $request->phone,
-                'hoarding_type'       => implode(',', $request->hoarding_type),
-                'location_city'       => $normalizedCity,
+                'user_id' => $user->id,
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'hoarding_type' => implode(',', $request->hoarding_type),
+                'location_city' => $normalizedCity,
                 'preferred_locations' => $normalizedLocalities,
-                'remarks'             => $request->remarks,
-                'preferred_modes'     => $request->preferred_modes ?? ['Call', 'Email'],
-                'is_phone_verified'   => true,
-                'status'              => 'new',
-                'source'              => 'mobile_app',
+                'remarks' => $request->remarks,
+                'preferred_modes' => $request->preferred_modes ?? ['Call', 'Email'],
+                'is_phone_verified' => true,
+                'status' => 'new',
+                'source' => 'mobile_app',
             ]);
+                             // =====================================================
+                            // SEND WELCOME EMAIL
+                            // ONLY FOR NEW CUSTOMER
+                            // =====================================================
 
-            // Find matching vendors and notify them
+                            if ($isNewCustomer && $password) {
+
+                            Mail::to($user->email)->queue(
+                            new CustomerWelcomeMail(
+                            $user,
+                            $password
+                            )
+                            );
+
+
+                            Log::info(
+                            'New customer welcome mail queued from mobile direct enquiry',
+                            [
+                            'user_id' => $user->id,
+                            'email' => $user->email,
+                            ]
+                            );
+                            }
+
+
             $vendors = $this->findRelevantVendors(
                 $normalizedCity,
                 $normalizedLocalities,
@@ -314,64 +426,95 @@ class DirectEnquiryApiController extends Controller
             if ($vendors->isNotEmpty()) {
                 $enquiry->assignedVendors()->attach($vendors->pluck('id'));
 
-                // Notify vendors with push and in-app notifications
                 foreach ($vendors as $vendor) {
                     Mail::to($vendor->email)->queue(new VendorDirectEnquiryMail($enquiry, $vendor));
 
-                    // In-app notification
                     $vendor->notify(new VendorDirectEnquiryNotification($enquiry));
 
-                    // Push notification with hoarding details
-                    $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
-                    send(
-                        $vendor,
-                        'New Hoarding Enquiry Received',
-                        "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
-                        [
-                            'type'           => 'vendor_direct_enquiry',
-                            'enquiry_id'     => $enquiry->id,
-                            'customer_name'  => $enquiry->name,
-                            'hoarding_type'  => implode(',', $request->hoarding_type),
-                            'city'           => $normalizedCity,
-                            'source'         => 'mobile_app'
-                        ]
-                    );
+                    // $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
+                    // send(
+                    //     $vendor,
+                    //     'New Hoarding Enquiry Received',
+                    //     "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
+                    //     [
+                    //         'type' => 'vendor_direct_enquiry',
+                    //         'enquiry_id' => $enquiry->id,
+                    //         'customer_name' => $enquiry->name,
+                    //         'hoarding_type' => implode(',', $request->hoarding_type),
+                    //         'city' => $normalizedCity,
+                    //         'source' => 'mobile_app'
+                    //     ]
+                    // );
+                     if (!empty($vendor->fcm_token)) {
+
+            $hoardingTypes = implode(
+                ', ',
+                array_map(
+                    'strtoupper',
+                    $request->hoarding_type
+                )
+            );
+
+            $sent = send(
+                $vendor->fcm_token,
+                'New Hoarding Enquiry Received',
+                "New {$hoardingTypes} enquiry from {$enquiry->name} in {$normalizedCity}",
+                [
+                    'type' => 'vendor_direct_enquiry',
+                    'enquiry_id' => (string) $enquiry->id,
+                    'customer_name' => $enquiry->name,
+                    'hoarding_type' => implode(',', $request->hoarding_type),
+                    'city' => $normalizedCity,
+                    'source' => 'mobile_app',
+                ]
+            );
+
+            if (!$sent) {
+                Log::warning(
+                    "FCM notification failed for vendor ID {$vendor->id}",
+                    [
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
+            }
+        } else {
+                Log::warning(
+                    "Vendor has no FCM token",
+                    [
+                        'vendor_id' => $vendor->id,
+                        'enquiry_id' => $enquiry->id,
+                    ]
+                );
+              }
                 }
             }
 
-            // Customer confirmation email
             Mail::to($enquiry->email)->queue(new UserDirectEnquiryConfirmation($enquiry));
 
-            // Send in-app notification to customer
-            // Note: Customer is not yet a registered user, so we'll store this for when they login
-            // or for guest notification display via email link
 
-            // Attempt to notify if customer exists in system by email
             $existingCustomer = User::where('email', $enquiry->email)
                 ->where('active_role', 'customer')
                 ->first();
 
             if ($existingCustomer) {
-                // In-app notification for registered customer
+
                 $existingCustomer->notify(new \Modules\Enquiries\Notifications\CustomerDirectEnquiryNotification($enquiry));
 
-                // Push notification to customer
                 $hoardingTypes = implode(', ', array_map('strtoupper', explode(',', $request->hoarding_type[0] ?? 'OOH')));
                 send(
                     $existingCustomer,
                     'Enquiry Submitted Successfully',
                     "Your {$hoardingTypes} hoarding enquiry for {$normalizedCity} has been submitted.",
                     [
-                        'type'           => 'customer_direct_enquiry',
-                        'enquiry_id'     => $enquiry->id,
-                        'hoarding_type'  => implode(',', $request->hoarding_type),
-                        'city'           => $normalizedCity,
-                        'status'         => 'submitted'
+                        'type' => 'customer_direct_enquiry',
+                        'enquiry_id' => $enquiry->id,
+                        'hoarding_type' => implode(',', $request->hoarding_type),
+                        'city' => $normalizedCity,
+                        'status' => 'submitted'
                     ]
                 );
             }
 
-            // Notify admins
             $admins = User::whereIn('active_role', ['admin', 'superadmin'])
                 ->where('status', 'active')
                 ->get();
@@ -382,15 +525,15 @@ class DirectEnquiryApiController extends Controller
             }
 
             DB::commit();
-            // Cleanup OTP records
+
             DB::table('guest_user_otps')
                 ->where('identifier', $request->phone)
                 ->where('purpose', 'direct_enquiry')
                 ->delete();
 
             Log::info('Direct enquiry submitted via mobile', [
-                'enquiry_id'       => $enquiry->id,
-                'city'             => $normalizedCity,
+                'enquiry_id' => $enquiry->id,
+                'city' => $normalizedCity,
                 'vendors_notified' => $vendors->count(),
             ]);
 
@@ -399,6 +542,19 @@ class DirectEnquiryApiController extends Controller
                 ['enquiry_id' => $enquiry->id],
                 201
             );
+            if ($user->fcm_token) {
+                $sent = send(
+                $user->fcm_token,
+                'Enquiry Submitted',
+                'Your enquiry has been submitted successfully. We’ll notify you when there is an update on your enquiry.',
+                ['type' => 'Enquiry', 'user_id' => $user->id]
+                );
+
+
+                if (!$sent) {
+                \Log::warning("FCM notification failed for user ID {$user->id}");
+                }
+                }
         } catch (\Throwable $e) {
             DB::rollBack();
 
@@ -407,41 +563,14 @@ class DirectEnquiryApiController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->error('Failed to submit enquiry. Please try again.', 500);
+            return $this->error(
+                'Failed to submit enquiry. Please try again.',
+                500
+            );
         }
     }
 
-    // =========================================================================
-    // GET /api/v1/vendor/enquiries
-    // Vendor: list all assigned enquiries with optional filters
-    // Auth: vendor token required
-    // =========================================================================
-    /**
-     * @OA\Get(
-     *     path="/vendor/enquiries",
-     *     summary="List all assigned direct enquiries for vendor",
-     *     description="Returns paginated list of direct enquiries assigned to the authenticated vendor. Supports filtering by status and viewed flag.",
-     *     tags={"Direct Enquiries"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(name="status", in="query", description="Filter by response status", required=false, @OA\Schema(type="string", enum={"pending","interested","quote_sent","declined"})),
-     *     @OA\Parameter(name="viewed", in="query", description="Filter by viewed status (true/false)", required=false, @OA\Schema(type="boolean")),
-     *     @OA\Parameter(name="per_page", in="query", description="Results per page (default: 15, max: 50)", required=false, @OA\Schema(type="integer", example=15)),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Paginated list of direct enquiries",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
-     *             @OA\Property(property="meta", type="object",
-     *                 @OA\Property(property="current_page", type="integer", example=1),
-     *                 @OA\Property(property="last_page", type="integer", example=2),
-     *                 @OA\Property(property="per_page", type="integer", example=15),
-     *                 @OA\Property(property="total", type="integer", example=20)
-     *             )
-     *         )
-     *     )
-     * )
-     */
+
     public function vendorIndex(Request $request): JsonResponse
     {
         $vendor = Auth::user();
@@ -461,17 +590,17 @@ class DirectEnquiryApiController extends Controller
             $query->wherePivot('has_viewed', $request->boolean('viewed'));
         }
 
-        $perPage   = min((int) $request->input('per_page', 15), 50);
+        $perPage = min((int) $request->input('per_page', 15), 50);
         $enquiries = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data'    => $enquiries->map(fn($e) => $this->formatEnquiryDetail($e, $e->assignedVendors->first()?->pivot)),
-            'meta'    => [
+            'data' => $enquiries->map(fn($e) => $this->formatEnquiryDetail($e, $e->assignedVendors->first()?->pivot)),
+            'meta' => [
                 'current_page' => $enquiries->currentPage(),
-                'last_page'    => $enquiries->lastPage(),
-                'per_page'     => $enquiries->perPage(),
-                'total'        => $enquiries->total(),
+                'last_page' => $enquiries->lastPage(),
+                'per_page' => $enquiries->perPage(),
+                'total' => $enquiries->total(),
             ],
         ]);
     }
@@ -509,7 +638,7 @@ class DirectEnquiryApiController extends Controller
      */
     public function vendorShow(int $id): JsonResponse
     {
-        $vendor  = Auth::user();
+        $vendor = Auth::user();
         $enquiry = $this->findVendorEnquiry($id, $vendor->id);
 
         if (!$enquiry) {
@@ -524,7 +653,7 @@ class DirectEnquiryApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => $this->formatEnquiryDetail($enquiry, $pivot),
+            'data' => $this->formatEnquiryDetail($enquiry, $pivot),
         ]);
     }
 
@@ -578,7 +707,7 @@ class DirectEnquiryApiController extends Controller
      */
     public function respond(Request $request, int $id): JsonResponse
     {
-        $vendor  = Auth::user();
+        $vendor = Auth::user();
         $enquiry = $this->findVendorEnquiry($id, $vendor->id);
 
         if (!$enquiry) {
@@ -587,8 +716,8 @@ class DirectEnquiryApiController extends Controller
 
         $request->validate([
             'response_status' => 'required|in:interested,quote_sent,declined',
-            'vendor_notes'    => 'nullable|string|max:1000',
-            'quoted_price'    => 'nullable|numeric|min:0|max:99999999.99',
+            'vendor_notes' => 'nullable|string|max:1000',
+            'quoted_price' => 'nullable|numeric|min:0|max:99999999.99',
         ]);
 
         try {
@@ -596,7 +725,7 @@ class DirectEnquiryApiController extends Controller
 
             $updateData = [
                 'response_status' => $request->response_status,
-                'responded_at'    => now(),
+                'responded_at' => now(),
             ];
 
             if ($request->filled('vendor_notes')) {
@@ -626,9 +755,9 @@ class DirectEnquiryApiController extends Controller
             DB::rollBack();
 
             Log::error('Vendor respond failed (mobile)', [
-                'vendor_id'  => $vendor->id,
+                'vendor_id' => $vendor->id,
                 'enquiry_id' => $id,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return $this->error('Failed to submit response. Please try again.', 500);
@@ -675,7 +804,7 @@ class DirectEnquiryApiController extends Controller
      */
     public function updateNotes(Request $request, int $id): JsonResponse
     {
-        $vendor  = Auth::user();
+        $vendor = Auth::user();
         $enquiry = $this->findVendorEnquiry($id, $vendor->id);
 
         if (!$enquiry) {
@@ -726,7 +855,7 @@ class DirectEnquiryApiController extends Controller
      */
     public function markViewed(int $id): JsonResponse
     {
-        $vendor  = Auth::user();
+        $vendor = Auth::user();
         $enquiry = $this->findVendorEnquiry($id, $vendor->id);
 
         if (!$enquiry) {
@@ -774,7 +903,7 @@ class DirectEnquiryApiController extends Controller
     {
         $vendor = Auth::user();
 
-        $total     = $vendor->assignedEnquiries()->count();
+        $total = $vendor->assignedEnquiries()->count();
         $responded = $vendor->assignedEnquiries()
             ->wherePivot('response_status', '!=', 'pending')
             ->count();
@@ -787,15 +916,15 @@ class DirectEnquiryApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => [
-                'total_enquiries'        => $total,
-                'new'                    => $vendor->newEnquiries()->count(),
-                'viewed'                 => $vendor->assignedEnquiries()->wherePivot('has_viewed', true)->count(),
-                'pending'                => $vendor->assignedEnquiries()->wherePivot('response_status', 'pending')->count(),
-                'interested'             => $vendor->assignedEnquiries()->wherePivot('response_status', 'interested')->count(),
-                'quotes_sent'            => $vendor->assignedEnquiries()->wherePivot('response_status', 'quote_sent')->count(),
-                'declined'               => $vendor->assignedEnquiries()->wherePivot('response_status', 'declined')->count(),
-                'response_rate_percent'  => $total > 0 ? round(($responded / $total) * 100, 2) : 0,
+            'data' => [
+                'total_enquiries' => $total,
+                'new' => $vendor->newEnquiries()->count(),
+                'viewed' => $vendor->assignedEnquiries()->wherePivot('has_viewed', true)->count(),
+                'pending' => $vendor->assignedEnquiries()->wherePivot('response_status', 'pending')->count(),
+                'interested' => $vendor->assignedEnquiries()->wherePivot('response_status', 'interested')->count(),
+                'quotes_sent' => $vendor->assignedEnquiries()->wherePivot('response_status', 'quote_sent')->count(),
+                'declined' => $vendor->assignedEnquiries()->wherePivot('response_status', 'declined')->count(),
+                'response_rate_percent' => $total > 0 ? round(($responded / $total) * 100, 2) : 0,
                 'avg_response_time_hours' => round($avgResponseHours ?? 0, 1),
             ],
         ]);
@@ -818,39 +947,39 @@ class DirectEnquiryApiController extends Controller
         $pivot = $enquiry->assignedVendors->first()?->pivot;
 
         return [
-            'id'              => $enquiry->id,
-            'name'            => $enquiry->name,
-            'city'            => $enquiry->location_city,
-            'hoarding_type'   => $enquiry->hoarding_type,
-            'status'          => $enquiry->status,
+            'id' => $enquiry->id,
+            'name' => $enquiry->name,
+            'city' => $enquiry->location_city,
+            'hoarding_type' => $enquiry->hoarding_type,
+            'status' => $enquiry->status,
             'response_status' => $pivot?->response_status ?? 'pending',
-            'has_viewed'      => (bool) ($pivot?->has_viewed ?? false),
-            'created_at'      => $enquiry->created_at?->toISOString(),
+            'has_viewed' => (bool) ($pivot?->has_viewed ?? false),
+            'created_at' => $enquiry->created_at?->toISOString(),
         ];
     }
 
     private function formatEnquiryDetail(DirectEnquiry $enquiry, $pivot): array
     {
         return [
-            'id'                  => $enquiry->id,
-            'name'                => $enquiry->name,
-            'email'               => $enquiry->email,
-            'phone'               => $enquiry->phone,
-            'hoarding_type'       => $enquiry->hoarding_type,
-            'location_city'       => $enquiry->location_city,
+            'id' => $enquiry->id,
+            'name' => $enquiry->name,
+            'email' => $enquiry->email,
+            'phone' => $enquiry->phone,
+            'hoarding_type' => $enquiry->hoarding_type,
+            'location_city' => $enquiry->location_city,
             'preferred_locations' => $enquiry->preferred_locations,
-            'remarks'             => $enquiry->remarks,
-            'preferred_modes'     => $enquiry->preferred_modes,
-            'status'              => $enquiry->status,
-            'source'              => $enquiry->source,
-            'created_at'          => $enquiry->created_at?->toISOString(),
+            'remarks' => $enquiry->remarks,
+            'preferred_modes' => $enquiry->preferred_modes,
+            'status' => $enquiry->status,
+            'source' => $enquiry->source,
+            'created_at' => $enquiry->created_at?->toISOString(),
 
             // Vendor-specific pivot data
             'vendor_response' => [
-                'status'       => $pivot?->response_status ?? 'pending',
-                'notes'        => $pivot?->vendor_notes,
+                'status' => $pivot?->response_status ?? 'pending',
+                'notes' => $pivot?->vendor_notes,
                 'quoted_price' => $pivot?->quoted_price,
-                'has_viewed'   => (bool) ($pivot?->has_viewed ?? false),
+                'has_viewed' => (bool) ($pivot?->has_viewed ?? false),
                 'responded_at' => $pivot?->responded_at,
                 'quote_sent_at' => $pivot?->quote_sent_at,
             ],
@@ -901,26 +1030,26 @@ class DirectEnquiryApiController extends Controller
         $city = trim(strtolower($city));
 
         $cityMappings = [
-            'lucknow'    => ['lucknow', 'lko', 'lakhnau', 'lakhnaow', 'lucknaw', 'lukhnow'],
-            'kanpur'     => ['kanpur', 'cawnpore', 'kanpoor', 'kanpore'],
-            'varanasi'   => ['varanasi', 'banaras', 'benares', 'kashi', 'varnasi'],
-            'agra'       => ['agra', 'agrah', 'aagra'],
-            'prayagraj'  => ['prayagraj', 'allahabad', 'ilahabad', 'prayag'],
-            'ballia'     => ['ballia', 'balliya', 'balia', 'balya'],
-            'mohali'     => ['mohali', 'sahibzada ajit singh nagar', 'sas nagar', 'mohalli'],
+            'lucknow' => ['lucknow', 'lko', 'lakhnau', 'lakhnaow', 'lucknaw', 'lukhnow'],
+            'kanpur' => ['kanpur', 'cawnpore', 'kanpoor', 'kanpore'],
+            'varanasi' => ['varanasi', 'banaras', 'benares', 'kashi', 'varnasi'],
+            'agra' => ['agra', 'agrah', 'aagra'],
+            'prayagraj' => ['prayagraj', 'allahabad', 'ilahabad', 'prayag'],
+            'ballia' => ['ballia', 'balliya', 'balia', 'balya'],
+            'mohali' => ['mohali', 'sahibzada ajit singh nagar', 'sas nagar', 'mohalli'],
             'chandigarh' => ['chandigarh', 'chandigrah', 'chandigar'],
-            'mumbai'     => ['mumbai', 'bombay', 'mumbay', 'mumby', 'mombai'],
-            'delhi'      => ['delhi', 'dilli', 'dehli', 'new delhi', 'newdelhi'],
-            'bangalore'  => ['bangalore', 'bengaluru', 'bangaluru', 'banglore', 'bengaloor'],
-            'kolkata'    => ['kolkata', 'calcutta', 'kolkatta', 'kalkatta', 'kolkota'],
-            'hyderabad'  => ['hyderabad', 'hydrabad', 'haidarabad', 'hyderabadh'],
-            'chennai'    => ['chennai', 'madras', 'chenai', 'chenna'],
-            'pune'       => ['pune', 'poona', 'puna'],
-            'ahmedabad'  => ['ahmedabad', 'amdavad', 'ahmadabad', 'ahmdabad'],
-            'jaipur'     => ['jaipur', 'jaypur', 'jeypore', 'jeypur'],
-            'surat'      => ['surat', 'surath', 'suratt'],
-            'indore'     => ['indore', 'indor', 'indaur'],
-            'bhopal'     => ['bhopal', 'bhopl', 'bhopaal'],
+            'mumbai' => ['mumbai', 'bombay', 'mumbay', 'mumby', 'mombai'],
+            'delhi' => ['delhi', 'dilli', 'dehli', 'new delhi', 'newdelhi'],
+            'bangalore' => ['bangalore', 'bengaluru', 'bangaluru', 'banglore', 'bengaloor'],
+            'kolkata' => ['kolkata', 'calcutta', 'kolkatta', 'kalkatta', 'kolkota'],
+            'hyderabad' => ['hyderabad', 'hydrabad', 'haidarabad', 'hyderabadh'],
+            'chennai' => ['chennai', 'madras', 'chenai', 'chenna'],
+            'pune' => ['pune', 'poona', 'puna'],
+            'ahmedabad' => ['ahmedabad', 'amdavad', 'ahmadabad', 'ahmdabad'],
+            'jaipur' => ['jaipur', 'jaypur', 'jeypore', 'jeypur'],
+            'surat' => ['surat', 'surath', 'suratt'],
+            'indore' => ['indore', 'indor', 'indaur'],
+            'bhopal' => ['bhopal', 'bhopl', 'bhopaal'],
         ];
 
         foreach ($cityMappings as $standard => $variations) {
@@ -947,18 +1076,18 @@ class DirectEnquiryApiController extends Controller
         }
 
         $locality = trim(strtolower($locality));
-        $city     = strtolower($city);
+        $city = strtolower($city);
 
         $localityMappings = [
             'lucknow' => [
-                'hazratganj'   => ['hazratganj', 'hazrat ganj', 'ganj'],
-                'gomti nagar'  => ['gomti nagar', 'gomtinagar', 'gomti', 'gomati nagar'],
+                'hazratganj' => ['hazratganj', 'hazrat ganj', 'ganj'],
+                'gomti nagar' => ['gomti nagar', 'gomtinagar', 'gomti', 'gomati nagar'],
                 'indira nagar' => ['indira nagar', 'indiranagar', 'indra nagar'],
-                'aminabad'     => ['aminabad', 'amina bad', 'aminaabad'],
-                'alambagh'     => ['alambagh', 'alam bagh', 'alambag'],
+                'aminabad' => ['aminabad', 'amina bad', 'aminaabad'],
+                'alambagh' => ['alambagh', 'alam bagh', 'alambag'],
             ],
             'ballia' => [
-                'rasra'    => ['rasra', 'raasra', 'rasara'],
+                'rasra' => ['rasra', 'raasra', 'rasara'],
                 'kharuwan' => ['kharuwan', 'kharwan'],
             ],
             'mohali' => [
@@ -1014,7 +1143,7 @@ class DirectEnquiryApiController extends Controller
 
         $vendorIds = $query->distinct()->pluck('vendor_id')->filter()->unique()->toArray();
 
-        // Fallback: any vendor with a hoarding in that city
+
         if (empty($vendorIds)) {
             $vendorIds = DB::table('hoardings')
                 ->select('vendor_id')

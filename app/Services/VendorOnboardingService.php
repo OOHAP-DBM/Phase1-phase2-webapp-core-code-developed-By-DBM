@@ -24,43 +24,67 @@ class VendorOnboardingService
     public function saveBusinessInfo(User $user, array $data): VendorProfile
     {
         return DB::transaction(function () use ($user, $data) {
-            // Create vendor profile if not exists
-            $profile = $user->vendorProfile ?: new VendorProfile(['user_id' => $user->id]);
 
-            // Save business and bank info
+            // Create vendor profile if it does not exist
+            $profile = $user->vendorProfile;
+
+            if (!$profile) {
+                $profile = new VendorProfile([
+                    'user_id' => $user->id,
+                    'onboarding_status' => 'draft',
+                    'onboarding_step' => 1,
+                ]);
+            }
+
+            // IMPORTANT:
+            // Do NOT overwrite onboarding_status here.
+            // If registration already auto-approved the vendor,
+            // keep "approved".
+            //
+            // Existing statuses such as:
+            // approved
+            // pending_approval
+            // rejected
+            // suspended
+            // draft
+            // will remain unchanged.
+
             $profile->fill([
-                'gstin' => $data['gstin'],
-                'company_type' => $data['business_type'],
-                'company_name' => $data['business_name'],
-                'registered_address' => $data['registered_address'],
-                'city' => $data['city'],
-                'state' => $data['state'],
-                'pincode' => $data['pincode'],
-                'bank_name' => $data['bank_name'],
-                'account_number' => $data['account_number'],
-                'ifsc_code' => $data['ifsc_code'],
-                'account_holder_name' => $data['account_holder_name'],
-                'pan' => $data['pan_number'],
-                'onboarding_status' => 'draft',
+                'gstin' => $data['gstin'] ?? null,
+                'company_type' => $data['business_type'] ?? null,
+                'company_name' => $data['business_name'] ?? null,
+                'registered_address' => $data['registered_address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'state' => $data['state'] ?? null,
+                'pincode' => $data['pincode'] ?? null,
+
+                'bank_name' => $data['bank_name'] ?? null,
+                'account_number' => $data['account_number'] ?? null,
+                'ifsc_code' => $data['ifsc_code'] ?? null,
+                'account_holder_name' => $data['account_holder_name'] ?? null,
+
+                'pan' => $data['pan_number'] ?? null,
             ]);
+
             // Handle PAN document upload
-            if (isset($data['pan_card_document']) && $data['pan_card_document'] instanceof UploadedFile) {
-                $profile->pan_card_document = $this->storePanDocument($user, $data['pan_card_document']);
+            if (
+                isset($data['pan_card_document']) &&
+                $data['pan_card_document'] instanceof UploadedFile
+            ) {
+                $profile->pan_card_document = $this->storePanDocument(
+                    $user,
+                    $data['pan_card_document']
+                );
             }
 
             // Onboarding step tracking
-            $profile->onboarding_step = max(1, (int) $profile->onboarding_step);
-            $profile->save();
-         
+            $profile->onboarding_step = max(
+                1,
+                (int) $profile->onboarding_step
+            );
 
-            // Save/Update KYC if needed (optional, extend as needed)
-            // if (isset($data['pan_number'])) {
-            //     VendorKyc::updateOrCreate(
-            //         ['vendor_id' => $profile->id],
-            //         ['pan_number' => $data['pan_number']]
-            //     );
-            // }
-            // dd($data);
+            $profile->save();
+
             return $profile;
         });
     }

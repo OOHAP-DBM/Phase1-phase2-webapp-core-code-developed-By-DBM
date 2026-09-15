@@ -12,9 +12,7 @@
 
 @section('content')
 <div class="bg-[#F7F7F7] w-full min-h-screen">
-
-    
-    {{-- Tabs --}}
+ 
     <div class="flex items-center justify-between mb-4">
         <div class="flex gap-6 text-sm font-medium border-b border-[#E5E7EB]">
             <a href="{{ route('admin.vendors.index',['status'=>'pending_approval']) }}"
@@ -42,8 +40,7 @@
             + Add Vendor
         </a>
     </div>
-
-    {{-- Search + Actions --}}
+ 
     <div class="bg-white rounded-xl p-4 flex items-center gap-4 mb-4">
 
         <form method="GET" action="{{ route('admin.vendors.index', ['status' => $status]) }}" class="flex-1 flex items-center gap-2" id="vendor-search-form">
@@ -90,7 +87,7 @@
             </button>
         @endif
     </div>
-{{-- TABLE --}}
+ 
 @if($status === 'pending_approval')
     @include('admin.vendors.tab.pending')
 @elseif($status === 'approved')

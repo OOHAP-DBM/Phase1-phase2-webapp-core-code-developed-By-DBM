@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 use App\Services\ProfileService;
+use App\Notifications\ProfileUpdatedNotification;
+
 
 class ProfileController extends Controller
 {
@@ -33,20 +36,107 @@ class ProfileController extends Controller
         $user = Auth::user();
         $vendor = $user->vendorProfile;
 
-        // Convert document paths to URLs
         if ($vendor) {
-            $vendor->pan_card_document = $vendor->pan_card_document
-                ? asset('storage/' . $vendor->pan_card_document)
-                : null;
-
-            $vendor->aadhaar_card_document = $vendor->aadhaar_card_document
-                ? asset('storage/' . $vendor->aadhaar_card_document)
-                : null;
+            $vendor->pan_card_document = $this->toPublicUrl($vendor->pan_card_document);
+            $vendor->aadhaar_card_document = $this->toPublicUrl($vendor->aadhaar_card_document);
         }
 
         return response()->json([
             'user' => $profileService->response($user),
             'vendor' => $vendor,
+        ]);
+    }
+
+    protected function toPublicUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        $publicDisk = Storage::disk('public');
+        if ($publicDisk->exists($path)) {
+            return $publicDisk->url($path);
+        }
+
+        $privateDisk = Storage::disk('private');
+        if ($privateDisk->exists($path)) {
+            $publicDisk->put($path, $privateDisk->get($path));
+            return $publicDisk->url($path);
+        }
+
+        return null;
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/profile/vendor/completion",
+     *     tags={"Vendor Profile"},
+     *     summary="Get vendor profile completion percentage",
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Vendor profile completion status",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="type", type="string", example="vendor"),
+     *                 @OA\Property(property="percentage", type="integer", example=80),
+     *                 @OA\Property(property="filled", type="integer", example=12),
+     *                 @OA\Property(property="total", type="integer", example=15),
+     *                 @OA\Property(property="is_complete", type="boolean", example=false)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Unauthenticated")
+     * )
+     */
+    public function completion(Request $request)
+    {
+        $user = $request->user();
+        if ($user->active_role !== 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+        $vendor = $user->vendorProfile;
+
+        $fields = [
+            $user->name,
+            $user->email,
+            $user->phone,
+            $user->avatar,
+            $vendor?->gstin,
+            $vendor?->company_name,
+            $vendor?->company_type,
+            $vendor?->pan,
+            $vendor?->bank_name,
+            $vendor?->account_holder_name,
+            $vendor?->account_number,
+            $vendor?->ifsc_code,
+            $vendor?->registered_address,
+            $vendor?->pincode,
+            $vendor?->city,
+            $vendor?->state,
+        ];
+
+        $filled = count(array_filter($fields, fn ($value) => !is_null($value) && $value !== ''));
+        $total = count($fields);
+        $percentage = $total > 0 ? round(($filled / $total) * 100) : 0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'type' => 'vendor',
+                'percentage' => $percentage,
+                'filled' => $filled,
+                'total' => $total,
+                'is_complete' => $percentage >= 100,
+            ],
         ]);
     }
 
@@ -119,19 +209,19 @@ class ProfileController extends Controller
                 $user->fill($data);
                 $user->save();
                 // ✅ Push
-                send(
-                    $user,
-                    'Profile Updated',
-                    'Your personal profile details have been updated successfully.',
-                    ['type' => 'profile_update']
-                );
+                // send(
+                //     $user,
+                //     'Profile Updated',
+                //     'Your personal profile details have been updated successfully.',
+                //     ['type' => 'profile_update']
+                // );
                 break;
             case 'business':
                 $data = $request->only(['company_name', 'company_type', 'gstin', 'pan', 'pan_file']);
                 $vendor->fill(array_filter($data));
                 if ($request->hasFile('pan_file')) {
                     $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
-                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
+                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'public');
                 }
                 $vendor->save();
                 break;
@@ -139,7 +229,7 @@ class ProfileController extends Controller
                 $data = $request->only(['pan', 'pan_file']);
                 if ($request->hasFile('pan_file')) {
                     $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
-                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
+                    $vendor->pan_card_document = $request->file('pan_file')->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'public');
                 }
                 $vendor->fill(array_filter($data));
                 $vendor->save();
@@ -179,6 +269,42 @@ class ProfileController extends Controller
             default:
                 abort(400, 'Invalid profile section');
         }
+         $user->notify(new ProfileUpdatedNotification());
+
+    if (!empty($user->fcm_token)) {
+
+        $sent = send(
+            $user->fcm_token,
+            'Profile Updated',
+            'Your profile details have been updated successfully.',
+            [
+                'type' => 'profile_update',
+                'user_id' => (string) $user->id,
+                'section' => (string) $section,
+            ]
+        );
+
+        if (!$sent) {
+
+            Log::warning(
+                "FCM notification failed for user ID {$user->id}",
+                [
+                    'section' => $section
+                ]
+            );
+        }
+
+    } else {
+
+        Log::warning(
+            "User has no FCM token",
+            [
+                'user_id' => $user->id,
+                'section' => $section
+            ]
+        );
+    }
+
 
         return response()->json(['message' => 'Profile updated successfully']);
     }
@@ -193,14 +319,14 @@ class ProfileController extends Controller
         ]);
 
         if ($request->hasFile('avatar')) {
-            if ($user->avatar && Storage::disk('private')->exists($user->avatar)) {
-                Storage::disk('private')->delete($user->avatar);
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
             }
 
             $bucket = str_pad((int)($user->id / 100), 2, '0', STR_PAD_LEFT);
             $avatarPath = "media/users/avatars/{$bucket}/{$user->id}";
             $fileName = time() . '.' . $request->file('avatar')->getClientOriginalExtension();
-            $storedPath = Storage::disk('private')->putFileAs($avatarPath, $request->file('avatar'), $fileName);
+            $storedPath = Storage::disk('public')->putFileAs($avatarPath, $request->file('avatar'), $fileName);
 
             if ($storedPath) {
                 $data['avatar'] = $storedPath;
@@ -212,8 +338,8 @@ class ProfileController extends Controller
 
     protected function removeAvatar(User $user)
     {
-        if ($user->avatar && Storage::disk('private')->exists($user->avatar)) {
-            Storage::disk('private')->delete($user->avatar);
+        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+            Storage::disk('public')->delete($user->avatar);
         }
         $user->update(['avatar' => null]);
     }
@@ -235,12 +361,12 @@ class ProfileController extends Controller
 
         if ($request->hasFile('pan_file')) {
             if ($vendor->pan_card_document) {
-                Storage::disk('private')->delete($vendor->pan_card_document);
+                Storage::disk('public')->delete($vendor->pan_card_document);
             }
 
             $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
             $vendor->pan_card_document = $request->file('pan_file')
-                ->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'private');
+                ->store("media/vendors/documents/{$bucket}/{$vendor->id}", 'public');
         }
 
         $vendor->update([
@@ -258,13 +384,13 @@ class ProfileController extends Controller
         ]);
 
         if ($vendor->pan_card_document) {
-            Storage::disk('private')->delete($vendor->pan_card_document);
+            Storage::disk('public')->delete($vendor->pan_card_document);
         }
 
         $bucket = str_pad((int)($vendor->id / 100), 2, '0', STR_PAD_LEFT);
         $path = $request->file('pan_file')->store(
             "media/vendors/documents/{$bucket}/{$vendor->id}",
-            'private'
+            'public'
         );
 
         $vendor->update([

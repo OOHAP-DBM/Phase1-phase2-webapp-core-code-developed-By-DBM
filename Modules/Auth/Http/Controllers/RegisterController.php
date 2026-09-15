@@ -19,7 +19,7 @@ use App\Notifications\UserWelcomeNotification;
 use App\Notifications\VendorApprovalPendingNotification;
 use Twilio\Rest\Client;
 use Illuminate\Support\Facades\Log;
-
+use App\Models\ActivityLog;
 
 
 
@@ -44,6 +44,15 @@ class RegisterController extends Controller
 
         // Store role in session
         session(['signup_role' => $request->role]);
+
+        ActivityLog::record(
+            action: 'registration_role_selected',
+            description: 'User selected registration role: ' . $request->role,
+            module: 'registration',
+            metadata: [
+                'role' => $request->role,
+            ]
+        );
 
         return redirect()->route('register.form');
     }
@@ -93,12 +102,13 @@ class RegisterController extends Controller
         $role = session('signup_role');
 
         DB::beginTransaction();
+        $password = $request->password;
 
         try {
             \Log::debug('RegisterController@register: request', $request->all());
             // Create user
             $user = User::create([
-                'name'  => $request->name,
+                'name' => $request->name,
 
                 'email' => $request->email,
                 'email_verified_at' => $request->email_verified ? now() : null,
@@ -110,6 +120,15 @@ class RegisterController extends Controller
 
                 'status' => 'active',
             ]);
+            app(\App\Services\LoggingService::class)->created(
+                $user,
+                'registration',
+                'User account created through registration.',
+                [
+                    'registration_method' => 'web',
+                    'registration_role' => $role,
+                ]
+            );
 
 
             // Assign role
@@ -120,8 +139,8 @@ class RegisterController extends Controller
                 if (!empty($user->email)) {
                     Mail::to($user->email)->send(
                         $role === 'vendor'
-                            ? new \Modules\Mail\VendorWelcomeMail($user)
-                            : new \Modules\Mail\CustomerWelcomeMail($user)
+                        ? new \Modules\Mail\VendorWelcomeMail($user, $password)
+                        : new \Modules\Mail\CustomerWelcomeMail($user)
                     );
                 }
             } catch (\Throwable $e) {
@@ -132,7 +151,7 @@ class RegisterController extends Controller
             }
             if ($role === 'customer') {
 
-                // 🔔 Admin notification
+
                 $admins = User::role('admin')->get();
                 foreach ($admins as $admin) {
                     $admin->notify(
@@ -140,7 +159,7 @@ class RegisterController extends Controller
                     );
                 }
 
-                // 🔔 Customer dashboard notification
+
                 $user->notify(
                     new UserWelcomeNotification('customer')
                 );
@@ -148,47 +167,193 @@ class RegisterController extends Controller
 
 
             // Handle vendor-specific setup
-          // Handle vendor-specific setup
+            // Handle vendor-specific setup
             if ($role === 'vendor') {
 
-                // 1️⃣ Create vendor profile
-                VendorProfile::create([
+                \Log::info('========== VENDOR AUTO APPROVAL DEBUG START ==========', [
                     'user_id' => $user->id,
-                    'onboarding_status' => 'draft',
-                    'onboarding_step' => 1,
+                    'user_email' => $user->email,
+                    'role' => $role,
                 ]);
-                // 3️⃣ Notify admins (approval pending)
-                $admins = User::role('admin')->get();
-                foreach ($admins as $admin) {
-                    $admin->notify(
+
+                $autoApproval = \App\Models\Setting::get(
+                    'auto_vendor_approval',
+                    false
+                );
+
+                \Log::info('VENDOR AUTO APPROVAL: Setting fetched', [
+                    'setting_key' => 'auto_vendor_approval',
+                    'value' => $autoApproval,
+                    'type' => gettype($autoApproval),
+                    'boolean_value' => (bool) $autoApproval,
+                ]);
+
+
+                $onboardingStatus = $autoApproval
+                    ? 'approved'
+                    : 'pending_approval';
+
+                \Log::info('VENDOR AUTO APPROVAL: Status determined', [
+                    'auto_approval' => (bool) $autoApproval,
+                    'onboarding_status' => $onboardingStatus,
+                ]);
+
+
+
+
+
+                $vendorProfile = VendorProfile::create([
+
+                    'user_id' => $user->id,
+
+                    'onboarding_status' => $onboardingStatus,
+
+                    'onboarding_step' => 1,
+
+                    'inventory_setup_completed' => false,
+
+                    'approved_at' => $autoApproval ? now() : null,
+
+                    // NULL because this is system auto-approval.
+                    // Admin approval will set auth()->id().
+                    'approved_by' => null,
+                ]);
+
+                app(\App\Services\LoggingService::class)->statusChanged(
+                    $vendorProfile,
+                    'pending_approval',
+                    'approved',
+                    'vendor_approval',
+                    'Vendor account automatically approved by system.'
+                );
+
+                $activity = ActivityLog::record(
+                    action: 'vendor_registered',
+                    description: 'New vendor account registered successfully.',
+                    module: 'registration',
+                    subject: $user,
+                    metadata: [
+                        'vendor_profile_id' => $vendorProfile->id,
+                        'onboarding_status' => $onboardingStatus,
+                        'auto_approved' => (bool) $autoApproval,
+                    ]
+                );
+
+                \Log::info('VENDOR ACTIVITY LOG RESULT', [
+                    'result' => $activity?->id,
+                    'user_id' => $user->id,
+                    'vendor_profile_id' => $vendorProfile->id,
+                ]);
+
+
+
+
+                $savedProfile = VendorProfile::find($vendorProfile->id);
+
+                \Log::info('VENDOR AUTO APPROVAL: Database verification', [
+                    'profile_id' => $savedProfile?->id,
+                    'db_status' => $savedProfile?->onboarding_status,
+                    'db_approved_at' => $savedProfile?->approved_at,
+                    'db_approved_by' => $savedProfile?->approved_by,
+                ]);
+
+                if (!$autoApproval) {
+
+                    \Log::warning('VENDOR AUTO APPROVAL: Auto approval is OFF', [
+                        'user_id' => $user->id,
+                        'profile_id' => $vendorProfile->id,
+                    ]);
+
+                    ActivityLog::record(
+                        action: 'vendor_pending_approval',
+                        description: 'Vendor registration submitted and is pending admin approval.',
+                        module: 'vendor_approval',
+                        subject: $vendorProfile,
+                        metadata: [
+                            'user_id' => $user->id,
+                            'status' => 'pending_approval',
+                        ]
+                    );
+
+
+                    $admins = User::role('admin')->get();
+
+                    \Log::info('VENDOR AUTO APPROVAL: Sending pending notification', [
+                        'admin_count' => $admins->count(),
+                        'vendor_id' => $user->id,
+                    ]);
+
+                    foreach ($admins as $admin) {
+                        $admin->notify(
+                            new VendorApprovalPendingNotification($user)
+                        );
+                    }
+
+
+                    $user->notify(
                         new VendorApprovalPendingNotification($user)
+                    );
+
+                } else {
+
+                    \Log::info('VENDOR AUTO APPROVAL: Vendor AUTO APPROVED', [
+                        'user_id' => $user->id,
+                        'profile_id' => $vendorProfile->id,
+                        'status' => $vendorProfile->onboarding_status,
+                    ]);
+
+                    ActivityLog::record(
+                        action: 'vendor_auto_approved',
+                        description: 'Vendor account was automatically approved.',
+                        module: 'vendor_approval',
+                        subject: $vendorProfile,
+                        metadata: [
+                            'approved_by' => 'system',
+                            'user_id' => $user->id,
+                        ]
                     );
                 }
 
-                // 4️⃣ Notify vendor
-                $user->notify(
-                    new VendorApprovalPendingNotification($user)
-                );
-
-                // 2️⃣ Commit DB changes FIRST
                 DB::commit();
 
-                
+                \Log::info('VENDOR AUTO APPROVAL: Transaction committed', [
+                    'user_id' => $user->id,
+                    'profile_id' => $vendorProfile->id,
+                    'final_status' => $vendorProfile->fresh()->onboarding_status,
+                ]);
 
-                // 5️⃣ Clear session role
+                \Log::info('========== VENDOR AUTO APPROVAL DEBUG END ==========');
+
+
                 session()->forget('signup_role');
 
-                // 6️⃣ Login vendor
+
                 Auth::login($user);
+                ActivityLog::record(
+                    action: 'customer_registered',
+                    description: 'New customer account registered successfully.',
+                    module: 'registration',
+                    subject: $user,
+                    metadata: [
+                        'registration_method' => 'web',
+                    ]
+                );
+
                 session(['merge_guest_data' => true]);
 
-                // 7️⃣ Redirect to onboarding
-                return redirect()->route('vendor.onboarding.contact-details')
-                    ->with('success', 'Account created! Please complete your vendor onboarding.');
+
+                return redirect()
+                    ->route('vendor.onboarding.contact-details')
+                    ->with(
+                        'success',
+                        $autoApproval
+                        ? 'Account created successfully! Your vendor account has been approved.'
+                        : 'Account created! Please wait for admin approval.'
+                    );
             }
 
 
-            // Customer flow
+            // Customer flow    
             DB::commit();
 
             // Clear session role
@@ -233,7 +398,7 @@ class RegisterController extends Controller
     public function sendEmailOtp(Request $request)
     {
         $request->validate(['email' => 'required|email']);
-         if (User::where('email', $request->email)->exists()) {
+        if (User::where('email', $request->email)->exists()) {
             return response()->json([
                 'success' => false,
                 'message' => 'This email is already registered. Please login instead.',
@@ -243,7 +408,7 @@ class RegisterController extends Controller
         // $otp = 1234;
 
         Cache::put('email_otp_' . $request->email, $otp, now()->addMinutes(1));
-        // Send OTP via email using a Mailable class
+
         try {
             Mail::to($request->email)->send(new \Modules\Mail\OtpVerificationMail($otp));
         } catch (\Exception $e) {
@@ -266,6 +431,10 @@ class RegisterController extends Controller
 
     public function sendPhoneOtp(Request $request)
     {
+        $request->validate([
+            'phone' => 'required|digits:10'
+        ]);
+
         if (User::where('phone', $request->phone)->exists()) {
             return response()->json([
                 'success' => false,
@@ -273,42 +442,70 @@ class RegisterController extends Controller
             ], 422);
         }
 
-        $request->validate([
-            'phone' => 'required|digits:10'
-        ]);
-
         $otp = rand(1000, 9999);
 
-        Cache::put('phone_otp_' . $request->phone, $otp, now()->addMinutes(1));
+        // Store OTP for 1 minute
+        Cache::put(
+            'phone_otp_' . $request->phone,
+            $otp,
+            now()->addMinutes(1)
+        );
 
         try {
-            $twilio = new Client(
+
+            // Check Twilio credentials
+            if (
+                empty(env('TWILIO_SID')) ||
+                empty(env('TWILIO_TOKEN')) ||
+                empty(env('TWILIO_FROM'))
+            ) {
+
+                Log::warning('Twilio credentials not found.');
+
+
+                Log::info("Phone OTP for {$request->phone}: {$otp}");
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'OTP generated successfully (Development Mode).',
+
+                ]);
+            }
+
+            $client = new Client(
                 env('TWILIO_SID'),
                 env('TWILIO_TOKEN')
             );
 
-            $twilio->messages->create(
-                '+91' . $request->phone, // Indian number
+            $client->messages->create(
+                '+91' . $request->phone,
                 [
                     'from' => env('TWILIO_FROM'),
-                    'body' => "Your OOHAPP OTP is {$otp}. Valid for 1 minutes."
+                    'body' => "Your OOHAPP OTP is {$otp}. Valid for 1 minute."
                 ]
             );
 
             return response()->json([
                 'success' => true,
-                'message' => 'OTP sent successfully'
+                'message' => 'OTP sent successfully.'
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('Twilio OTP failed', [
-                'error' => $e->getMessage()
+
+            Log::error('Twilio OTP Error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
 
+            // Fallback for development
+            Log::info("Phone OTP for {$request->phone}: {$otp}");
+
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to send OTP. Please try again.'
-            ], 500);
+                'success' => true,
+                'message' => 'Twilio failed. OTP generated for development.',
+                'otp' => $otp // Remove this in production
+            ]);
         }
     }
 
@@ -333,6 +530,15 @@ class RegisterController extends Controller
             return response()->json(['message' => 'Vendor profile not found'], 404);
         }
         $profile->update(['onboarding_step' => 2]);
+        ActivityLog::record(
+            action: 'contact_verification_skipped',
+            description: 'Vendor skipped contact verification during onboarding.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => 2,
+            ]
+        );
         return response()->json(['message' => 'Contact verification skipped']);
     }
 }

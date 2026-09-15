@@ -61,7 +61,7 @@
                                 if (($item->is_recommended ?? 0) == 1) {
                                     $isRecommended = true;
                                 } else {
-                                    $isRecommended = ($item->view_count ?? 0) >= 50 || 
+                                    $isRecommended = ($item->view_count ?? 0) >= 50 ||
                                                     ($item->expected_eyeball ?? 0) >= 5000;
                                 }
                             @endphp
@@ -168,6 +168,7 @@
                                         id="cart-btn-{{ $item->id }}"
                                         class="cart-btn flex-1 border border-[#c7c7c7] py-2 text-sm rounded cursor-pointer"
                                         data-id="{{ $item->id }}"
+                                        data-vendor-id="{{ $item->vendor_id }}"
                                         data-in-cart="{{ in_array($item->id, $cartHoardingIds) ? '1' : '0' }}"
                                         data-auth="{{ auth()->check() ? '1' : '0' }}"
                                         onclick="event.preventDefault(); event.stopPropagation(); toggleCart(this, {{ $item->id }})"

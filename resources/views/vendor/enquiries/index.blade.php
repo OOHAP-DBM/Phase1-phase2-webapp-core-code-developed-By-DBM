@@ -26,7 +26,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
-                    <h4 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mb-0">Enquiry & Offers</h4>
+                    <h4 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mb-0">Enquiries</h4>
                 </div>
                 <p class="text-sm text-gray-700 mt-2">Check all your sent offers to customers, track and manage them here.</p>
             </div>

@@ -5,7 +5,7 @@
 @section('content')
 @include('components.customer.navbar')
 <div class="bg-white">
-    <div class="max-w-[1460px] mx-auto px-6 py-6">
+    <div class="max-w-[1460px] mx-auto px-6 py-6  pb-6 pt-10 md:pt-25 scroll-mt-32 md:scroll-mt-48">
 
         {{-- HEADER --}}
 <div class="bg-white pt-5 mb-6
@@ -33,7 +33,7 @@
         {{-- TITLE --}}
         <div>
             <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                My Wishlist 
+                My Wishlist
 
                 @if($wishlist->total() > 0)
                     <span class="text-xs font-semibold px-2 py-0.5
@@ -123,7 +123,6 @@
                                 </svg>
                             </button>
                         </div>
-
                         {{-- CONTENT --}}
                         <div class="p-4 flex flex-col flex-grow">
 
@@ -182,7 +181,7 @@
                             </div>
 
 
-       
+
 
                         @if($hoarding->today_availability_status === 'available')
                             <p class="text-xs text-gray-500 font-semibold mb-1">

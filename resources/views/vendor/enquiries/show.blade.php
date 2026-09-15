@@ -51,6 +51,7 @@
                             <div>Business Name : <span>{{ $enquiry->customer->company_name ?? 'N/A' }}</span></div>
                             <div>GSTIN : <span>{{ $enquiry->customer->gstin ?? 'N/A' }}</span></div>
                             <div>Mobile : <span>{{ $enquiry->contact_number ?? $enquiry->customer->phone ?? '' }}</span></div>
+                              <div>Email : <span>{{ $enquiry->email ?? $enquiry->customer->email ?? '' }}</span></div>
                             <div>Address : <span>{{ $enquiry->customer->address ?? $enquiry->customer->billing_address ?? $enquiry->customer->billing_city ?? $enquiry->customer->billing_state ?? '' }}</span></div>
                         </div>
                     </div>
@@ -75,10 +76,10 @@
                         <span class="text-lg font-semibold leading-none">{{ $enquiry->created_at->format('d') }}</span>
                         <span class="text-sm text-gray-500">{{ $enquiry->created_at->format('M y') }}</span>
                         <br>
-                        <!-- <a href="{{ route('vendor.offers.create', ['enquiry_id' => $enquiry->id]) }}"
+                        {{-- <a href="{{ route('vendor.offers.create', ['enquiry_id' => $enquiry->id]) }}"
                             class="btn-color mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer">
                             Create Offer
-                        </a> -->
+                        </a> --}}
                     </div>
                 </div>
             </div>
@@ -105,7 +106,7 @@
                         'DOOH' => 'Selected Digital Screens for the offer',
                         'DIGITAL-DOOH' => 'Selected Digital Screens for the offer',
                         'HOARDINGS' => 'Selected hoardings for the offer',
-                    ]; 
+                    ];
                 @endphp
                 @foreach($groups as $type => $items)
                     <div class="mb-8">

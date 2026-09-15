@@ -12,13 +12,13 @@ use Illuminate\Http\Request;
 
 /**
  * PROMPT 104: Hoarding Availability API for Frontend Calendar
- * 
+ *
  * Controller for availability calendar endpoints
  * Returns date availability status for calendar heatmap UI
  */
 class HoardingAvailabilityController extends Controller
-      
-   
+
+
 {
     protected HoardingAvailabilityService $availabilityService;
 
@@ -29,21 +29,21 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Get availability calendar for a hoarding
-     * 
+     *
      * GET /api/v1/hoardings/availability/{hoarding}/calendar
-     * 
+     *
      * Query Parameters:
      * - start_date (required): YYYY-MM-DD
      * - end_date (required): YYYY-MM-DD
      * - include_details (optional): true/false, default false
-     * 
+     *
      * Response Statuses:
      * - available: No conflicts, can be booked
      * - booked: Has confirmed booking or POS booking
      * - blocked: Maintenance block active
      * - hold: Active payment hold
      * - partial: Multiple statuses on same date
-     * 
+     *
      * @param GetAvailabilityCalendarRequest $request
      * @param Hoarding $hoarding
      * @return JsonResponse
@@ -103,9 +103,9 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Get availability summary (counts only)
-     * 
+     *
      * GET /api/v1/hoardings/availability/{hoarding}/summary
-     * 
+     *
      * @param GetAvailabilityCalendarRequest $request
      * @param Hoarding $hoarding
      * @return JsonResponse
@@ -168,9 +168,9 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Get month calendar (optimized for monthly view)
-     * 
+     *
      * GET /api/v1/hoardings/{hoarding}/availability/month/{year}/{month}
-     * 
+     *
      * @param Request $request
      * @param Hoarding $hoarding
      * @param int $year
@@ -218,14 +218,14 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Check availability for specific dates (batch check)
-     * 
+     *
      * POST /api/v1/hoardings/{hoarding}/availability/check-dates
-     * 
+     *
      * Body:
      * {
      *   "dates": ["2025-12-20", "2025-12-21", "2025-12-22"]
      * }
-     * 
+     *
      * @param CheckMultipleDatesRequest $request
      * @param Hoarding $hoarding
      * @return JsonResponse
@@ -271,14 +271,14 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Get next N available dates
-     * 
+     *
      * GET /api/v1/hoardings/availability/{hoarding}/next-available
-     * 
+     *
      * Query Parameters:
      * - count (optional): Number of dates to find, default 10
      * - start_from (optional): Start date, default today
      * - max_search_days (optional): Max days to search, default 365
-     * 
+     *
      * @param Request $request
      * @param Hoarding $hoarding
      * @return JsonResponse
@@ -322,16 +322,16 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Get availability heatmap data (for visualization)
-     * 
+     *
      * GET /api/v1/hoardings/availability/{hoarding}/heatmap
-     * 
+     *
      * Returns color-coded data for calendar heatmap:
      * - available: green (#22c55e)
      * - booked: red (#ef4444)
      * - blocked: gray (#6b7280)
      * - hold: yellow (#eab308)
      * - partial: orange (#f97316)
-     * 
+     *
      * @param GetAvailabilityCalendarRequest $request
      * @param Hoarding $hoarding
      * @return JsonResponse
@@ -431,12 +431,12 @@ class HoardingAvailabilityController extends Controller
 
     /**
      * Get quick status check (lightweight, single date)
-     * 
+     *
      * GET /hoardings/{hoarding}/availability/quick-check
-     * 
+     *
      * Query Parameters:
      * - date (required): YYYY-MM-DD
-     * 
+     *
      * @param Request $request
      * @param Hoarding $hoarding
      * @return JsonResponse

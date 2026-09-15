@@ -25,6 +25,7 @@ class CartController extends Controller
             $items = $hoardings->map(function($h) use ($cartService) {
                 $item = (object) [
                     'hoarding_id'   => $h->id,
+                    'vendor_id'     => $h->vendor_id,
                     'title'         => $h->title,
                     'slug'          => $h->slug,
                     'city'          => $h->city,
@@ -75,6 +76,7 @@ class CartController extends Controller
 
         $data = $request->validate([
             'hoarding_id'    => 'required|integer',
+            'vendor_id'      => 'required|integer',
             'package_id'     => 'nullable|integer',
             'package_source' => 'nullable|string|in:ooh_package,dooh_package,slot',
         ]);
@@ -82,6 +84,7 @@ class CartController extends Controller
         return response()->json(
             $cartService->add(
                 $data['hoarding_id'],
+                $data['vendor_id'],
                 $data['package_id'] ?? null,
                 $data['package_source'] ?? null
             )
@@ -109,8 +112,53 @@ class CartController extends Controller
 
         return response()->json([
             'status'  => 'removed',
-            'in_cart' => false,          
+            'in_cart' => false,
             'message' => 'Item removed from cart',
+        ]);
+    }
+
+    /* =====================================================
+     | REMOVE MULTIPLE FROM CART
+     ===================================================== */
+    public function removeMultiple(Request $request, CartService $cartService)
+    {
+        if (!auth()->check()) {
+            return response()->json([
+                'status'  => 'login_required',
+                'message' => 'Please login to remove items from cart',
+            ], 401);
+        }
+
+        $data = $request->validate([
+            'hoarding_ids' => 'required|array',
+            'hoarding_ids.*' => 'integer',
+        ]);
+
+        $result = $cartService->removeMultiple($data['hoarding_ids']);
+
+        return response()->json([
+            'status'  => $result['status'],
+            'message' => $result['message'],
+        ]);
+    }
+
+    /* =====================================================
+     | CLEAR CART
+     ===================================================== */
+    public function clear(Request $request, CartService $cartService)
+    {
+        if (!auth()->check()) {
+            return response()->json([
+                'status'  => 'login_required',
+                'message' => 'Please login to clear cart',
+            ], 401);
+        }
+
+        $result = $cartService->removeMultiple('all');
+
+        return response()->json([
+            'status'  => $result['status'],
+            'message' => $result['message'],
         ]);
     }
     public function selectPackage(Request $request)
@@ -127,7 +175,7 @@ class CartController extends Controller
         ->update([
             'package_id'    => $request->package_id,
             'package_label' => $request->package_label,
-            'updated_at'    => now(), 
+            'updated_at'    => now(),
         ]);
 
         return response()->json([

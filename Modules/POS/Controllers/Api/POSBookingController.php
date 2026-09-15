@@ -1965,7 +1965,5 @@ class POSBookingController extends Controller
             ]);
         }
     }
-
-
-   
 }
+

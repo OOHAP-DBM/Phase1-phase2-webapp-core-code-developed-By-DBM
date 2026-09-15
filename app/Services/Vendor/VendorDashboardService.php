@@ -56,7 +56,7 @@ class VendorDashboardService
             ->withCount('bookings')
             ->orderBy('bookings_count', 'desc')
             ->take($limit)
-            ->get()
+            ->get(5)
             ->map(fn($h) => [
                 'id'       => $h->id,
                 'title'    => $h->title,

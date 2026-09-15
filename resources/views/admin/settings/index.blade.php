@@ -227,8 +227,9 @@
         <div class="btn-group">
             <form action="{{ route('admin.settings.clear-cache') }}" method="POST" class="d-inline">
                 @csrf
-                <button type="submit" class="btn btn-outline-primary">
-                    <i class="bi bi-arrow-clockwise"></i> Clear Cache
+               <button type="submit" class="btn btn-primary save-btn">
+                    <i class="bi bi-arrow-clockwise" style="color: white;"></i>
+                    Clear Cache
                 </button>
             </form>
         </div>
@@ -268,7 +269,7 @@
     {{-- <ul class="nav nav-tabs settings-tabs" role="tablist">
         @foreach($groups as $groupKey => $groupLabel)
         <li class="nav-item" role="presentation">
-            <a class="nav-link {{ $activeGroup === $groupKey ? 'active' : '' }}" 
+            <a class="nav-link {{ $activeGroup === $groupKey ? 'active' : '' }}"
                href="{{ route('admin.settings.index', ['group' => $groupKey]) }}">
                 @switch($groupKey)
                     @case('general')
@@ -427,6 +428,11 @@
                                 <div class="sms-field-row">
                                     <label class="form-label" for="sms_msg91_base_url">API URL</label>
                                     <input type="text" class="form-control setting-input" id="sms_msg91_base_url" name="settings[sms_msg91_base_url]" value="{{ $settingValue('sms_msg91_base_url', 'https://api.msg91.com/api/v2/sendsms') }}">
+                                </div>
+                                <div class="sms-field-row">
+                                    <label class="form-label" for="sms_msg91_template_id">Template / Flow ID</label>
+                                    <input type="text" class="form-control setting-input" id="sms_msg91_template_id" name="settings[sms_msg91_template_id]" value="{{ $settingValue('sms_msg91_template_id', '') }}">
+                                    <small class="text-muted">Optional MSG91 template or flow ID to send templated messages.</small>
                                 </div>
                             </div>
 

@@ -348,6 +348,13 @@ class SettingsSeeder extends Seeder
                 'description' => 'MSG91 API base URL',
                 'group' => 'sms',
             ],
+            [
+                'key' => 'sms_msg91_template_id',
+                'value' => '',
+                'type' => 'string',
+                'description' => 'MSG91 template / flow id (optional)',
+                'group' => 'sms',
+            ],
 
             [
                 'key' => 'sms_clickatell_active',
