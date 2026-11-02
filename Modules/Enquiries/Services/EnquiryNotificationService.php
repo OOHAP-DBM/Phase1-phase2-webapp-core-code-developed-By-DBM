@@ -4,15 +4,27 @@ namespace Modules\Enquiries\Services;
 
 use App\Models\User;
 use App\Services\NotificationEmailService;
-
+use App\Models\ActivityLog;
 class EnquiryNotificationService
 {
     public function __construct(
         protected NotificationEmailService $notificationEmailService
-    ) {}
+    ) {
+    }
 
     public function notifyAll($enquiry, array $vendorGroups): void
     {
+        ActivityLog::record(
+            'created',
+            'Customer submitted a new enquiry.',
+            'Enquiries',
+            $enquiry,
+            [
+                'enquiry_id' => $enquiry->id,
+                'enquiry_number' => $enquiry->id,
+                'customer_id' => $enquiry->customer_id ?? auth()->id(),
+            ]
+        );
         // 1. NOTIFY CUSTOMER (EMAIL + IN-APP NOTIFICATION)
         $customer = $enquiry->customer;
         if ($customer) {
@@ -22,17 +34,17 @@ class EnquiryNotificationService
             try {
                 $this->notificationEmailService->send(
                     $customer,
-                    new \Modules\Mail\CustomerEnquiryConfirmationMail($enquiry, $customer)
+                    new \Modules\Mail\CustomerEnquiryConfirmationMail($enquiry)
                 );
                 \Log::info('Customer enquiry confirmation email sent', [
                     'customer_id' => $customer->id,
-                    'enquiry_id'  => $enquiry->id
+                    'enquiry_id' => $enquiry->id
                 ]);
             } catch (\Exception $e) {
                 \Log::error('Failed to send customer enquiry confirmation email', [
                     'customer_id' => $customer->id,
-                    'enquiry_id'  => $enquiry->id,
-                    'error'       => $e->getMessage()
+                    'enquiry_id' => $enquiry->id,
+                    'error' => $e->getMessage()
                 ]);
             }
 
@@ -51,7 +63,7 @@ class EnquiryNotificationService
                 'Enquiry Submitted Successfully',
                 'Your enquiry has been submitted. Vendors will contact you soon.',
                 [
-                    'type'       => 'customer_enquiry',
+                    'type' => 'customer_enquiry',
                     'enquiry_id' => $enquiry->id
                 ]
             );
@@ -69,14 +81,14 @@ class EnquiryNotificationService
                         new \Modules\Mail\VendorEnquiryNotificationMail($enquiry, $vendor, collect($items))
                     );
                     \Log::info('Vendor enquiry notification email sent', [
-                        'vendor_id'  => $vendor->id,
+                        'vendor_id' => $vendor->id,
                         'enquiry_id' => $enquiry->id
                     ]);
                 } catch (\Exception $e) {
                     \Log::error('Failed to send vendor enquiry notification email', [
-                        'vendor_id'  => $vendor->id,
+                        'vendor_id' => $vendor->id,
                         'enquiry_id' => $enquiry->id,
-                        'error'      => $e->getMessage()
+                        'error' => $e->getMessage()
                     ]);
                 }
 
@@ -95,7 +107,7 @@ class EnquiryNotificationService
                     'New Enquiry Received - OOHAPP',
                     'You have received a new enquiry. Please check the app for details.',
                     [
-                        'type'       => 'vendor_enquiry',
+                        'type' => 'vendor_enquiry',
                         'enquiry_id' => $enquiry->id
                     ]
                 );

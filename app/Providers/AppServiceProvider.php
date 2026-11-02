@@ -202,25 +202,24 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiting(): void
     {
-        // Default API rate limiter - 60 requests per minute
+         
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
-        // Authentication endpoints - Strict limits to prevent brute force
+        
         RateLimiter::for('auth', function (Request $request) {
-            // 5 login attempts per minute per IP
+            
             return Limit::perMinute(5)
                 ->by($request->ip())
-                ->response(function (Request $request, array $headers) {
+                ->response(function (Request $request, array $headers)  {
                     return response()->json([
                         'message' => 'Too many login attempts. Please try again later.',
                         'retry_after' => $headers['Retry-After'] ?? 60
                     ], 429);
                 });
         });
-
-        // OTP endpoints - Very strict to prevent SMS/Email flooding
+ 
         RateLimiter::for('otp', function (Request $request) {
             // 3 OTP requests per 5 minutes per phone/email
             $identifier = $request->input('phone') ?? $request->input('email') ?? $request->ip();

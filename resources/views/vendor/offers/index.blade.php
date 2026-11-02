@@ -1,282 +1,133 @@
 @extends('layouts.vendor')
 
+@section('title', 'Manage Offers')
 @section('content')
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-tag"></i> My Offers</h2>
-        <a href="{{ route('vendor.offers.create') }}" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Create New Offer
-        </a>
-    </div>
+<div class="px-6 py-6 bg-gray-50">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
 
-    <!-- Filters -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form id="filterForm" class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Status</label>
-                    <select class="form-select" name="status" id="statusFilter">
-                        <option value="">All Statuses</option>
-                        <option value="draft">Draft</option>
-                        <option value="sent">Sent</option>
-                        <option value="accepted">Accepted</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="expired">Expired</option>
-                    </select>
+        <div class="px-6 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-bold text-gray-800">Manage Offers</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Check all your sent offers to customers, you can track and manage them here</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <input type="text" id="offer-search" placeholder="Search customer by name, email, mobile number…"
+                        class="w-72 pl-9 pr-3 border border-gray-300 rounded text-xs h-[38px]">
+                    <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"/><path d="M21 21l-3.5-3.5"/>
+                    </svg>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">From Date</label>
-                    <input type="date" class="form-control" name="from_date" id="fromDate">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">To Date</label>
-                    <input type="date" class="form-control" name="to_date" id="toDate">
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="button" class="btn btn-primary me-2" id="applyFilters">
-                        <i class="bi bi-funnel"></i> Apply
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" id="clearFilters">
-                        <i class="bi bi-x-circle"></i> Clear
-                    </button>
-                </div>
-            </form>
+                <button id="filter-toggle-btn" type="button" class="border border-gray-300 bg-white px-4 h-[38px] text-xs font-semibold rounded hover:bg-gray-50">Filter</button>
+            </div>
         </div>
-    </div>
 
-    <!-- Offers Table -->
-    <div class="card">
-        <div class="card-body">
-            <div id="loadingSpinner" class="text-center py-5 d-none">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+        {{-- Filter panel --}}
+        <div id="filter-panel" class="hidden border-b bg-gray-50 px-6 py-4">
+            <div class="flex flex-col sm:flex-row gap-8">
+                <div>
+                    <p class="text-xs font-bold text-gray-700 mb-2">Offer Status</p>
+                    <div class="flex flex-wrap gap-4 text-xs">
+                        <label class="flex items-center gap-1.5"><input type="checkbox" class="offer-status-cb" value="all" checked> All</label>
+                        <label class="flex items-center gap-1.5"><input type="checkbox" class="offer-status-cb" value="sent"> Pending</label>
+                        <label class="flex items-center gap-1.5"><input type="checkbox" class="offer-status-cb" value="accepted"> Accepted</label>
+                        <label class="flex items-center gap-1.5"><input type="checkbox" class="offer-status-cb" value="rejected"> Rejected</label>
+                        <label class="flex items-center gap-1.5"><input type="checkbox" class="offer-status-cb" value="expired"> Expired</label>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-xs font-bold text-gray-700 mb-2">Created Offer by date</p>
+                    <div class="flex flex-wrap items-center gap-4 text-xs mb-2">
+                        <label class="flex items-center gap-1.5"><input type="radio" name="date_preset" value="all" checked> All</label>
+                        <label class="flex items-center gap-1.5"><input type="radio" name="date_preset" value="last_week"> Last week</label>
+                        <label class="flex items-center gap-1.5"><input type="radio" name="date_preset" value="last_month"> Last month</label>
+                        <label class="flex items-center gap-1.5"><input type="radio" name="date_preset" value="last_year"> Last year</label>
+                        <label class="flex items-center gap-1.5"><input type="radio" name="date_preset" value="custom"> Custom Date</label>
+                    </div>
+                    <div id="custom-date-range" class="hidden flex items-center gap-2">
+                        <input type="date" id="filter-from-date" class="border border-gray-300 rounded text-xs h-[34px] px-2">
+                        <span class="text-gray-400 text-xs">to</span>
+                        <input type="date" id="filter-to-date" class="border border-gray-300 rounded text-xs h-[34px] px-2">
+                    </div>
                 </div>
             </div>
-
-            <div id="offersTable">
-                <!-- Will be populated by JavaScript -->
+            <div class="flex justify-end gap-2 mt-4">
+                <button id="filter-reset-btn" type="button" class="px-4 py-2 text-xs font-semibold text-gray-600 border border-gray-300 rounded hover:bg-white">Reset</button>
+                <button id="filter-apply-btn" type="button" class="px-5 py-2 text-xs font-bold text-white bg-[#2E5B42] rounded hover:bg-opacity-90">Apply Filter</button>
             </div>
+        </div>
+
+        <div class="px-6 pt-4">
+            <p class="text-sm font-semibold text-gray-700">All Created Offers (<span id="offers-total-count">{{ $offers->total() }}</span>)</p>
+        </div>
+
+        <div class="overflow-x-auto px-2 pb-2">
+            <table class="min-w-[1000px] w-full text-xs text-left">
+                <thead class="text-gray-500 border-b">
+                    <tr>
+                        {{-- <th class="px-3 py-3 font-semibold w-8"><input type="checkbox" id="select-all-offers"></th> --}}
+                        <th class="px-3 py-3 font-semibold">Sn</th>
+                        <th class="px-3 py-3 font-semibold">Enquiry ID</th>
+                        <th class="px-3 py-3 font-semibold">Offer ID</th>
+                        <th class="px-3 py-3 font-semibold">Customer Name</th>
+                        <th class="px-3 py-3 font-semibold"># of Hoardings</th>
+                        <th class="px-3 py-3 font-semibold"># of Locations</th>
+                        <th class="px-3 py-3 font-semibold">Offer Valid Till</th>
+                        <th class="px-3 py-3 font-semibold">Offer Status</th>
+                        <th class="px-3 py-3 font-semibold">Action</th>
+                        <th class="px-3 py-3 font-semibold w-8"></th>
+                    </tr>
+                </thead>
+                <tbody id="offers-table-body">
+                    @include('vendor.offers.partials.table', ['offers' => $offers])
+                </tbody>
+            </table>
+        </div>
+
+        <div id="offers-pagination" class="px-6 py-4 border-t">
+            @include('vendor.offers.partials.pagination', ['offers' => $offers])
+        </div>
+
+        <button type="button" onclick="toggleArchivedSection()" class="w-full text-left px-6 py-3 border-t bg-gray-50 text-sm text-gray-600 flex items-center justify-between">
+            <span><span id="archived-count">{{ $archivedCount }}</span> Offer{{ $archivedCount === 1 ? '' : 's' }} are Archived</span>
+            <svg id="archived-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div id="archived-section" class="hidden px-6 pb-4"></div>
+    </div>
+</div>
+
+{{-- Row "..." menu --}}
+<div id="row-menu" class="hidden fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg text-xs w-44">
+    <button class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2" onclick="rowMenuAction('view')">👁 View Offer Details</button>
+    <button class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2" onclick="rowMenuAction('modify')">✏️ Modify Offer</button>
+    <button class="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2 text-red-600" onclick="rowMenuAction('archive')">🗄 Archive this Offer</button>
+</div>
+
+{{-- Archive confirm --}}
+<div id="archiveConfirmModal" class="fixed inset-0 z-[90] hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" onclick="closeArchiveConfirm()"></div>
+    <div class="relative bg-white rounded-xl shadow-2xl w-[92vw] max-w-md p-6">
+        <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 mb-4">
+            <p class="text-sm font-bold text-amber-800">⚠ Are you sure you want to archive this offer?</p>
+        </div>
+        <p class="text-xs text-gray-500 mb-1">Archiving this offer moves it out of your active list.</p>
+        <p class="text-xs text-red-500 mb-6">This can be restored later from the archived section.</p>
+        <div class="flex justify-end gap-3">
+            <button type="button" onclick="closeArchiveConfirm()" class="px-5 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 rounded-md">Cancel</button>
+            <button type="button" id="archive-confirm-yes-btn" class="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-md hover:bg-red-700">Proceed to Archive</button>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const offersTable = document.getElementById('offersTable');
-
-    function getStatusBadge(status) {
-        const badges = {
-            'draft': '<span class="badge bg-secondary">Draft</span>',
-            'sent': '<span class="badge bg-info">Sent</span>',
-            'accepted': '<span class="badge bg-success">Accepted</span>',
-            'rejected': '<span class="badge bg-danger">Rejected</span>',
-            'expired': '<span class="badge bg-warning text-dark">Expired</span>'
-        };
-        return badges[status] || status;
-    }
-
-    function formatPrice(price, priceType) {
-        const formatted = `₹${parseFloat(price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-        const types = {
-            'total': ' (Total)',
-            'monthly': '/month',
-            'weekly': '/week',
-            'daily': '/day'
-        };
-        return formatted + (types[priceType] || '');
-    }
-
-    function getValidUntilDisplay(validUntil) {
-        if (!validUntil) {
-            return '<span class="text-muted">No expiry</span>';
-        }
-        
-        const date = new Date(validUntil);
-        const now = new Date();
-        const diff = date - now;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        
-        if (days < 0) {
-            return '<span class="text-danger">Expired</span>';
-        } else if (days === 0) {
-            return '<span class="text-danger">Today</span>';
-        } else if (days <= 3) {
-            return `<span class="text-danger">${days} days</span>`;
-        } else if (days <= 7) {
-            return `<span class="text-warning">${days} days</span>`;
-        } else {
-            return `<span class="text-muted">${days} days</span>`;
-        }
-    }
-
-    function getActions(offer) {
-        let actions = `<div class="btn-group">`;
-        
-        actions += `<a href="/vendor/offers/${offer.id}" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-eye"></i> View
-        </a>`;
-        
-        if (offer.status === 'draft') {
-            actions += `<a href="/vendor/offers/${offer.id}/edit" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-pencil"></i> Edit
-            </a>`;
-            actions += `<button class="btn btn-sm btn-success" onclick="sendOffer(${offer.id})">
-                <i class="bi bi-send"></i> Send
-            </button>`;
-            actions += `<button class="btn btn-sm btn-outline-danger" onclick="deleteOffer(${offer.id})">
-                <i class="bi bi-trash"></i>
-            </button>`;
-        }
-        
-        actions += `</div>`;
-        return actions;
-    }
-
-    async function loadOffers() {
-        loadingSpinner.classList.remove('d-none');
-        offersTable.innerHTML = '';
-
-        try {
-            const params = new URLSearchParams();
-            const status = document.getElementById('statusFilter').value;
-            const fromDate = document.getElementById('fromDate').value;
-            const toDate = document.getElementById('toDate').value;
-
-            if (status) params.append('status', status);
-            if (fromDate) params.append('from_date', fromDate);
-            if (toDate) params.append('to_date', toDate);
-
-            const response = await fetch(`/api/v1/offers?${params.toString()}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('api_token')}`,
-                    'Accept': 'application/json'
-                }
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Failed to load offers');
-            }
-
-            if (result.data.length === 0) {
-                offersTable.innerHTML = `
-                    <div class="text-center py-5 text-muted">
-                        <i class="bi bi-inbox display-1"></i>
-                        <p class="mt-3">No offers found</p>
-                    </div>`;
-                return;
-            }
-
-            let tableHTML = `
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Enquiry/Hoarding</th>
-                                <th>Version</th>
-                                <th>Customer</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Valid Until</th>
-                                <th>Created</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
-            result.data.forEach(offer => {
-                const hoardingTitle = offer.price_snapshot?.hoarding_title || 'N/A';
-                const customerName = offer.price_snapshot?.customer_name || 'N/A';
-                const createdDate = new Date(offer.created_at).toLocaleDateString('en-IN');
-                
-                tableHTML += `
-                    <tr>
-                        <td>
-                            <strong>Enquiry #${offer.enquiry_id}</strong><br>
-                            <small class="text-muted">${hoardingTitle}</small>
-                        </td>
-                        <td><span class="badge bg-primary">v${offer.version}</span></td>
-                        <td>${customerName}</td>
-                        <td><strong>${formatPrice(offer.price, offer.price_type)}</strong></td>
-                        <td>${getStatusBadge(offer.status)}</td>
-                        <td>${getValidUntilDisplay(offer.valid_until)}</td>
-                        <td>${createdDate}</td>
-                        <td>${getActions(offer)}</td>
-                    </tr>`;
-            });
-
-            tableHTML += `</tbody></table></div>`;
-            offersTable.innerHTML = tableHTML;
-
-        } catch (error) {
-            offersTable.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle"></i> ${error.message}
-                </div>`;
-        } finally {
-            loadingSpinner.classList.add('d-none');
-        }
-    }
-
-    window.sendOffer = async function(offerId) {
-        if (!confirm('Send this offer to the customer?')) return;
-
-        try {
-            const response = await fetch(`/api/v1/offers/${offerId}/send`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('api_token')}`,
-                    'Accept': 'application/json'
-                }
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Failed to send offer');
-            }
-
-            alert('Offer sent successfully!');
-            loadOffers();
-        } catch (error) {
-            alert(error.message);
-        }
-    };
-
-    window.deleteOffer = async function(offerId) {
-        if (!confirm('Delete this draft offer?')) return;
-
-        try {
-            const response = await fetch(`/api/v1/offers/${offerId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('api_token')}`,
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                const result = await response.json();
-                throw new Error(result.message || 'Failed to delete offer');
-            }
-
-            alert('Offer deleted successfully!');
-            loadOffers();
-        } catch (error) {
-            alert(error.message);
-        }
-    };
-
-    document.getElementById('applyFilters').addEventListener('click', loadOffers);
-    document.getElementById('clearFilters').addEventListener('click', function() {
-        document.getElementById('filterForm').reset();
-        loadOffers();
-    });
-
-    // Initial load
-    loadOffers();
-});
+window.OFFERS_INDEX_URL = '{{ route('vendor.offers.index') }}';
+window.OFFERS_ARCHIVE_URL_TEMPLATE = '{{ route('vendor.offers.archive', ['offer' => '__ID__']) }}';
+window.OFFERS_UNARCHIVE_URL_TEMPLATE = '{{ route('vendor.offers.unarchive', ['offer' => '__ID__']) }}';
+window.OFFERS_REMIND_URL_TEMPLATE = '{{ route('vendor.offers.remind', ['offer' => '__ID__']) }}';
+window.OFFERS_CREATE_URL = '{{ route('vendor.offers.create') }}';
+window.CSRF_TOKEN = '{{ csrf_token() }}';
+window.OFFERS_ACCEPT_CUSTOMER_MOD_URL_TEMPLATE = '{{ route('vendor.offers.accept-customer-modification', ['offer' => '__ID__']) }}';
 </script>
+<script src="{{ asset('js/offers-index.js') }}"></script>
 @endsection
+

@@ -22,8 +22,8 @@ use Illuminate\Support\Facades\Redirect;
 use Modules\Auth\Http\Requests\VerifyOTPRequest;
 use Modules\Auth\Services\OTPService;
 use Illuminate\Http\JsonResponse;
+use App\Models\ActivityLog;
 class OnboardingController extends Controller
-
 {
     /**
      * Ensure vendor has profile
@@ -45,31 +45,94 @@ class OnboardingController extends Controller
      * @param VendorOnboardingService $service
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function submitVendorInfo(VendorBusinessInfoRequest $request, VendorOnboardingService $service)
-    {
+    public function submitVendorInfo(
+        VendorBusinessInfoRequest $request,
+        VendorOnboardingService $service
+    ) {
         $user = Auth::user();
+
         DB::beginTransaction();
+
         try {
+            \Log::info('VENDOR BUSINESS INFO: START', [
+                'user_id' => $user->id,
+                'profile_id' => $user->vendorProfile?->id,
+                'current_status' => $user->vendorProfile?->onboarding_status,
+                'onboarding_step' => $user->vendorProfile?->onboarding_step,
+            ]);
+
             // Save business info, bank info, and PAN upload
-            $profile = $service->saveBusinessInfo($user, $request->validated());
-            // Onboarding step tracking
-            $profile->onboarding_step = max(1, (int) $profile->onboarding_step) + 1;
-            $profile->onboarding_status = 'pending_approval';
+            $profile = $service->saveBusinessInfo(
+                $user,
+                $request->validated()
+            );
+
+            \Log::info('VENDOR BUSINESS INFO: SERVICE SAVED', [
+                'profile_id' => $profile->id,
+                'status_after_service' => $profile->onboarding_status,
+                'step_after_service' => $profile->onboarding_step,
+            ]);
+
+            // Only update onboarding progress.
+            // DO NOT overwrite approval status.
+            $profile->onboarding_step = max(
+                1,
+                (int) $profile->onboarding_step
+            ) + 1;
+
             $profile->save();
+
+            \Log::info('VENDOR BUSINESS INFO: PROFILE UPDATED', [
+                'profile_id' => $profile->id,
+                'final_status' => $profile->onboarding_status,
+                'final_step' => $profile->onboarding_step,
+            ]);
+
             // Assign vendor role if not already assigned
             if (!$user->hasRole('vendor')) {
                 $user->assignRole('vendor');
-                // Set active_role to vendor (but keep previous role)
                 $user->active_role = 'vendor';
+                $user->save();
             }
-            $user->save();
+
             DB::commit();
-            // Redirect to vendor dashboard with flash message
-            // Session::flash('success', 'Your vendor request is pending. Once approved by admin, you will be notified.');
+            ActivityLog::record(
+                action: 'business_info_submitted',
+                description: 'Vendor business information submitted successfully.',
+                module: 'vendor_onboarding',
+                subject: $profile,
+                metadata: [
+                    'onboarding_step' => $profile->onboarding_step,
+                    'onboarding_status' => $profile->onboarding_status,
+                ]
+            );
+
+
+            \Log::info('VENDOR BUSINESS INFO: TRANSACTION COMMITTED', [
+                'user_id' => $user->id,
+                'profile_id' => $profile->id,
+                'final_status' => $profile->onboarding_status,
+            ]);
+
             return Redirect::route('vendor.dashboard');
-        } catch (\Exception $e) {
+
+        } catch (\Throwable $e) {
+
             DB::rollBack();
-            return \Redirect::back()->withErrors(['error' => 'Failed to save vendor info. Please try again.']);
+
+            \Log::error('VENDOR BUSINESS INFO: FAILED', [
+                'user_id' => $user->id,
+                'profile_id' => $user->vendorProfile?->id,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return Redirect::back()->withErrors([
+                'error' => 'Failed to save vendor info. Please try again.'
+            ]);
         }
     }
     /**
@@ -78,7 +141,7 @@ class OnboardingController extends Controller
     protected function getVendorProfile()
     {
         $user = Auth::user();
-        
+
         if (!$user->vendorProfile) {
             return VendorProfile::create([
                 'user_id' => $user->id,
@@ -122,7 +185,19 @@ class OnboardingController extends Controller
             'onboarding_step' => max($profile->onboarding_step, 2),
         ]);
 
-        return redirect()->route('vendor.onboarding.business-info')
+        // Activity Log
+        ActivityLog::record(
+            action: 'company_details_updated',
+            description: 'Vendor company details saved successfully.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => $profile->onboarding_step,
+            ]
+        );
+
+        return redirect()
+            ->route('vendor.onboarding.business-info')
             ->with('success', 'Company details saved successfully!');
     }
     public function showContactDetails()
@@ -193,7 +268,19 @@ class OnboardingController extends Controller
             'onboarding_step' => max($profile->onboarding_step, 3),
         ]);
 
-        return redirect()->route('vendor.onboarding.kyc-documents')
+        // Activity Log
+        ActivityLog::record(
+            action: 'business_info_updated',
+            description: 'Vendor business information saved successfully.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => $profile->onboarding_step,
+            ]
+        );
+
+        return redirect()
+            ->route('vendor.onboarding.kyc-documents')
             ->with('success', 'Business information saved successfully!');
     }
 
@@ -220,43 +307,73 @@ class OnboardingController extends Controller
 
         // Upload each document
         if ($request->hasFile('pan_card_document')) {
-            $documents['pan_card_document'] = $request->file('pan_card_document')->store('vendor/kyc', 'public');
+            $documents['pan_card_document'] = $request
+                ->file('pan_card_document')
+                ->store('vendor/kyc', 'public');
         }
 
         if ($request->hasFile('gst_certificate')) {
-            $documents['gst_certificate'] = $request->file('gst_certificate')->store('vendor/kyc', 'public');
+            $documents['gst_certificate'] = $request
+                ->file('gst_certificate')
+                ->store('vendor/kyc', 'public');
         }
 
         if ($request->hasFile('company_registration_certificate')) {
-            $documents['company_registration_certificate'] = $request->file('company_registration_certificate')->store('vendor/kyc', 'public');
+            $documents['company_registration_certificate'] = $request
+                ->file('company_registration_certificate')
+                ->store('vendor/kyc', 'public');
         }
 
         if ($request->hasFile('address_proof')) {
-            $documents['address_proof'] = $request->file('address_proof')->store('vendor/kyc', 'public');
+            $documents['address_proof'] = $request
+                ->file('address_proof')
+                ->store('vendor/kyc', 'public');
         }
 
         if ($request->hasFile('cancelled_cheque')) {
-            $documents['cancelled_cheque'] = $request->file('cancelled_cheque')->store('vendor/kyc', 'public');
+            $documents['cancelled_cheque'] = $request
+                ->file('cancelled_cheque')
+                ->store('vendor/kyc', 'public');
         }
 
         if ($request->hasFile('owner_id_proof')) {
-            $documents['owner_id_proof'] = $request->file('owner_id_proof')->store('vendor/kyc', 'public');
+            $documents['owner_id_proof'] = $request
+                ->file('owner_id_proof')
+                ->store('vendor/kyc', 'public');
         }
 
         // Handle other documents (multiple files)
         if ($request->hasFile('other_documents')) {
             $otherDocs = [];
+
             foreach ($request->file('other_documents') as $file) {
                 $otherDocs[] = $file->store('vendor/kyc', 'public');
             }
+
             $documents['other_documents'] = json_encode($otherDocs);
         }
 
-        $documents['onboarding_step'] = max($profile->onboarding_step, 4);
+        $documents['onboarding_step'] = max(
+            $profile->onboarding_step,
+            4
+        );
 
         $profile->update($documents);
 
-        return redirect()->route('vendor.onboarding.bank-details')
+        // Activity Log
+        ActivityLog::record(
+            action: 'kyc_documents_uploaded',
+            description: 'Vendor KYC documents uploaded successfully.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => $profile->onboarding_step,
+                'documents_uploaded' => array_keys($documents),
+            ]
+        );
+
+        return redirect()
+            ->route('vendor.onboarding.bank-details')
             ->with('success', 'Documents uploaded successfully!');
     }
 
@@ -289,7 +406,19 @@ class OnboardingController extends Controller
             'onboarding_step' => max($profile->onboarding_step, 5),
         ]);
 
-        return redirect()->route('vendor.onboarding.terms-agreement')
+        // Activity Log
+        ActivityLog::record(
+            action: 'bank_details_updated',
+            description: 'Vendor bank details saved successfully.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => $profile->onboarding_step,
+            ]
+        );
+
+        return redirect()
+            ->route('vendor.onboarding.terms-agreement')
             ->with('success', 'Bank details saved successfully!');
     }
 
@@ -324,8 +453,25 @@ class OnboardingController extends Controller
         // Mark onboarding as complete and submit for approval
         $profile->completeOnboarding();
 
-        return redirect()->route('vendor.onboarding.waiting')
-            ->with('success', 'Onboarding completed! Your application is under review.');
+        // Activity Log
+        ActivityLog::record(
+            action: 'terms_accepted',
+            description: 'Vendor accepted the Terms & Conditions and commission agreement.',
+            module: 'vendor_onboarding',
+            subject: $profile,
+            metadata: [
+                'onboarding_step' => $profile->onboarding_step,
+                'terms_accepted' => true,
+                'commission_agreement_accepted' => true,
+            ]
+        );
+
+        return redirect()
+            ->route('vendor.landing')
+            ->with(
+                'success',
+                'Onboarding completed! Let’s get your inventory started.'
+            );
     }
 
     /**
@@ -373,17 +519,18 @@ class OnboardingController extends Controller
         }
 
         // Email already used by another account
-        if (User::where('email', $request->email)
-            ->where('id', '!=', $user->id)
-            ->exists()) {
+        if (
+            User::where('email', $request->email)
+                ->where('id', '!=', $user->id)
+                ->exists()
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email already in use'
             ], 422);
         }
 
-        $otp = 1234; // demo
-
+        $otp = 1234;
         Cache::put(
             'vendor_email_otp_' . $user->id,
             ['otp' => $otp, 'email' => $request->email],
@@ -391,10 +538,15 @@ class OnboardingController extends Controller
         );
 
         Mail::to($request->email)->send(new \Modules\Mail\OtpVerificationMail($otp));
-
+        ActivityLog::record(
+            'otp_sent',
+            'Vendor email verification OTP sent',
+            'vendor_verification',
+            $user
+        );
         return response()->json(['success' => true]);
     }
-    //only  for verifcation vendor @aviral
+
     public function verifyEmailOtp(Request $request)
     {
         $request->validate([
@@ -419,16 +571,21 @@ class OnboardingController extends Controller
             'email_verified_at' => now()
         ]);
 
-        // Increase onboarding_step if needed
+
         $profile = $user->vendorProfile;
         if ($profile && $profile->onboarding_step < 2) {
             $profile->onboarding_step = 2;
             $profile->save();
         }
-
+        ActivityLog::record(
+            'email_verified',
+            'Vendor email address verified successfully',
+            'vendor_verification',
+            $user
+        );
         return response()->json(['success' => true]);
     }
-    //only  for verifcation vendor @aviral
+
     public function sendPhoneOtp(Request $request)
     {
         $request->validate([
@@ -446,9 +603,11 @@ class OnboardingController extends Controller
         }
 
         // Phone already used by another account
-        if (User::where('phone', $request->phone)
-            ->where('id', '!=', $user->id)
-            ->exists()) {
+        if (
+            User::where('phone', $request->phone)
+                ->where('id', '!=', $user->id)
+                ->exists()
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Mobile number already in use'
@@ -460,12 +619,17 @@ class OnboardingController extends Controller
         Cache::put(
             'vendor_phone_otp_' . $user->id,
             [
-                'otp'   => $otp,
+                'otp' => $otp,
                 'phone' => $request->phone
             ],
             now()->addMinutes(10)
         );
-
+        ActivityLog::record(
+            'otp_sent',
+            'Vendor phone verification OTP sent',
+            'vendor_verification',
+            $user
+        );
         // TODO: SMS Gateway integration
         // sendSms($request->phone, "Your OTP is $otp");
 
@@ -495,6 +659,12 @@ class OnboardingController extends Controller
             'phone' => $cached['phone'],
             'phone_verified_at' => now()
         ]);
+        ActivityLog::record(
+            'phone_verified',
+            'Vendor phone number verified successfully',
+            'vendor_verification',
+            $user
+        );
 
         // Increase onboarding_step if needed
         $profile = $user->vendorProfile;
@@ -516,7 +686,12 @@ class OnboardingController extends Controller
                 'onboarding_step' => 2
             ]);
         }
-
+        ActivityLog::record(
+            'verification_skipped',
+            'Vendor skipped contact verification',
+            'vendor_onboarding',
+            $user
+        );
         return response()->json(['success' => true]);
     }
 
@@ -526,12 +701,17 @@ class OnboardingController extends Controller
             $user = auth()->user();
             $profile = $this->getVendorProfile();
 
-            // Update step to 3 and set status to pending so they can access dashboard
+            // Only update onboarding progress.
+            // IMPORTANT: Do not overwrite onboarding approval status.
             $profile->update([
                 'onboarding_step' => 3,
-                'onboarding_status' => 'pending_approval'
             ]);
-
+            ActivityLog::record(
+                'business_info_skipped',
+                'Vendor skipped business information during onboarding',
+                'vendor_onboarding',
+                $user
+            );
             // Optional: Ensure role is assigned even if they skip
             if (!$user->hasRole('vendor')) {
                 $user->assignRole('vendor');
@@ -543,8 +723,12 @@ class OnboardingController extends Controller
                 'success' => true,
                 'redirect' => route('vendor.dashboard')
             ]);
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 

@@ -21,19 +21,26 @@ class VendorEnquiryNotification extends Notification
 
     public function via($notifiable)
     {
-        return ['database']; 
+        return ['database'];
     }
 
     /* ================= DATABASE ================= */
 
     public function toDatabase($notifiable)
     {
-        return [
+$hoardingTitles = collect($this->items)
+        ->map(function ($item) {
+            return $item->hoarding->title ?? null;
+        })
+        ->filter()
+        ->implode(', ');        return [
+
             'enquiry_id'   => $this->enquiry->id,
             'item_count'   => count($this->items),
-           'customer_name' => optional($this->enquiry->customer)->name 
+           'customer_name' => optional($this->enquiry->customer)->name
                  ?? ($this->enquiry->meta['customer_name'] ?? 'New Client'),
-            'message'      => 'New enquiry raised for ' . count($this->items) . ' hoarding.',
+        'message'       => 'New enquiry received for ' . $hoardingTitles . '.',
+            //'message'      => 'New enquiry raised for ' . count($this->items) . ' hoarding.',
             'action_url'   => route('vendor.enquiries.show', $this->enquiry->id),
             'role'         => 'vendor',
         ];

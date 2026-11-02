@@ -19,9 +19,9 @@ class EnquiryController extends Controller
     {
         $vendorId = auth()->id();
         $enquiry = \Modules\Enquiries\Models\Enquiry::with([
-            'items' => function($q) {
+            'items' => function ($q) {
                 $q->with([
-                    'hoarding' => function($q) {
+                    'hoarding' => function ($q) {
                         $q->with('media');
                     },
                     'package'
@@ -31,7 +31,7 @@ class EnquiryController extends Controller
         ])->findOrFail($id);
 
         // Only allow if vendor has access to this enquiry
-        $hasAccess = $enquiry->items->contains(function($item) use ($vendorId) {
+        $hasAccess = $enquiry->items->contains(function ($item) use ($vendorId) {
             return $item->hoarding?->vendor_id === $vendorId;
         });
         if (!$hasAccess) {
@@ -41,12 +41,12 @@ class EnquiryController extends Controller
         $enquiry = $this->enrichEnquiryData($enquiry);
         return view('vendor.enquiries.show', compact('enquiry'));
     }
-    
+
     public function index(Request $request)
     {
         // Fetch all enquiries for vendor's hoardings with search and filter
         $vendorId = auth()->id();
-        $query = Enquiry::whereHas('items.hoarding', function($q) use ($vendorId) {
+        $query = Enquiry::whereHas('items.hoarding', function ($q) use ($vendorId) {
             $q->where('vendor_id', $vendorId);
         });
 
@@ -68,8 +68,8 @@ class EnquiryController extends Controller
             }
         }
 
-        
-          if ($request->filled('date_filter')) {
+
+        if ($request->filled('date_filter')) {
 
             $now = Carbon::now();
 
@@ -113,9 +113,9 @@ class EnquiryController extends Controller
 
         $enquiries = $query
             ->with([
-                'items' => function($q) {
+                'items' => function ($q) {
                     $q->with([
-                        'hoarding' => function($q) {
+                        'hoarding' => function ($q) {
                             $q->with('media');
                         },
                         'package'
@@ -128,7 +128,7 @@ class EnquiryController extends Controller
             ->appends($request->all());
 
         // Process each enquiry with additional data
-        $enquiries->getCollection()->transform(function($enquiry) {
+        $enquiries->getCollection()->transform(function ($enquiry) {
             return $this->enrichEnquiryData($enquiry);
         });
 
@@ -141,15 +141,15 @@ class EnquiryController extends Controller
     private function enrichEnquiryData($enquiry)
     {
         $vendorId = auth()->id();
-        
+
         // SECURITY: Filter items to show only current vendor's hoardings
-        $enquiry->items = $enquiry->items->filter(function($item) use ($vendorId) {
+        $enquiry->items = $enquiry->items->filter(function ($item) use ($vendorId) {
             return $item->hoarding?->vendor_id === $vendorId;
         })->values();
-        
+
         // Get locations
         $enquiry->locations = $enquiry->items
-            ->map(function($item) {
+            ->map(function ($item) {
                 return $item->hoarding?->locality;
             })
             ->filter()
@@ -157,19 +157,19 @@ class EnquiryController extends Controller
             ->values();
 
         // Enrich each item with image URL
-        $enquiry->items = $enquiry->items->map(function($item) {
+        $enquiry->items = $enquiry->items->map(function ($item) {
             if ($item->hoarding_type === 'dooh') {
                 // For DOOH: Get image from dooh_screen_media table via hoarding_id
                 $doohMedia = \DB::table('dooh_screen_media')
-                    ->where('dooh_screen_id', function($q) use ($item) {
+                    ->where('dooh_screen_id', function ($q) use ($item) {
                         $q->select('id')
                             ->from('dooh_screens')
                             ->where('hoarding_id', $item->hoarding_id)
                             ->limit(1);
                     })
                     ->where('is_primary', 1)
-                    ->orWhere(function($q) use ($item) {
-                        $q->where('dooh_screen_id', function($q2) use ($item) {
+                    ->orWhere(function ($q) use ($item) {
+                        $q->where('dooh_screen_id', function ($q2) use ($item) {
                             $q2->select('id')
                                 ->from('dooh_screens')
                                 ->where('hoarding_id', $item->hoarding_id)
@@ -179,20 +179,20 @@ class EnquiryController extends Controller
                     ->orderBy('is_primary', 'desc')
                     ->orderBy('sort_order', 'asc')
                     ->first();
-                
+
                 $item->image_url = $doohMedia ? asset('storage/' . $doohMedia->file_path) : null;
             } else {
                 // For OOH: Get image from hoarding_media table
                 $oohMedia = \DB::table('hoarding_media')
                     ->where('hoarding_id', $item->hoarding_id)
                     ->where('is_primary', 1)
-                    ->orWhere(function($q) use ($item) {
+                    ->orWhere(function ($q) use ($item) {
                         $q->where('hoarding_id', $item->hoarding_id);
                     })
                     ->orderBy('is_primary', 'desc')
                     ->orderBy('sort_order', 'asc')
                     ->first();
-                
+
                 $item->image_url = $oohMedia ? asset('storage/' . $oohMedia->file_path) : null;
             }
             $item->package_name = '-';
@@ -228,7 +228,7 @@ class EnquiryController extends Controller
         // Get offer validity information
         $latestOffer = Offer::where('enquiry_id', $enquiry->id)->latest()->first();
         $enquiry->valid_till = $latestOffer?->expires_at ?? $latestOffer?->valid_until;
-        
+
         // Calculate days left
         if ($enquiry->valid_till) {
             $daysLeft = now()->diffInDays($enquiry->valid_till, false);
@@ -248,9 +248,118 @@ class EnquiryController extends Controller
             'cancelled' => ['text' => 'text-red-600', 'bg' => 'bg-red-50'],
             'pending' => ['text' => 'text-yellow-600', 'bg' => 'bg-yellow-50'],
         ];
-        
+
         $enquiry->status_color = $enquiry->status_colors[$enquiry->status] ?? $enquiry->status_colors['draft'];
 
         return $enquiry;
+    }
+
+    public function myDirectEnquiries(Request $request)
+    {
+        $vendorId = auth()->id();
+
+        $query = Enquiry::where('created_by', $vendorId)
+            ->where('source', 'direct');
+
+        // Search by enquiry ID
+        if ($request->filled('search')) {
+            $searchId = preg_replace('/\D/', '', trim($request->search));
+
+            if ($searchId !== '') {
+                $query->where('id', (int) $searchId);
+            }
+        }
+
+        // Date filter
+        if ($request->filled('date_filter')) {
+            $now = Carbon::now();
+
+            switch ($request->date_filter) {
+
+                case 'last_week':
+                    $query->whereBetween('created_at', [
+                        $now->copy()->subWeek()->startOfWeek(),
+                        $now->copy()->subWeek()->endOfWeek(),
+                    ]);
+                    break;
+
+                case 'last_month':
+                    $query->whereBetween('created_at', [
+                        $now->copy()->subMonth()->startOfMonth(),
+                        $now->copy()->subMonth()->endOfMonth(),
+                    ]);
+                    break;
+
+                case 'last_year':
+                    $query->whereBetween('created_at', [
+                        $now->copy()->subYear()->startOfYear(),
+                        $now->copy()->subYear()->endOfYear(),
+                    ]);
+                    break;
+
+                case 'custom':
+                    if (
+                        $request->filled('from_date') &&
+                        $request->filled('to_date')
+                    ) {
+                        $query->whereBetween('created_at', [
+                            Carbon::parse($request->from_date)->startOfDay(),
+                            Carbon::parse($request->to_date)->endOfDay(),
+                        ]);
+                    }
+                    break;
+            }
+        }
+
+        $enquiries = $query
+            ->with([
+                'items' => function ($q) {
+                    $q->with([
+                        'hoarding' => function ($q) {
+                            $q->with('media');
+                        },
+                        'package'
+                    ]);
+                },
+                'customer'
+            ])
+            ->latest()
+            ->paginate(10)
+            ->appends($request->all());
+
+        // Same enrichment used by existing vendor enquiry list
+        $enquiries->getCollection()->transform(function ($enquiry) {
+            return $this->enrichEnquiryData($enquiry);
+        });
+
+        return view('vendor.enquiries.direct-index', compact('enquiries'));
+    }
+
+    public function showDirectEnquiry($id)
+    {
+        $vendorId = auth()->id();
+
+        $enquiry = Enquiry::with([
+            'items' => function ($q) {
+                $q->with([
+                    'hoarding' => function ($q) {
+                        $q->with('media');
+                    },
+                    'package'
+                ]);
+            },
+            'customer'
+        ])
+            ->where('created_by', $vendorId)
+            ->where('source', 'direct')
+            ->findOrFail($id);
+
+        // Existing enrichment logic reuse
+        $enquiry = $this->enrichEnquiryData($enquiry);
+
+        return view(
+            'vendor.enquiries.direct-show',
+            compact('enquiry')
+        );
     }
 }

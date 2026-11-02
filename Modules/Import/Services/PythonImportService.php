@@ -8,21 +8,10 @@ use Modules\Import\Exceptions\ImportApiException;
 
 class PythonImportService
 {
-    /**
-     * Request timeout in seconds
-     */
+
     protected const REQUEST_TIMEOUT = 300;
 
-    /**
-     * Process import by sending files to Python API
-     *
-     * @param string $excelPath Path to the Excel file
-     * @param string $pptPath Path to the PowerPoint file
-     * @param int $vendorId Vendor ID
-     * @param string $mediaType Media type for the import
-     * @return array Structured response array
-     * @throws ImportApiException
-     */
+
     public function processImport(string $excelPath, string $pptPath, int $vendorId, string $mediaType): array
     {
         try {
@@ -98,18 +87,6 @@ class PythonImportService
         }
     }
 
-    /**
-     * Send multipart request to Python API
-     *
-     * @param string $baseUrl
-     * @param string $token
-     * @param string $excelPath
-     * @param string $pptPath
-     * @param int $vendorId
-     * @param string $mediaType
-     * @return Response
-     * @throws ImportApiException
-     */
     protected function sendImportRequest(
         string $baseUrl,
         string $token,
@@ -180,14 +157,6 @@ class PythonImportService
             throw ImportApiException::connectionFailed($e);
         }
     }
-
-    /**
-     * Process the API response
-     *
-     * @param Response $response
-     * @return array
-     * @throws ImportApiException
-     */
     protected function processResponse(Response $response): array
     {
         try {
@@ -199,8 +168,6 @@ class PythonImportService
                     $response->json()
                 );
             }
-
-            // Validate response structure
             if (!isset($data['status'])) {
                 throw ImportApiException::invalidResponse(
                     'Missing "status" in response',
@@ -208,7 +175,6 @@ class PythonImportService
                 );
             }
 
-            // Return structured response
             $rows = [];
             if (isset($data['rows']) && is_array($data['rows'])) {
                 $rows = $data['rows'];
@@ -292,8 +258,8 @@ class PythonImportService
                 'batch_id' => $data['batch_id'] ?? null,
                 'total_rows' => (int) ($data['total_rows'] ?? count($normalizedRows)),
                 'processed_rows' => (int) ($data['processed_rows'] ?? count($normalizedRows)),
-                'valid_rows' => (int) ($data['valid_rows'] ?? count(array_filter($normalizedRows, fn ($row) => ($row['status'] ?? '') === 'valid'))),
-                'invalid_rows' => (int) ($data['invalid_rows'] ?? count(array_filter($normalizedRows, fn ($row) => ($row['status'] ?? '') !== 'valid'))),
+                'valid_rows' => (int) ($data['valid_rows'] ?? count(array_filter($normalizedRows, fn($row) => ($row['status'] ?? '') === 'valid'))),
+                'invalid_rows' => (int) ($data['invalid_rows'] ?? count(array_filter($normalizedRows, fn($row) => ($row['status'] ?? '') !== 'valid'))),
                 'errors' => $data['errors'] ?? [],
                 'images_zip_base64' => $imagesZipBase64,
                 'images_zip_url' => $imagesZipUrl,
@@ -311,12 +277,6 @@ class PythonImportService
         }
     }
 
-    /**
-     * Validate file exists
-     *
-     * @param string $filePath
-     * @throws ImportApiException
-     */
     protected function validateFileExists(string $filePath): void
     {
         if (!file_exists($filePath)) {
@@ -327,13 +287,6 @@ class PythonImportService
             throw ImportApiException::fileNotFound("File is not readable: {$filePath}");
         }
     }
-
-    /**
-     * Get base URL from configuration
-     *
-     * @return string
-     * @throws ImportApiException
-     */
     protected function getBaseUrl(): string
     {
         $baseUrl = config('import.python_url', env('PYTHON_IMPORT_URL', 'http://127.0.0.1:9000'));
@@ -345,23 +298,10 @@ class PythonImportService
         return $baseUrl;
     }
 
-    /**
-     * Get authentication token from configuration
-     *
-     * @return string
-     * @throws ImportApiException
-     */
     protected function getAuthToken(): string
     {
         return (string) config('import.python_token', env('PYTHON_IMPORT_TOKEN', ''));
     }
-
-    /**
-     * Get detailed error information
-     *
-     * @param ImportApiException $exception
-     * @return array
-     */
     public function getErrorDetails(ImportApiException $exception): array
     {
         return [
@@ -372,13 +312,6 @@ class PythonImportService
         ];
     }
 
-    /**
-     * Find the first string value in a nested array tree that matches a predicate.
-     *
-     * @param array $data
-     * @param callable $predicate
-     * @return string|null
-     */
     protected function findFirstStringValue(array $data, callable $predicate): ?string
     {
         foreach ($data as $value) {
@@ -397,13 +330,6 @@ class PythonImportService
         return null;
     }
 
-    /**
-     * Find the first scalar value by matching any key in a nested array tree.
-     *
-     * @param array $data
-     * @param array<int, string> $keys
-     * @return string|null
-     */
     protected function findFirstValueByKeys(array $data, array $keys): ?string
     {
         foreach ($keys as $key) {

@@ -5,12 +5,10 @@ namespace Modules\Quotations\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Quotation;
 use Illuminate\Http\Request;
-
+use App\Models\Offer;
 class QuotationController extends Controller
 {
-    /**
-     * Display a listing of quotations for the customer panel.
-     */
+
     public function index(Request $request)
     {
         // Fetch quotations for the logged-in customer, optionally filter by status
@@ -25,13 +23,24 @@ class QuotationController extends Controller
         return view('customer.quotations.index', compact('quotations'));
     }
 
-    /**
-     * Show a specific quotation.
-     */
+
+    public function create(Request $request)
+    {
+        $offer = Offer::with([
+            'customer',
+            'items',
+            'items.hoarding'
+        ])->findOrFail($request->offer_id);
+
+        return view(
+            'customer.quotations.create',
+            compact('offer')
+        );
+    }
+
     public function show($id)
     {
-        // TODO: Fetch and authorize the quotation
-        // Example: $quotation = Quotation::findOrFail($id);
+
         $quotation = null;
         return view('customer.quotations.show', compact('quotation'));
     }

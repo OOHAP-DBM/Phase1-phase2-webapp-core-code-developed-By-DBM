@@ -58,7 +58,7 @@ class VendorApprovalPendingNotification extends Notification implements ShouldQu
         return (new \Illuminate\Notifications\Messages\MailMessage)
             ->subject($message)
             ->mailer('smtp')
-            ->view('admin.emails.vendor-approval', [   // ✅ CHANGE HERE
+            ->view('admin.emails.vendor-approval', [   
                 'name' => $this->vendorUser->name,
                 'email' => $this->vendorUser->email,
                 'actionUrl' => $actionUrl,

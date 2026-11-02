@@ -251,6 +251,14 @@
                             >
                             Filter
                         </button>
+                        <button
+    type="button"
+    onclick="window.location.href='{{ url('/my/enquiries') }}'"
+    class="px-4 py-2 bg-green-600 text-white text-sm font-medium
+           hover:bg-green-700 cursor-pointer"
+>
+    View More
+</button>
                     </div>
                 </div>
                 <div class="bg-white border border-gray-200 overflow-x-auto">

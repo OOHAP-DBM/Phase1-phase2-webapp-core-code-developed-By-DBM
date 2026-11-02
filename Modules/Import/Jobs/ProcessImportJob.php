@@ -103,6 +103,9 @@ class ProcessImportJob implements ShouldQueue
                 'processed_rows' => $processedRows,
                 'failed_rows' => $failedRows,
             ]);
+            
+
+             
         } catch (Exception $e) {
             $this->import->markAsFailed($e->getMessage());
 

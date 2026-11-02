@@ -18,6 +18,9 @@ Route::middleware(['throttle:register'])->group(function () {
 
 Route::middleware(['throttle:auth'])->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
+
+    // Google API login: accepts a Google id_token from client and returns a Sanctum token
+    Route::post('/google', [\App\Http\Controllers\OAuthController::class, 'apiGoogleLogin']);
 });
 
 // http: //127.0.0.1:8000/api/v1/auth/register/otp/verify
