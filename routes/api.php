@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\RazorpayWebhookController;
@@ -8,7 +9,7 @@ use App\Http\Controllers\Api\Customer\CustomerHomeController;
 use Modules\Enquiries\Controllers\Api\DirectEnquiryApiController;
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\EmailSettingController;
-use App\Http\Controllers\Api\ReviewController ;
+use App\Http\Controllers\Api\ReviewController;
 
 /**
  * OOHAPP API v1 Routes
@@ -22,8 +23,6 @@ use App\Http\Controllers\Api\ReviewController ;
 Route::middleware(['throttle:webhooks'])->group(function () {
     Route::post('/webhooks/razorpay', [RazorpayWebhookController::class, 'handle']);
 });
-
-
 
 // Allow guest access to GET wishlist
 Route::get('v1/wishlist', [ShortlistController::class, 'index']);
@@ -58,7 +57,6 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
             'version' => '1.0.0'
         ]);
     });
-
     Route::middleware(['auth:sanctum', 'role:customer'])->prefix('customer')->group(function () {
         Route::get('/home', [CustomerHomeController::class, 'index']);
     });
@@ -142,11 +140,8 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
 
 });
 Route::middleware(['auth:sanctum', 'throttle:authenticated'])->prefix('account')->group(function () {
-        Route::post('/delete/send-otp', [AccountController::class, 'sendDeleteOtp']);
-        Route::post('/delete/verify-otp', [AccountController::class, 'verifyDeleteOtp']);
-        Route::delete('/delete', [AccountController::class, 'deleteAccount']);
+    Route::post('/delete/send-otp', [AccountController::class, 'sendDeleteOtp']);
+    Route::post('/delete/verify-otp', [AccountController::class, 'verifyDeleteOtp']);
+    Route::delete('/delete', [AccountController::class, 'deleteAccount']);
 });
 // API route for invoice download
-
-
-

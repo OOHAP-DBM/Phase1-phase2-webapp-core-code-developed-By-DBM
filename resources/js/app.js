@@ -1,4 +1,5 @@
 import './bootstrap';
+import './destination-suggestions';
 
 /**
  * Global: Closes vendor sidebar on mobile before navigating back

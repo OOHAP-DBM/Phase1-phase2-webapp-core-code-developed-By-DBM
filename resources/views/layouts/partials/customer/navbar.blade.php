@@ -94,9 +94,30 @@
             </div>
         </div>
 
-        <form action="{{ route('search') }}" method="GET" class="flex md:hidden items-center max-w-[50%] px-1 gap-1">
-            <input type="text" name="location" placeholder="Search..."
-                class="flex-1 w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none">
+        {{-- Mobile Search (Hidden on medium screens) --}}
+        <form action="{{ route('search') }}"
+              method="GET"
+              class="flex md:hidden items-center max-w-[50%] px-1 gap-1">
+            <div class="destination-search-field flex-1 min-w-0">
+                <input
+                    type="text"
+                    name="location"
+                    placeholder="Search..."
+                    value="{{ request('location') }}"
+                    class="flex-1 w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none"
+                    autocomplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="destination-suggestions-customer"
+                    data-destination-search
+                    data-suggestions-url="{{ route('search.destination-suggestions') }}"
+                >
+                <input type="hidden" name="near_me" value="{{ request('near_me') }}" data-near-me>
+                <input type="hidden" name="lat" value="{{ request('lat') }}" data-near-latitude>
+                <input type="hidden" name="lng" value="{{ request('lng') }}" data-near-longitude>
+                <div class="destination-suggestions destination-suggestions-mobile" id="destination-suggestions-customer" role="listbox" hidden></div>
+            </div>
         </form>
 
         @auth

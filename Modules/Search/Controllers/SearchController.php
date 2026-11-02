@@ -162,11 +162,12 @@ class SearchController extends Controller
             $query->where('hoardings.enable_weekly_booking', 1)
                 ->whereNotNull('hoardings.weekly_price_1');
         }
-        if ($request->filled('location')) {
-            $loc = strtolower($request->location);
+        if ($request->filled('location') && !($request->boolean('near_me') && $request->filled('lat') && $request->filled('lng'))) {
+            $loc = mb_strtolower(trim($request->location));
             $query->where(function ($q) use ($loc) {
                 $q->whereRaw('LOWER(hoardings.city) LIKE ?', ["%{$loc}%"])
                     ->orWhereRaw('LOWER(hoardings.state) LIKE ?', ["%{$loc}%"])
+                    ->orWhereRaw('LOWER(hoardings.locality) LIKE ?', ["%{$loc}%"])
                     ->orWhereRaw('LOWER(hoardings.address) LIKE ?', ["%{$loc}%"])
                     ->orWhereRaw('LOWER(hoardings.title) LIKE ?', ["%{$loc}%"]);
             });
@@ -355,6 +356,88 @@ class SearchController extends Controller
             'results' => $results,
             'cartHoardingIds' => $cartHoardingIds,
         ]);
+    }
+
+    public function destinationSuggestions(Request $request)
+    {
+        $validated = $request->validate([
+            'q' => 'nullable|string|max:100',
+        ]);
+        $term = mb_strtolower(trim($validated['q'] ?? ''));
+
+        $availableHoardings = DB::table('hoardings')
+            ->join('vendor_profiles', function ($join) {
+                $join->on('vendor_profiles.user_id', '=', 'hoardings.vendor_id')
+                    ->where('vendor_profiles.onboarding_status', 'approved')
+                    ->whereNull('vendor_profiles.deleted_at');
+            })
+            ->where('hoardings.status', 'active')
+            ->whereNull('hoardings.deleted_at');
+
+        $applyTerm = static function ($query) use ($term): void {
+            if ($term === '') {
+                return;
+            }
+
+            $like = '%' . $term . '%';
+            $query->where(function ($matches) use ($like) {
+                $matches->whereRaw('LOWER(hoardings.city) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(hoardings.state) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(hoardings.locality) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(hoardings.address) LIKE ?', [$like]);
+            });
+        };
+
+        $cityQuery = (clone $availableHoardings)
+            ->whereNotNull('hoardings.city')
+            ->where('hoardings.city', '<>', '')
+            ->select('hoardings.city', 'hoardings.state')
+            ->selectRaw('COUNT(*) as popularity')
+            ->groupBy('hoardings.city', 'hoardings.state');
+        $applyTerm($cityQuery);
+        $cities = $cityQuery
+            ->orderByDesc('popularity')
+            ->limit(10)
+            ->get()
+            ->map(static fn ($row) => [
+                'type' => 'city',
+                'value' => $row->city,
+                'subtitle' => $row->state ?: 'City',
+                'popularity' => (int) $row->popularity,
+            ]);
+
+        $localityQuery = (clone $availableHoardings)
+            ->whereNotNull('hoardings.locality')
+            ->where('hoardings.locality', '<>', '')
+            ->whereNotNull('hoardings.city')
+            ->select('hoardings.locality', 'hoardings.city', 'hoardings.state')
+            ->selectRaw('COUNT(*) as popularity')
+            ->groupBy('hoardings.locality', 'hoardings.city', 'hoardings.state');
+        $applyTerm($localityQuery);
+        $localities = $localityQuery
+            ->orderByDesc('popularity')
+            ->limit(10)
+            ->get()
+            ->map(static fn ($row) => [
+                'type' => 'area',
+                'value' => $row->locality,
+                'subtitle' => 'Area in ' . $row->city . ($row->state ? ', ' . $row->state : ''),
+                'popularity' => (int) $row->popularity,
+            ]);
+
+        $suggestions = $cities->take(5)
+            ->concat($localities->take(5))
+            ->concat($cities->skip(5))
+            ->concat($localities->skip(5))
+            ->unique(static fn ($item) => mb_strtolower($item['type'] . '|' . $item['value'] . '|' . $item['subtitle']))
+            ->take(10)
+            ->values()
+            ->map(static function ($item) {
+                unset($item['popularity']);
+                return $item;
+            });
+
+        return response()->json(['suggestions' => $suggestions]);
     }
 
     /**
