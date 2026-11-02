@@ -12,7 +12,7 @@ class SmsService
 
     public function __construct()
     {
-        $activeGateway = Setting::get('sms_gateway');
+        $activeGateway = Setting::get('sms_active_gateway');
 
         switch ($activeGateway) {
 

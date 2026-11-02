@@ -190,17 +190,16 @@ $mainMedia  = $mediaItems->first();
 <div class="media-wrapper">
 
 <div class="hoarding-image-box" id="main-media">
+@if($mainMedia)
+        @if($mainMedia->isVideo())
+                <video autoplay muted loop playsinline preload="auto">
+                <source src="{{ asset('storage/' . $mainMedia->file_path) }}" type="{{ $mainMedia->normalizedMimeType() }}" >
+                </video>
+        @else
+                <img src="{{ asset('storage/' . ($mainMedia->path_1500 ?? $mainMedia->file_path)) }}" alt="Hoarding Media" >
 
-@if($mainMedia && $mainMedia->isVideo())
-
-<video autoplay muted loop playsinline preload="auto">
-<source src="{{ asset('storage/'.$mainMedia->file_path) }}" type="{{ $mainMedia->normalizedMimeType() }}">
-</video>
-
-@else
-
-<img src="{{ asset('storage/'.($mainMedia->path_1500 ?? $mainMedia->file_path)) }}">
-
+        @endif
+@else No media available
 @endif
 
 </div>

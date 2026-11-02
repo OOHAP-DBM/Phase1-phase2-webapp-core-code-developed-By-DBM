@@ -5,7 +5,7 @@
 <div class="px-6 py-6 bg-gray-50 min-h-screen">
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-    
+
     <!-- LEFT : Heading with Mobile Back Button -->
     <div class="flex items-center gap-2">
         <button onclick="handleBackWithSidebarClose()" type="button" class="sm:hidden inline-flex items-center justify-center  rounded-full text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500 ml-[-5px]">

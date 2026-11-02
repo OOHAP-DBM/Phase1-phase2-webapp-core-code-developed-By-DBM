@@ -1,93 +1,193 @@
 <!-- FOOTER TOP -->
+
 <tr>
-<td style="background:#eeeeee;padding:25px 20px;font-family:Arial,Helvetica,sans-serif;">
+    <td align="center" style="
+            background:#eeeeee;
+            padding:24px 20px 20px 20px;
+            font-family:Arial,Helvetica,sans-serif;
+        ">
 
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+            <tr>
 
-            <!-- LEFT SIDE : APP BUTTONS -->
-            <td align="left" valign="middle">
+                <!-- APP BUTTONS -->
 
-                <table cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                        <td>
-                            <a href="https://play.google.com/store" target="_blank">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Google_Play_Store_badge_EN.svg/512px-Google_Play_Store_badge_EN.svg.png"
-                                    width="140" height="42"
-                                    style="display:block;border:0;outline:none;text-decoration:none;height:42px;">
-                            </a>
-                        </td>
-                        <td style="width:7px;"></td>
-                        <td>
-                            <a href="https://www.apple.com/app-store/" target="_blank">
-                                <img src="https://staging.oohapp.io/assets/images/emails/app-store.png"
-                                    width="140" height="42"
-                                    style="display:block;border:0;outline:none;text-decoration:none;height:42px;">
-                            </a>
-                        </td>
+                <td align="left" valign="middle" style="vertical-align:middle;">
 
-                    </tr>
-                </table>
+                    <table cellpadding="0" cellspacing="0" border="0">
+                        <tr>
 
-            </td>
+                            <!-- GOOGLE PLAY -->
+
+                            <td valign="middle" style="vertical-align:middle;padding:0;">
+                                <a href="https://play.google.com/store" target="_blank"
+                                    style="display:block;text-decoration:none;">
+                                    <img src="https://www.eatingjam.com/wp-content/uploads/2025/05/GetItOnGooglePlay_Badge_Web_color_English.png"
+                                        width="140" height="42" alt="Get it on Google Play" style="
+                                            display:block;
+                                            width:140px;
+                                            height:42px;
+                                            border:0;
+                                            outline:none;
+                                            margin:13px;
+                                        ">
+                                </a>
+                            </td>
 
 
-            <!-- RIGHT SIDE : SOCIAL -->
-            <td align="right" valign="middle">
+                            <!-- APP BUTTON GAP -->
 
-                <table cellpadding="0" cellspacing="0" border="0">
-                    <tr>
+                            <td width="10" style="
+                                    width:10px;
+                                    font-size:0;
+                                    line-height:0;
+                                ">
+                                &nbsp;
+                            </td>
 
-                        <td style="font-size:14px;color:#444;padding-right:8px;">
-                            Follow us:
-                        </td>
 
-                        <td style="padding:0 4px;">
-                            <a href="https://www.facebook.com/profile.php?id=100083678822547">
-                                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="22" style="display:block;" alt="Facebook">
-                            </a>
-                        </td>
+                            <!-- APP STORE -->
 
-                        <td style="padding:0 4px;">
-                            <a href="https://twitter.com/oohapads">
-                                <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" width="22" style="display:block;">
-                            </a>
-                        </td>
+                            <td valign="middle" style="vertical-align:middle;padding:0;">
+                                <a href="https://www.apple.com/app-store/" target="_blank"
+                                    style="display:block;text-decoration:none;">
+                                    <img src="https://staging.oohapp.io/assets/images/emails/app-store.png" width="140"
+                                        height="42" alt="Download on the App Store" style="
+                                            display:block;
+                                            width:140px;
+                                            height:42px;
+                                            border:0;
+                                            outline:none;
+                                        ">
+                                </a>
+                            </td>
 
-                        <td style="padding:0 4px;">
-                            <a href="https://www.instagram.com/oohappofficial/">
-                                <img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" width="22" style="display:block;">
-                            </a>
-                        </td>
+                        </tr>
+                    </table>
 
-                        <td style="padding-left:4px;">
-                            <a href="https://www.linkedin.com/company/oohapp/">
-                                <img src="https://cdn-icons-png.flaticon.com/512/3536/3536505.png" width="22" style="display:block;">
-                            </a>
-                        </td>
+                </td>
 
-                    </tr>
-                </table>
 
-            </td>
+                <!-- SOCIAL -->
 
-        </tr>
-    </table>
+                <td align="right" valign="middle" style="vertical-align:middle;">
 
-</td>
+                    <table cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+
+                            <td valign="middle" style="
+                                    vertical-align:middle;
+                                    padding:0 7px 0 0;
+                                    font-size:14px;
+                                    line-height:22px;
+                                    color:#444444;
+                                    white-space:nowrap;
+                                ">
+                                Follow us:
+                            </td>
+
+
+                            <!-- FACEBOOK -->
+
+                            <td valign="middle" style="vertical-align:middle;padding:0 2px;">
+                                <a href="https://www.facebook.com/profile.php?id=100083678822547" target="_blank"
+                                    style="display:block;text-decoration:none;">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="22"
+                                        height="22" alt="Facebook" style="
+                                            display:block;
+                                            width:22px;
+                                            height:22px;
+                                            border:0;
+                                        ">
+                                </a>
+                            </td>
+
+
+                            <!-- TWITTER -->
+
+                            <td valign="middle" style="vertical-align:middle;padding:0 2px;">
+                                <a href="https://twitter.com/oohapads" target="_blank"
+                                    style="display:block;text-decoration:none;">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/733/733579.png" width="22"
+                                        height="22" alt="Twitter" style="
+                                            display:block;
+                                            width:22px;
+                                            height:22px;
+                                            border:0;
+                                        ">
+                                </a>
+                            </td>
+
+
+                            <!-- INSTAGRAM -->
+
+                            <td valign="middle" style="vertical-align:middle;padding:0 2px;">
+                                <a href="https://www.instagram.com/oohappofficial/" target="_blank"
+                                    style="display:block;text-decoration:none;">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png" width="22"
+                                        height="22" alt="Instagram" style="
+                                            display:block;
+                                            width:22px;
+                                            height:22px;
+                                            border:0;
+                                        ">
+                                </a>
+                            </td>
+
+
+                            <!-- LINKEDIN -->
+
+                            <td valign="middle" style="vertical-align:middle;padding:0 0 0 2px;">
+                                <a href="https://www.linkedin.com/company/oohapp/" target="_blank"
+                                    style="display:block;text-decoration:none;">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/3536/3536505.png" width="22"
+                                        height="22" alt="LinkedIn" style="
+                                            display:block;
+                                            width:22px;
+                                            height:22px;
+                                            border:0;
+                                        ">
+                                </a>
+                            </td>
+
+                        </tr>
+                    </table>
+
+                </td>
+
+            </tr>
+        </table>
+
+    </td>
 </tr>
 
 
-<!-- FOOTER BOTTOM BAR -->
+<!-- SPACE BETWEEN FOOTER SECTIONS -->
+
 <tr>
-<td align="center"
-    style="background:#dedede;
-           padding:16px 20px;
-           font-size:13px;
-           color:#555;
-           font-family:Arial,Helvetica,sans-serif;">
+    <td style="
+            height:10px;
+            line-height:10px;
+            font-size:10px;
+            background:#eeeeee;
+        ">
+        &nbsp;
+    </td>
+</tr>
 
-    Please do not reply to this email. This is an automated email sent from OOHAPP
 
-</td>
+<!-- FOOTER BOTTOM -->
+
+<tr>
+    <td align="center" style="
+            background:#dedede;
+            padding:13px 20px;
+            font-family:Arial,Helvetica,sans-serif;
+            font-size:13px;
+            line-height:20px;
+            text-align:center;
+            color:#555555;
+        ">
+        Please do not reply to this email. This is an automated email sent by OOHAPP
+    </td>
 </tr>

@@ -22,8 +22,10 @@ class OfferController extends Controller
      * Create a draft offer for an enquiry
      * POST /api/v1/enquiries/{enquiryId}/offers
      */
+
     public function createDraft(Request $request, int $enquiryId): JsonResponse
     {
+
         $validator = Validator::make($request->all(), [
             'price' => 'required|numeric|min:0',
             'price_type' => 'required|in:total,monthly,weekly,daily',
@@ -40,6 +42,7 @@ class OfferController extends Controller
         }
 
         try {
+
             $data = $validator->validated();
             $data['enquiry_id'] = $enquiryId;
 
@@ -241,6 +244,7 @@ class OfferController extends Controller
      */
     public function getByEnquiry(int $enquiryId): JsonResponse
     {
+
         $offers = $this->service->getByEnquiry($enquiryId);
 
         return response()->json([

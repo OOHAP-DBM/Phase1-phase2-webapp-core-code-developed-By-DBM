@@ -11,62 +11,15 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules\Password;
 use Modules\Auth\Services\OTPService;
 use App\Services\ProfileService;
+use Illuminate\Validation\Rule;
 use Throwable;
 use App\Models\User;
-
-// Customer Profile Section @Aviral
-
+use App\Notifications\ProfileUpdatedNotification;
 
 
-/**
- * @OA\Tag(
- *     name="Authentication",
- *     description="Customer & Vendor authentication APIs"
- * )
- */
-
-/**
- * @OA\Schema(
- *     schema="CustomerProfile",
- *     type="object",
- *     @OA\Property(property="id", type="integer", example=12),
- *     @OA\Property(property="name", type="string", example="Rahul Sharma"),
- *     @OA\Property(property="email", type="string", example="rahul@example.com"),
- *     @OA\Property(property="email_verified", type="boolean", example=true),
- *     @OA\Property(property="phone", type="string", example="9876543210"),
- *     @OA\Property(property="phone_verified", type="boolean", example=true),
- *     @OA\Property(property="avatar", type="string", example="https://app.com/storage/media/users/avatars/12/avatar.png"),
- *     @OA\Property(property="company_name", type="string", example="OOH Media Pvt Ltd"),
- *     @OA\Property(property="gstin", type="string", example="09ABCDE1234F1Z5")
- * )
- */
 
 class ProfileController extends Controller
 {
-
-    /**
-     * @OA\Get(
-     *     path="/profile/customer/show",
-     *     tags={"Customer Profile"},
-     *     summary="Get logged-in customer profile",
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Profile fetched successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", ref="#/components/schemas/CustomerProfile")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthenticated"
-     *     )
-     * )
-     */
-
     public function show(Request $request, ProfileService $service)
     {
         return response()->json([
@@ -78,50 +31,63 @@ class ProfileController extends Controller
         ]);
     }
 
-
     /**
-     * @OA\Post(
-     *     path="/profile/customer/update",
+     * @OA\Get(
+     *     path="/profile/customer/completion",
      *     tags={"Customer Profile"},
-     *     summary="Update customer profile",
+     *     summary="Get customer profile completion percentage",
      *     security={{"sanctum":{}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\MediaType(
-     *             mediaType="multipart/form-data",
-     *             @OA\Schema(
-     *                 required={"name","email","phone"},
-     *                 @OA\Property(property="name", type="string", example="Rahul Sharma"),
-     *                 @OA\Property(property="email", type="string", example="rahul@example.com"),
-     *                 @OA\Property(property="phone", type="string", example="9876543210"),
-     *                 @OA\Property(property="company_name", type="string", example="OOH Media Pvt Ltd"),
-     *                 @OA\Property(property="gstin", type="string", example="09ABCDE1234F1Z5"),
-     *                 @OA\Property(
-     *                     property="avatar",
-     *                     type="string",
-     *                     format="binary",
-     *                     description="Profile image (jpg, png, webp)"
-     *                 )
+     *     @OA\Response(
+     *         response=200,
+     *         description="Customer profile completion status",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="type", type="string", example="customer"),
+     *                 @OA\Property(property="percentage", type="integer", example=67),
+     *                 @OA\Property(property="filled", type="integer", example=4),
+     *                 @OA\Property(property="total", type="integer", example=6),
+     *                 @OA\Property(property="is_complete", type="boolean", example=false)
      *             )
      *         )
      *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Profile updated successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Profile updated successfully"),
-     *             @OA\Property(property="data", ref="#/components/schemas/CustomerProfile")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=403, description="Email or phone not verified"),
-     *     @OA\Response(response=422, description="Validation error"),
-     *     @OA\Response(response=500, description="Server error")
+     *     @OA\Response(response=401, description="Unauthenticated")
      * )
      */
+    public function completion(Request $request)
+    {
+
+        $user = $request->user();
+        if ($user->active_role === 'vendor') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+            $fields = [
+            $user->name,
+            $user->email,
+            $user->phone,
+            $user->avatar,
+            $user->company_name,
+            $user->gstin,
+        ];
+
+        $filled = count(array_filter($fields, fn ($value) => !is_null($value) && $value !== ''));
+        $total = count($fields);
+        $percentage = $total > 0 ? round(($filled / $total) * 100) : 0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'type' => 'customer',
+                'percentage' => $percentage,
+                'filled' => $filled,
+                'total' => $total,
+                'is_complete' => $percentage >= 100,
+            ],
+        ]);
+    }
 
     public function update(Request $request, ProfileService $service)
     {
@@ -134,29 +100,87 @@ class ProfileController extends Controller
             ], 403);
         }
 
-
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'company_name' => 'nullable|string|max:255',
-            'gstin' => 'nullable|string|max:255',
+
+            'gstin' => [
+                'nullable',
+                'string',
+                'max:15',
+                Rule::unique('users', 'gstin')->ignore($user->id),
+            ],
+
             'avatar' => 'nullable|image|max:2048',
         ]);
+
+        // Empty GSTIN ko NULL bana do
+        // $data['gstin'] = filled($request->gstin)
+        //     ? strtoupper(trim($request->gstin))
+        //     : null;
+          if ($request->has('gstin')) {
+
+        $gstin = trim((string) $request->input('gstin'));
+
+        if ($gstin === '') {
+            $data['gstin'] = null;
+        } else {
+            $data['gstin'] = strtoupper($gstin);
+        }
+    } else {
+        // Don't change existing GSTIN if it wasn't sent
+        unset($data['gstin']);
+    }
 
         if ($request->hasFile('avatar')) {
             $data['avatar'] = $service->updateAvatar($user, $request->file('avatar'));
         }
 
-
         $user->update($data);
-        // ✅ Push Notification (Clean call)
-        send(
-            $user,
-            'Profile Updated Successfully',
+        $user->notify(new ProfileUpdatedNotification());
+
+        // send(
+        //     $user,
+        //     'Profile Updated Successfully',
+        //     'Your profile details have been updated successfully.',
+        //     [
+        //         'type' => 'profile_update'
+        //     ]
+        // );
+
+          if (!empty($user->fcm_token)) {
+
+        $sent = send(
+            $user->fcm_token,
+            'Profile Updated',
             'Your profile details have been updated successfully.',
             [
-                'type' => 'profile_update'
+                'type' => 'profile_update',
+                'user_id' => (string) $user->id,
+
             ]
         );
+
+        if (!$sent) {
+
+            Log::warning(
+                "FCM notification failed for user ID {$user->id}",
+                [
+                    // 'section' => $section
+                ]
+            );
+        }
+
+    } else {
+
+        Log::warning(
+            "User has no FCM token",
+            [
+                'user_id' => $user->id,
+                // 'section' => $section
+            ]
+        );
+    }
 
         return response()->json([
             'success' => true,
@@ -167,27 +191,6 @@ class ProfileController extends Controller
             ]),
         ]);
     }
-
-
-    /**
-     * @OA\Delete(
-     *     path="/profile/avatar",
-     *     tags={"Customer Profile"},
-     *     summary="Remove customer avatar",
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Avatar removed successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Avatar removed successfully")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=500, description="Unable to remove avatar")
-     * )
-     */
 
     public function removeAvatar(Request $request)
     {
@@ -216,38 +219,6 @@ class ProfileController extends Controller
             ], 500);
         }
     }
-
-
-    /**
-     * @OA\Post(
-     *     path="/profile/change-password",
-     *     tags={"Customer Profile"},
-     *     summary="Change account password",
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"current_password","new_password","new_password_confirmation"},
-     *             @OA\Property(property="current_password", type="string", example="OldPass@123"),
-     *             @OA\Property(property="new_password", type="string", example="NewPass@123"),
-     *             @OA\Property(property="new_password_confirmation", type="string", example="NewPass@123")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Password changed successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Password changed successfully")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=422, description="Invalid current password"),
-     *     @OA\Response(response=500, description="Unable to change password")
-     * )
-     */
 
     public function changePassword(Request $request, ProfileService $service)
     {
@@ -282,73 +253,6 @@ class ProfileController extends Controller
             ], 500);
         }
     }
-
-
-    /**
-     * @OA\Post(
-     *     path="/profile/send-otp",
-     *     tags={"Profile OTP"},
-     *     summary="Send OTP to change email or phone",
-     *     description="Sends a one-time password (OTP) to the provided email or phone number. Requires Bearer authentication.",
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"type","value"},
-     *             @OA\Property(
-     *                 property="type",
-     *                 type="string",
-     *                 enum={"email","phone"},
-     *                 example="email",
-     *                 description="Type of identifier to change"
-     *             ),
-     *             @OA\Property(
-     *                 property="value",
-     *                 type="string",
-     *                 example="newuser@example.com",
-     *                 description="New email or phone number"
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="OTP sent successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="OTP sent successfully")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation or business logic error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Email already taken")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=429,
-     *         description="Too many OTP requests",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Please wait before requesting another OTP")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthenticated"
-     *     )
-     * )
-     */
-
-
-    /* ==============================
-     | SEND OTP
-     ============================== */
     public function sendOtp(Request $request, ProfileService $service)
     {
         $data = $request->validate([
@@ -383,67 +287,6 @@ class ProfileController extends Controller
             'message' => 'OTP sent successfully',
         ]);
     }
-
-
-
-
-    /**
-     * @OA\Post(
-     *     path="/profile/verify-otp",
-     *     tags={"Profile OTP"},
-     *     summary="Verify OTP and update email or phone",
-     *     description="Verifies the OTP sent to email or phone and updates the user's profile accordingly.",
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"type","value","otp"},
-     *             @OA\Property(
-     *                 property="type",
-     *                 type="string",
-     *                 enum={"email","phone"},
-     *                 example="phone",
-     *                 description="Type of identifier being verified"
-     *             ),
-     *             @OA\Property(
-     *                 property="value",
-     *                 type="string",
-     *                 example="9876543210",
-     *                 description="Email or phone number used for OTP"
-     *             ),
-     *             @OA\Property(
-     *                 property="otp",
-     *                 type="string",
-     *                 example="1234",
-     *                 description="4-digit OTP received by the user"
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="OTP verified and profile updated",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Email updated successfully")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Invalid or expired OTP",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Invalid or expired OTP")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthenticated"
-     *     )
-     * )
-     */
 
     public function verifyOtp(Request $request, ProfileService $service)
     {

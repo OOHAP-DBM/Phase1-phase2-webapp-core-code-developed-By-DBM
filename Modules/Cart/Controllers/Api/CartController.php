@@ -22,12 +22,12 @@ class CartController extends Controller
      * @OA\Post(
      *     path="/cart/add",
      *     tags={"Cart"},
-     *     summary="Add or update hoarding in cart with vendor validation",
-     *     description="Add a hoarding to the cart or update an existing cart item with package details. Validates that the hoarding belongs to the specified vendor. Cart can only contain hoardings from one vendor at a time.",
+     *     summary="Add or update hoarding in cart (multi-vendor enabled)",
+     *     description="Add a hoarding to the cart or update an existing cart item with package details. Validates that the hoarding belongs to the specified vendor. Multi-vendor hoardings are allowed in the cart; handle per-vendor splitting at checkout.",
      *     security={{"sanctum":{}}},
      *     @OA\RequestBody(
      *         required=true,
-     *         description="Cart item details with vendor validation",
+     *         description="Cart item details",
      *         @OA\JsonContent(
      *             required={"hoarding_id", "vendor_id"},
      *             @OA\Property(
@@ -85,7 +85,7 @@ class CartController extends Controller
      *     ),
      *     @OA\Response(
      *         response=422,
-     *         description="Validation failed - vendor mismatch, conflict, or invalid data",
+     *         description="Validation failed - vendor mismatch or invalid data",
      *         @OA\JsonContent(
      *             type="object",
      *             @OA\Property(
@@ -99,16 +99,6 @@ class CartController extends Controller
      *                         @OA\Property(property="success", type="boolean", example=false),
      *                         @OA\Property(property="status", type="string", example="vendor_mismatch"),
      *                         @OA\Property(property="message", type="string", example="This hoarding does not belong to the specified vendor")
-     *                     )
-     *                 ),
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(
-     *                         property="vendor_conflict",
-     *                         type="object",
-     *                         @OA\Property(property="success", type="boolean", example=false),
-     *                         @OA\Property(property="status", type="string", example="vendor_conflict"),
-     *                         @OA\Property(property="message", type="string", example="Your cart already contains hoardings from a different vendor. Please remove the existing hoardings before adding hoardings from another vendor.")
      *                     )
      *                 )
      *             )

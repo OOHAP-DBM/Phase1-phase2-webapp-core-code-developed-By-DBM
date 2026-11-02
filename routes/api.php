@@ -13,7 +13,7 @@ use App\Http\Controllers\Api\ReviewController;
 
 /**
  * OOHAPP API v1 Routes
- * 
+ *
  * All API v1 endpoints are prefixed with /api/v1
  * Module-specific routes are loaded from routes/api_v1/ directory
  * Rate limiting applied based on endpoint sensitivity
@@ -31,9 +31,9 @@ Route::get('v1/wishlist', [ShortlistController::class, 'index']);
 Route::middleware(['auth:sanctum'])
     ->prefix('v1/wishlist')
     ->group(function () {
-        Route::post('/{hoardingId}', [ShortlistController::class, 'store']); // Add
-        Route::delete('/{hoardingId}', [ShortlistController::class, 'destroy']); // Remove
-        Route::delete('/', [ShortlistController::class, 'clear']);       // Clear all
+        Route::post('/{hoardingId}', [ShortlistController::class, 'store']);
+        Route::delete('/{hoardingId}', [ShortlistController::class, 'destroy']);
+        Route::delete('/', [ShortlistController::class, 'clear']);
         Route::post('/toggle/{hoardingId}', [ShortlistController::class, 'toggle']);
         Route::get('/check/{hoardingId}', [ShortlistController::class, 'check']);
         Route::get('/count', [ShortlistController::class, 'count']);
@@ -48,6 +48,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 });
 
 Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
+
     // Health check
     Route::get('/health', function () {
         return response()->json([
@@ -88,6 +89,10 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
     Route::prefix('search')->group(base_path('routes/api_v1/search.php'));
     Route::prefix('pos')->group(base_path('routes/api_v1/pos.php')); // POS Module
     Route::prefix('pages')->group(base_path('routes/api_v1/cms.php')); // CMS Module
+
+    // Logs module
+    Route::prefix('logs')->group(base_path('routes/api_v1/logs.php'));
+
     Route::middleware('auth:sanctum')->prefix('/email-settings')->group(function () {
         Route::get('/',                     [EmailSettingController::class, 'index']);
         Route::post('/send-verification',   [EmailSettingController::class, 'sendVerification']);
@@ -131,6 +136,8 @@ Route::prefix('v1')->middleware(['throttle:api'])->group(function () {
         Route::delete('reviews/{id}',      [ReviewController::class, 'destroy']);
         Route::delete('reviews/bulk',      [ReviewController::class, 'bulkDelete']);
     });
+
+
 });
 Route::middleware(['auth:sanctum', 'throttle:authenticated'])->prefix('account')->group(function () {
     Route::post('/delete/send-otp', [AccountController::class, 'sendDeleteOtp']);

@@ -19,7 +19,7 @@
                         <p class="mb-0"><strong>Duration:</strong> {{ $offer->price_snapshot['duration_days'] ?? 0 }} days</p>
                     </div>
 
-                    <form id="quotationForm">
+                    <form id="quotationForm">   
                         @csrf
                         <input type="hidden" name="offer_id" value="{{ $offer->id }}">
                         <input type="hidden" id="quotationId" value="{{ $quotation->id ?? '' }}">

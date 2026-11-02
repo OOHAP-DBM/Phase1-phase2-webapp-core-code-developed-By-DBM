@@ -8,21 +8,17 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureVendorOnboardingApproved
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        $profile = $user?->vendorProfile;
 
         if (
             !$user ||
-            !$user->vendorProfile ||
-            !$user->vendorProfile->isApproved()
+            !$profile ||
+            !$profile->isApproved()
         ) {
-            // API REQUEST
+            // API request
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
@@ -30,12 +26,14 @@ class EnsureVendorOnboardingApproved
                 ], 403);
             }
 
-            // WEB REQUEST
+            // Web request
             return redirect()
                 ->route('vendor.dashboard')
-                ->with('error', 'Your vendor onboarding is not approved yet.');
+                ->with(
+                    'error',
+                    'Your vendor onboarding is not approved yet.'
+                );
         }
-        
 
         return $next($request);
     }

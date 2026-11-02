@@ -63,8 +63,32 @@ class ProfileService
             'email_verified' => (bool) $user->email_verified_at,
             'phone' => $user->phone,
             'phone_verified' => (bool) $user->phone_verified_at,
-            'avatar' => $user->avatar ? asset('storage/' . $user->avatar) : null,
+            'avatar' => $this->publicUrl($user->avatar),
         ], $extra);
+    }
+
+    protected function publicUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        $publicDisk = Storage::disk('public');
+        if ($publicDisk->exists($path)) {
+            return $publicDisk->url($path);
+        }
+
+        $privateDisk = Storage::disk('private');
+        if ($privateDisk->exists($path)) {
+            $publicDisk->put($path, $privateDisk->get($path));
+            return $publicDisk->url($path);
+        }
+
+        return null;
     }
 
     const OTP_EXPIRY_MINUTES = 0.5; // 30 seconds for testing
