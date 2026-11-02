@@ -160,12 +160,23 @@ padding-bottom:6px;
             class="inline-flex items-center bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md transition-shadow pl-2 pr-1 w-full max-w-2xl">
 
             {{-- WHERE --}}
-            <div class="flex flex-col flex-grow px-6 border-r border-gray-200 w-[100px] md:w-[200px] xl:w-[400px]">
+            <div class="destination-search-field flex flex-col flex-grow px-6 border-r border-gray-200 w-[100px] md:w-[200px] xl:w-[400px]">
                 <label class="text-sm font-bold uppercase tracking-wider text-gray-900">Where</label>
                 <input type="text" name="location" onfocus="resetHeader()"
                     placeholder="Search Hoardings..."
                     value="{{ request('location') }}"  {{-- ← add this --}}
-                    class="text-sm text-gray-500 outline-none placeholder-gray-400 border-none p-0 focus:ring-0 w-full"/>
+                    class="text-sm text-gray-500 outline-none placeholder-gray-400 border-none p-0 focus:ring-0 w-full"
+                    autocomplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="destination-suggestions-desktop"
+                    data-destination-search
+                    data-suggestions-url="{{ route('search.destination-suggestions') }}"/>
+                <input type="hidden" name="near_me" value="{{ request('near_me') }}" data-near-me>
+                <input type="hidden" name="lat" value="{{ request('lat') }}" data-near-latitude>
+                <input type="hidden" name="lng" value="{{ request('lng') }}" data-near-longitude>
+                <div class="destination-suggestions" id="destination-suggestions-desktop" role="listbox" hidden></div>
             </div>
    
             {{-- WHEN trigger --}}
@@ -196,7 +207,7 @@ padding-bottom:6px;
 <div id="hoardingCalPopup"
      style="display:none; position:fixed; z-index:9999; background:#fff;
             border:1px solid #e5e7eb; border-radius:16px;
-            box-shadow:0 8px 32px rgba(0,0,0,0.13); padding:24px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.13); padding:3px 8px 8px;
             width:680px; max-width:96vw;"
      onclick="event.stopPropagation()">
 
@@ -278,11 +289,13 @@ padding-bottom:6px;
 
         reposition: function () {
             var trigger = document.getElementById('hoardingWhenTrigger');
+            var searchForm = document.getElementById('hoardingSearchForm');
             var popup   = document.getElementById('hoardingCalPopup');
             var rect    = trigger.getBoundingClientRect();
+            var formRect = searchForm.getBoundingClientRect();
 
-            // ✅ FIX: remove scrollY
-            popup.style.top = (rect.bottom + 80) + 'px';
+            var top = Math.min(formRect.bottom + 12, window.innerHeight - popup.offsetHeight - 12);
+            popup.style.top = Math.max(12, top) + 'px';
 
             // center align
             var left = rect.left + rect.width / 2 - 340;
@@ -297,9 +310,9 @@ padding-bottom:6px;
             if (e) e.stopPropagation();
             var popup = document.getElementById('hoardingCalPopup');
             if (popup.style.display === 'none' || !popup.style.display) {
-                hCal.reposition();
                 popup.style.display = 'block';
                 hCal.render();
+                hCal.reposition();
             } else {
                 popup.style.display = 'none';
             }
@@ -544,6 +557,16 @@ padding-bottom:6px;
             hCal.close();
         }
     });
+
+    var searchBlock = document.getElementById('searchBlock');
+    if (searchBlock) {
+        searchBlock.addEventListener('transitionend', function (e) {
+            var popup = document.getElementById('hoardingCalPopup');
+            if (e.target === searchBlock && e.propertyName === 'transform' && popup.style.display === 'block') {
+                hCal.reposition();
+            }
+        });
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         hoardingTab.switchTab('hoardings', document.getElementById('tab-hoardings'));

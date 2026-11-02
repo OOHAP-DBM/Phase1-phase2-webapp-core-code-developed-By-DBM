@@ -6,13 +6,24 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </span>
-            <input type="text" 
+            <input type="text"
                 name="location"
-                placeholder="Search Hoardings..." 
-                class="w-full py-2  pl-10 pr-4 bg-white border border-gray-300 rounded-full text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-400 shadow-sm text-sm"
+                placeholder="Search Hoardings..."
+                value="{{ request('location') }}"
+                class="w-full py-2 pl-10 pr-4 bg-white border border-gray-300 rounded-full text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-400 shadow-sm text-sm"
                 id="mobile-search-input"
                 autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="destination-suggestions-mobile"
+                data-destination-search
+                data-suggestions-url="{{ route('search.destination-suggestions') }}"
             >
+            <input type="hidden" name="near_me" value="{{ request('near_me') }}" data-near-me>
+            <input type="hidden" name="lat" value="{{ request('lat') }}" data-near-latitude>
+            <input type="hidden" name="lng" value="{{ request('lng') }}" data-near-longitude>
+            <div class="destination-suggestions destination-suggestions-mobile" id="destination-suggestions-mobile" role="listbox" hidden></div>
         </form>
     </div>
 

@@ -36,6 +36,8 @@ use App\Http\Controllers\Admin\RazorpaySettingsController;
 Route::get('/api/geocode', [GeocodeController::class, 'search']);
 Route::get('/api/pincode', [GeocodeController::class, 'pincode']);
 Route::get('/api/reverse-geocode', [GeocodeController::class, 'reverse']);
+Route::get('/api/destination-suggestions', [SearchController::class, 'destinationSuggestions'])
+    ->name('search.destination-suggestions');
 // SEO-friendly hoarding search route (pattern controlled by config/seo_search_routes.php)
 $seoSearchPattern = config('seo_search_routes.pattern', '/billboard-advertising/{city}/{area?}');
 Route::get($seoSearchPattern, [SearchController::class, 'seoSearch'])->name('search.seo');
