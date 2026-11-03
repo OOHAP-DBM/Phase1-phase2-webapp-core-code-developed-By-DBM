@@ -12,6 +12,139 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
+.destination-search-field {
+    position: relative;
+}
+
+.destination-suggestions {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+    width: min(420px, calc(100vw - 24px));
+    max-height: min(70vh, 480px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 3px 8px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 12px 36px rgba(17, 24, 39, 0.16);
+}
+
+.destination-suggestions[hidden] {
+    display: none;
+}
+
+.destination-suggestions-heading {
+    padding: 2px 12px 8px;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.destination-suggestion-option {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 12px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    padding: 10px 12px;
+    color: #111827;
+    text-align: left;
+    cursor: pointer;
+}
+
+.destination-suggestion-option:hover,
+.destination-suggestion-option:focus-visible {
+    background: #f3f4f6;
+    outline: none;
+}
+
+.destination-suggestion-icon {
+    display: flex;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--destination-background, #f3f4f6);
+    color: var(--destination-foreground, #374151);
+}
+
+.destination-suggestion-icon svg {
+    width: 38px;
+    height: 38px;
+}
+
+.destination-suggestion-icon.destination-green {
+    --destination-background: #eef6f0;
+    --destination-foreground: #328449;
+    --destination-accent: #65a96f;
+}
+
+.destination-suggestion-icon.destination-coral {
+    --destination-background: #fff0ed;
+    --destination-foreground: #ed6252;
+    --destination-accent: #f19a62;
+}
+
+.destination-suggestion-icon.destination-pink {
+    --destination-background: #fff0f4;
+    --destination-foreground: #ed4e70;
+    --destination-accent: #f58b9f;
+}
+
+.destination-suggestion-icon.destination-ochre {
+    --destination-background: #fbf5eb;
+    --destination-foreground: #bc8c45;
+    --destination-accent: #dfb46d;
+}
+
+.destination-suggestion-icon.destination-blue {
+    --destination-background: #edf5fb;
+    --destination-foreground: #4b8db9;
+    --destination-accent: #79b5d7;
+}
+
+.destination-suggestion-icon.destination-nearby-icon {
+    --destination-background: #edf4f9;
+}
+
+.destination-suggestion-copy {
+    min-width: 0;
+}
+
+.destination-suggestion-name {
+    display: block;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.destination-suggestion-subtitle,
+.destination-suggestion-status {
+    display: block;
+    margin-top: 2px;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.destination-suggestion-status {
+    padding: 12px;
+}
+
+.destination-suggestions-mobile {
+    max-height: min(65vh, 420px);
+}
+
 /* =================================
    Admin Sidebar & Header Base
 ================================= */
