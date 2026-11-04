@@ -1165,6 +1165,7 @@ class HoardingTransferService
         $errors = [];
         $seenReferences = [];
         $referencedFiles = [];
+        $rowsWithMissingMedia = [];
 
         foreach ($rows as $index => $record) {
             $line = $recordLines[$index] ?? ($index + 2);
@@ -1193,8 +1194,17 @@ class HoardingTransferService
                 }
                 $this->validateCsvNumericFields($record);
             } catch (\InvalidArgumentException $exception) {
+                if (str_contains($exception->getMessage(), 'references a missing or invalid media file')) {
+                    $rowsWithMissingMedia[] = $line;
+                    continue;
+                }
                 $errors[] = "Row {$line}: " . $exception->getMessage();
             }
+        }
+
+        if ($rowsWithMissingMedia) {
+            $errors[] = 'Rows ' . implode(', ', $rowsWithMissingMedia)
+                . ' reference media files that are not in the uploaded CSV ZIP. Upload the original CSV transfer bundle ZIP downloaded from the same Export action without extracting, editing, or recompressing it. If using a separate media ZIP, it must be the matching ZIP from that exact export.';
         }
 
         $unreferencedFiles = array_diff_key($mediaFiles, $referencedFiles);
