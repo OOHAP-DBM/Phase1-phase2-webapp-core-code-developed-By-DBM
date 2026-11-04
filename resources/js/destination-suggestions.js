@@ -21,6 +21,12 @@ function initDestinationSearch(input) {
     let positionFrame;
 
     const close = () => {
+        requestId++;
+        window.clearTimeout(timer);
+        if (activeRequest) {
+            activeRequest.abort();
+            activeRequest = null;
+        }
         dropdown.hidden = true;
         input.setAttribute('aria-expanded', 'false');
     };
@@ -219,6 +225,13 @@ function initDestinationSearch(input) {
     document.addEventListener('click', (event) => {
         if (!dropdown.contains(event.target) && !input.contains(event.target)) close();
     });
+    window.addEventListener('direct-enquiry-modal:opening', close);
+    const enquiryModal = document.getElementById('directEnquiryModal');
+    if (enquiryModal) {
+        new MutationObserver(() => {
+            if (!enquiryModal.classList.contains('hidden')) close();
+        }).observe(enquiryModal, { attributes: true, attributeFilter: ['class'] });
+    }
     form.querySelector('#hoardingWhenTrigger')?.addEventListener('click', close);
     document.addEventListener('scroll', (event) => {
         if (dropdown.contains(event.target) || dropdown.hidden || positionFrame) return;

@@ -865,6 +865,11 @@ Route::middleware(['auth', 'role:vendor'])->prefix('vendor')->name('vendor.')->g
 
         // Listings Management (PROMPT 26)
         Route::get('/my-hoardings', [Modules\Hoardings\Http\Controllers\Vendor\HoardingController::class, 'myHoardings'])->name('hoardings.myHoardings');
+        Route::get('/my-hoardings/import', fn () => redirect()->route('vendor.hoardings.myHoardings'))
+            ->name('hoardings.import.redirect');
+        Route::post('/my-hoardings/import', [Modules\Hoardings\Http\Controllers\Vendor\HoardingController::class, 'previewTransferImport'])->name('hoardings.import');
+        Route::post('/my-hoardings/import/confirm', [Modules\Hoardings\Http\Controllers\Vendor\HoardingController::class, 'confirmTransferImport'])->name('hoardings.import.confirm');
+        Route::post('/my-hoardings/import/cancel', [Modules\Hoardings\Http\Controllers\Vendor\HoardingController::class, 'cancelTransferImport'])->name('hoardings.import.cancel');
         Route::post('hoardings/{id}/toggle', [Modules\Hoardings\Http\Controllers\Vendor\HoardingController::class, 'toggleStatus'])->name('hoardings.toggle');
         Route::get('/hoardings/create', [Modules\Hoardings\Http\Controllers\Vendor\OOHListingController::class, 'create'])->name('hoardings.create');
         Route::post('/hoardings/store', [Modules\Hoardings\Http\Controllers\Vendor\OOHListingController::class, 'store'])->name('hoarding.store');

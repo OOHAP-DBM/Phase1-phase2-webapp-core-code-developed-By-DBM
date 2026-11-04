@@ -110,6 +110,46 @@
             <span class="mr-2 text-lg">+</span> 
             Add a Hoarding
         </a>
+
+        <form action="{{ route('vendor.hoardings.import') }}" method="POST" enctype="multipart/form-data" class="mt-3 flex flex-col items-center gap-2">
+            @csrf
+            <p class="max-w-md text-sm text-gray-600">
+                To import, choose Export &gt; CSV transfer bundle (.zip with media) and upload the ZIP without extracting it, or upload the OOHAPP .xlsx transfer workbook. CSV/PDF report exports cannot be imported. A standalone transfer .csv needs its matching media ZIP.
+            </p>
+            <label for="hoarding-import-file"
+                   class="inline-flex items-center justify-center px-8 py-3 border border-blue-600 text-blue-700 hover:bg-blue-50 font-medium rounded-lg cursor-pointer">
+                Choose transfer file
+            </label>
+            <input id="hoarding-import-file" type="file" name="file" accept=".xlsx,.csv,.zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip" class="sr-only" required>
+            <details class="text-sm text-gray-600">
+                <summary class="cursor-pointer">CSV media ZIP (optional)</summary>
+                <input id="hoarding-import-media-file" type="file" name="media_file" accept=".zip,application/zip" class="mt-1 max-w-xs text-sm">
+            </details>
+            <button type="submit"
+                    class="inline-flex items-center justify-center px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md">
+                Preview Import
+            </button>
+        </form>
+        @if($errors->any())
+            <ul class="mt-3 list-disc pl-5 text-left text-sm text-red-700">
+                @foreach($errors->all() as $error)
+                    @foreach(preg_split('/\r\n|\r|\n/', $error) as $errorLine)
+                        <li>{{ $errorLine }}</li>
+                    @endforeach
+                @endforeach
+            </ul>
+        @endif
+        @if(session('hoarding_import_result'))
+            @php
+                $importResult = session('hoarding_import_result');
+            @endphp
+            <div class="mt-3 text-sm text-gray-700">
+                <p>{{ $importResult['created'] }} created as drafts, {{ $importResult['skipped'] }} duplicate or still-existing hoardings skipped.</p>
+                @foreach($importResult['hoardings'] as $item)
+                    <p>{{ $item['title'] }} — {{ $item['status'] }}</p>
+                @endforeach
+            </div>
+        @endif
         
     </div>
 </div>
