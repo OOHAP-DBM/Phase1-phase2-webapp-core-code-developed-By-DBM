@@ -114,20 +114,16 @@
         <form action="{{ route('vendor.hoardings.import') }}" method="POST" enctype="multipart/form-data" class="mt-3 flex flex-col items-center gap-2">
             @csrf
             <p class="max-w-md text-sm text-gray-600">
-                To import, choose Export &gt; CSV transfer bundle (.zip with media) and upload the ZIP without extracting it, or upload the OOHAPP .xlsx transfer workbook. CSV/PDF report exports cannot be imported. A standalone transfer .csv needs its matching media ZIP.
+                Upload an OOHAPP .xlsx transfer workbook to restore hoardings and their included media.
             </p>
             <label for="hoarding-import-file"
                    class="inline-flex items-center justify-center px-8 py-3 border border-blue-600 text-blue-700 hover:bg-blue-50 font-medium rounded-lg cursor-pointer">
-                Choose transfer file
+                Choose Excel file
             </label>
-            <input id="hoarding-import-file" type="file" name="file" accept=".xlsx,.csv,.zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip" class="sr-only" required>
-            <details class="text-sm text-gray-600">
-                <summary class="cursor-pointer">CSV media ZIP (optional)</summary>
-                <input id="hoarding-import-media-file" type="file" name="media_file" accept=".zip,application/zip" class="mt-1 max-w-xs text-sm">
-            </details>
+            <input id="hoarding-import-file" type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr-only" required>
             <button type="submit"
                     class="inline-flex items-center justify-center px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md">
-                Preview Import
+                Preview Excel Import
             </button>
         </form>
         @if($errors->any())

@@ -3,13 +3,10 @@
 @section('content')
 <div class="mx-auto max-w-5xl px-4 py-8">
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
-        <h1 class="text-xl font-semibold text-gray-900">Review hoarding import</h1>
+        <h1 class="text-xl font-semibold text-gray-900">Review Excel hoarding import</h1>
         <p class="mt-2 text-sm text-gray-600">
             Transfer file is mapped to your signed-in vendor account ({{ $preview['vendor_name'] }}).
             Ready listings will be imported as drafts. Already-imported records and original listings still present in this same database will be skipped.
-        </p>
-        <p class="mt-2 text-sm text-gray-600">
-            CSV/PDF report exports are not transfer files. To import with CSV, upload the CSV transfer bundle ZIP from Export without extracting it so its media stays included.
         </p>
 
         <div class="mt-5 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">

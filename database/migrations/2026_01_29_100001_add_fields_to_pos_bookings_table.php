@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -6,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-         Schema::table('pos_bookings', function (Blueprint $table) {
+        Schema::table('pos_bookings', function (Blueprint $table) {
 
             /*
              |-------------------------------------------------
@@ -16,9 +17,9 @@ return new class extends Migration {
             $table->dropForeign(['customer_id']);
             $table->unsignedBigInteger('customer_id')->nullable(false)->change();
             $table->foreign('customer_id')
-                  ->references('id')
-                  ->on('users')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('users')
+                ->onDelete('cascade');
 
             /*
              |-------------------------------------------------
@@ -67,12 +68,7 @@ return new class extends Migration {
              | 5. Index
              |-------------------------------------------------
              */
-            $indexExists = DB::select("
-                SHOW INDEX FROM pos_bookings 
-                WHERE Key_name = 'pos_bookings_vendor_id_customer_id_index'
-            ");
-
-            if (empty($indexExists)) {
+            if (!Schema::hasIndex('pos_bookings', 'pos_bookings_vendor_id_customer_id_index')) {
                 $table->index(['vendor_id', 'customer_id']);
             }
         });
@@ -80,7 +76,7 @@ return new class extends Migration {
 
     public function down(): void
     {
-         Schema::table('pos_bookings', function (Blueprint $table) {
+        Schema::table('pos_bookings', function (Blueprint $table) {
 
             // revert FK
             if (Schema::hasColumn('pos_bookings', 'customer_id')) {

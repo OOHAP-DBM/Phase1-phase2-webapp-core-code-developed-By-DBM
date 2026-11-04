@@ -103,10 +103,26 @@ class HoardingTransferService
         $listingsSheet->setTitle('Hoardings');
         $spreadsheet->setActiveSheetIndexByName('Hoardings');
         $mediaFiles = [];
+        $skippedHoardings = [];
         try {
             $records = [];
             foreach ($hoardings as $hoarding) {
-                $records[] = $this->exportHoarding($hoarding, $vendor, $mediaFiles);
+                $mediaFilesBeforeHoarding = $mediaFiles;
+                try {
+                    $records[] = $this->exportHoarding($hoarding, $vendor, $mediaFiles);
+                } catch (HoardingTransferMediaMissingException $exception) {
+                    $mediaFiles = $mediaFilesBeforeHoarding;
+                    $skippedHoardings[] = [
+                        'id' => $hoarding->id,
+                        'title' => $hoarding->title,
+                        'reason' => $exception->getMessage(),
+                    ];
+                }
+            }
+
+            if ($records === []) {
+                $details = implode("\n", array_column($skippedHoardings, 'reason'));
+                throw new \InvalidArgumentException("No hoardings were exported because all selected listings have missing media.\n{$details}");
             }
 
             $manifest = [
@@ -183,6 +199,7 @@ class HoardingTransferService
         return [
             'path' => $workbookPath,
             'filename' => 'oohapp-hoardings-' . now()->format('Ymd-His') . '.xlsx',
+            'skipped_hoardings' => $skippedHoardings,
         ];
     }
 
@@ -627,7 +644,7 @@ class HoardingTransferService
             ->map(function (Media $media, int $index) use ($reference, &$mediaFiles) {
                 $file = $media->getPath();
                 if (!is_file($file)) {
-                    throw new \InvalidArgumentException('A hoarding media file is missing from storage and cannot be included in the transfer.');
+                    throw new HoardingTransferMediaMissingException('A hoarding media file is missing from storage and cannot be included in the transfer.');
                 }
                 $mediaReference = "media/{$reference}/library-{$index}-" . $this->safeFileName($media->file_name);
                 $this->registerMediaFile($mediaFiles, $mediaReference, $file, $media->file_name, (string) ($media->mime_type ?: 'application/octet-stream'));
@@ -704,7 +721,7 @@ class HoardingTransferService
 
         if (!$files) {
             $recordId = isset($attributes['id']) ? ' #' . $attributes['id'] : '';
-            throw new \InvalidArgumentException(
+            throw new HoardingTransferMediaMissingException(
                 "A hoarding media record has no available file to include in the transfer. {$context}, media record{$recordId}: the database references a file that is missing from public storage. Restore the original media files or replace/remove the broken media entry before exporting."
             );
         }
@@ -1585,10 +1602,13 @@ class HoardingTransferService
 
     private function safeAttributes($model, array $excluded): array
     {
-        $attributes = $model->getAttributes();
-        foreach ($excluded as $key) {
-            unset($attributes[$key]);
+        $attributes = [];
+        foreach (array_keys($model->getAttributes()) as $key) {
+            if (!in_array($key, $excluded, true)) {
+                $attributes[$key] = $model->getAttribute($key);
+            }
         }
+
         return $attributes;
     }
 

@@ -117,20 +117,16 @@
                         class="flex items-center gap-2 whitespace-nowrap">
                         @csrf
                         <label for="hoarding-import-file"
-                            title="Import an OOHAPP .xlsx transfer workbook or CSV transfer file. For a transfer CSV, upload its matching media ZIP or the complete CSV transfer bundle ZIP."
+                            title="Import an OOHAPP Excel transfer workbook, including its media."
                             class="px-5 py-2 border border-blue-600 text-blue-700 hover:bg-blue-50 font-medium rounded-md text-[13px] cursor-pointer">
-                            Choose transfer file
+                            Choose Excel file
                         </label>
-                        <input id="hoarding-import-file" type="file" name="file" accept=".xlsx,.csv,.zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip" class="sr-only" required>
+                        <input id="hoarding-import-file" type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr-only" required>
                         <button type="submit"
                             class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-[13px] cursor-pointer">
-                            Preview Import
+                            Preview Excel Import
                         </button>
                     </form>
-                    <details class="text-xs text-gray-600">
-                        <summary class="cursor-pointer">CSV media ZIP (optional)</summary>
-                        <input id="hoarding-import-media-file" type="file" name="media_file" form="hoarding-import-form" accept=".zip,application/zip" class="mt-1 max-w-36 text-xs">
-                    </details>
                     <a href="{{ route('vendor.hoardings.add') }}"
                         class="px-4 py-2 bg-black text-white font-medium rounded-md text-[13px] flex items-center whitespace-nowrap flex-shrink-0">
                         + Add New Hoarding
@@ -165,7 +161,7 @@
                 @if(!empty($importResult['hoardings']))
                     <ul class="mt-2 list-disc pl-5 text-sm">
                         @foreach($importResult['hoardings'] as $item)
-                            <li>{{ $item['title'] }} — {{ $item['status'] }}@if(!empty($item['id'])) (DEV ID: {{ $item['id'] }})@endif</li>
+                            <li>{{ $item['title'] }} — {{ $item['status'] }}@if(!empty($item['id'])) (ID: {{ $item['id'] }})@endif</li>
                         @endforeach
                     </ul>
                 @endif
@@ -838,7 +834,7 @@ function autoSearchHoardings(e) {
     function showExportFormatPrompt() {
         Swal.fire({
             title: 'Export Hoardings',
-            text: 'CSV and PDF are reports. For complete CSV transfer data and media choose CSV Transfer Bundle; Excel transfer workbooks continue to include media. Select rows to export only those; with no selection, all your hoardings are exported.',
+            text: 'Select Excel for a complete transfer workbook including media. Hoardings with missing media are skipped. CSV and PDF remain report exports. Select rows to export only those; with no selection, all your hoardings are exported.',
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Export',
@@ -848,7 +844,6 @@ function autoSearchHoardings(e) {
             inputOptions: {
                 'csv': 'CSV report (reporting only)',
                 'excel': 'Excel (.xlsx transfer workbook)',
-                'csv_transfer': 'CSV transfer bundle (.zip with media; for import)',
                 'pdf': 'PDF'
             },
             customClass: {
@@ -866,7 +861,7 @@ function autoSearchHoardings(e) {
                 let url = new URL(window.location.href);
                 url.searchParams.set('export', '1');
                 url.searchParams.set('format', format);
-                if (format === 'excel' || format === 'csv_transfer') {
+                if (format === 'excel') {
                     url.searchParams.delete('hoarding_ids[]');
                     url.searchParams.delete('hoarding_ids');
                     document.querySelectorAll('.row-checkbox:checked').forEach((checkbox) => {
