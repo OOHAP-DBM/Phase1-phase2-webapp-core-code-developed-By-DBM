@@ -555,14 +555,16 @@ class HoardingTransferService
             $record['brand_logos'] = HoardingBrandLogo::query()->where('hoarding_id', $hoarding->id)
                 ->orderBy('sort_order')
                 ->get()
-                ->map(fn (HoardingBrandLogo $logo) => $this->exportFileRecord(
-                    $reference,
-                    'ooh-logo',
-                    $logo->getAttributes(),
-                    ['id', 'hoarding_id', 'created_at', 'updated_at', 'deleted_at'],
-                    $mediaFiles,
-                    $this->hoardingMediaContext($hoarding, 'brand logo')
-            ))
+                ->map(function (HoardingBrandLogo $logo) use ($reference, &$mediaFiles, $hoarding) {
+                    return $this->exportFileRecord(
+                        $reference,
+                        'ooh-logo',
+                        $logo->getAttributes(),
+                        ['id', 'hoarding_id', 'created_at', 'updated_at', 'deleted_at'],
+                        $mediaFiles,
+                        $this->hoardingMediaContext($hoarding, 'brand logo')
+                    );
+                })
                 ->filter()
                 ->values()
                 ->all();
@@ -577,25 +579,29 @@ class HoardingTransferService
                 ->map(fn (DOOHSlot $slot) => $this->safeAttributes($slot, ['id', 'dooh_screen_id', 'booking_id', 'start_date', 'end_date', 'total_booking_days', 'total_booking_cost', 'created_at', 'updated_at', 'deleted_at']))
                 ->all();
             $record['screen_media'] = $screen->media
-                ->map(fn (DOOHScreenMedia $media) => $this->exportMediaRecord(
-                    $reference,
-                    'dooh-media',
-                    $media,
-                    $mediaFiles,
-                    $this->hoardingMediaContext($hoarding, 'screen media')
-                ))
+                ->map(function (DOOHScreenMedia $media) use ($reference, &$mediaFiles, $hoarding) {
+                    return $this->exportMediaRecord(
+                        $reference,
+                        'dooh-media',
+                        $media,
+                        $mediaFiles,
+                        $this->hoardingMediaContext($hoarding, 'screen media')
+                    );
+                })
                 ->filter()
                 ->values()
                 ->all();
             $record['screen_brand_logos'] = $screen->brandLogos
-                ->map(fn (DOOHScreenBrandLogo $logo) => $this->exportFileRecord(
-                    $reference,
-                    'dooh-logo',
-                    $logo->getAttributes(),
-                    ['id', 'dooh_screen_id', 'created_at', 'updated_at', 'deleted_at'],
-                    $mediaFiles,
-                    $this->hoardingMediaContext($hoarding, 'screen brand logo')
-                ))
+                ->map(function (DOOHScreenBrandLogo $logo) use ($reference, &$mediaFiles, $hoarding) {
+                    return $this->exportFileRecord(
+                        $reference,
+                        'dooh-logo',
+                        $logo->getAttributes(),
+                        ['id', 'dooh_screen_id', 'created_at', 'updated_at', 'deleted_at'],
+                        $mediaFiles,
+                        $this->hoardingMediaContext($hoarding, 'screen brand logo')
+                    );
+                })
                 ->filter()
                 ->values()
                 ->all();
@@ -604,13 +610,15 @@ class HoardingTransferService
         }
 
         $record['media'] = $hoarding->oohMedia
-            ->map(fn (HoardingMedia $media) => $this->exportMediaRecord(
-                $reference,
-                'ooh-media',
-                $media,
-                $mediaFiles,
-                $this->hoardingMediaContext($hoarding, 'media')
-            ))
+            ->map(function (HoardingMedia $media) use ($reference, &$mediaFiles, $hoarding) {
+                return $this->exportMediaRecord(
+                    $reference,
+                    'ooh-media',
+                    $media,
+                    $mediaFiles,
+                    $this->hoardingMediaContext($hoarding, 'media')
+                );
+            })
             ->filter()
             ->values()
             ->all();
