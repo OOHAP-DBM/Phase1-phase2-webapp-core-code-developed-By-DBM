@@ -113,7 +113,24 @@
                         class="px-6 py-2 bg-[#00A86B] hover:bg-emerald-700 text-white font-medium rounded-md text-[13px] cursor-pointer whitespace-nowrap flex-shrink-0">
                         Export
                     </button>
-
+                    <form id="hoarding-import-form" action="{{ route('vendor.hoardings.import') }}" method="POST" enctype="multipart/form-data"
+                        class="flex items-center gap-2 whitespace-nowrap">
+                        @csrf
+                        <label for="hoarding-import-file"
+                            title="Import an OOHAPP .xlsx transfer workbook or CSV transfer file. For a transfer CSV, upload its matching media ZIP or the complete CSV transfer bundle ZIP."
+                            class="px-5 py-2 border border-blue-600 text-blue-700 hover:bg-blue-50 font-medium rounded-md text-[13px] cursor-pointer">
+                            Choose transfer file
+                        </label>
+                        <input id="hoarding-import-file" type="file" name="file" accept=".xlsx,.csv,.zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/zip" class="sr-only" required>
+                        <button type="submit"
+                            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md text-[13px] cursor-pointer">
+                            Preview Import
+                        </button>
+                    </form>
+                    <details class="text-xs text-gray-600">
+                        <summary class="cursor-pointer">CSV media ZIP (optional)</summary>
+                        <input id="hoarding-import-media-file" type="file" name="media_file" form="hoarding-import-form" accept=".zip,application/zip" class="mt-1 max-w-36 text-xs">
+                    </details>
                     <a href="{{ route('vendor.hoardings.add') }}"
                         class="px-4 py-2 bg-black text-white font-medium rounded-md text-[13px] flex items-center whitespace-nowrap flex-shrink-0">
                         + Add New Hoarding
@@ -124,6 +141,37 @@
     </div>
 
     @include('hoardings.vendor.filter')
+
+    @if($errors->any() || session('hoarding_import_result'))
+        <div class="mx-6 mt-4 rounded-md border p-4 {{ $errors->any() ? 'border-red-200 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-800' }}">
+            @if($errors->any())
+                <p class="font-semibold">{{ $errors->has('export') ? 'Export failed' : 'Import failed' }}</p>
+                <ul class="mt-1 list-disc pl-5 text-sm">
+                    @foreach($errors->all() as $error)
+                        @foreach(preg_split('/\r\n|\r|\n/', $error) as $errorLine)
+                            <li>{{ $errorLine }}</li>
+                        @endforeach
+                    @endforeach
+                </ul>
+            @else
+                @php
+                    $importResult = session('hoarding_import_result');
+                @endphp
+                <p class="font-semibold">Import finished</p>
+                <p class="mt-1 text-sm">
+                    {{ $importResult['created'] }} created as drafts,
+                    {{ $importResult['skipped'] }} duplicate or still-existing hoardings skipped.
+                </p>
+                @if(!empty($importResult['hoardings']))
+                    <ul class="mt-2 list-disc pl-5 text-sm">
+                        @foreach($importResult['hoardings'] as $item)
+                            <li>{{ $item['title'] }} — {{ $item['status'] }}@if(!empty($item['id'])) (DEV ID: {{ $item['id'] }})@endif</li>
+                        @endforeach
+                    </ul>
+                @endif
+            @endif
+        </div>
+    @endif
 
     <div class="w-full mx-auto py-3 space-y-5">
         {{-- <div class="flex flex-wrap gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">
@@ -269,8 +317,6 @@
                                 </form>
                             @endif
                         </td>
-
-
 
                             <td class="px-3 sm:px-4 py-2 sm:py-3 text-center whitespace-nowrap">
                                 <div class="relative inline-block text-left">
@@ -792,7 +838,7 @@ function autoSearchHoardings(e) {
     function showExportFormatPrompt() {
         Swal.fire({
             title: 'Export Hoardings',
-            text: 'Select the format you want to export:',
+            text: 'CSV and PDF are reports. For complete CSV transfer data and media choose CSV Transfer Bundle; Excel transfer workbooks continue to include media. Select rows to export only those; with no selection, all your hoardings are exported.',
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Export',
@@ -800,8 +846,9 @@ function autoSearchHoardings(e) {
             cancelButtonText: 'Cancel',
             input: 'radio',
             inputOptions: {
-                'csv': 'CSV',
-                'excel': 'Excel',
+                'csv': 'CSV report (reporting only)',
+                'excel': 'Excel (.xlsx transfer workbook)',
+                'csv_transfer': 'CSV transfer bundle (.zip with media; for import)',
                 'pdf': 'PDF'
             },
             customClass: {
@@ -819,10 +866,18 @@ function autoSearchHoardings(e) {
                 let url = new URL(window.location.href);
                 url.searchParams.set('export', '1');
                 url.searchParams.set('format', format);
+                if (format === 'excel' || format === 'csv_transfer') {
+                    url.searchParams.delete('hoarding_ids[]');
+                    url.searchParams.delete('hoarding_ids');
+                    document.querySelectorAll('.row-checkbox:checked').forEach((checkbox) => {
+                        url.searchParams.append('hoarding_ids[]', checkbox.value);
+                    });
+                }
                 window.location.href = url.toString();
             }
         });
     }
+
 </script>
  <script>
     function confirmToggleMenuAction(e, btn, isActiveNow) {
