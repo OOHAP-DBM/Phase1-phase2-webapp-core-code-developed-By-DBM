@@ -8,8 +8,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Session;
 use Modules\Hoardings\Services\HoardingService;
+use Modules\Hoardings\Services\HoardingTransferService;
 use App\Models\Hoarding;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Vendor HoardingController
@@ -364,7 +366,7 @@ class HoardingController extends Controller
             // Build query for export (no pagination)
             if ($activeTab === 'draft') {
                 $query = Hoarding::where('vendor_id', $vendor->id)
-                    ->where('status', 'Draft');
+                    ->where('status', Hoarding::STATUS_DRAFT);
                 if ($search) {
                     $query->search($search);
                 }
@@ -409,6 +411,41 @@ class HoardingController extends Controller
                 $hoardings = $query->orderByDesc('created_at')->get();
             }
 
+            if (in_array($request->input('format'), ['excel', 'csv_transfer'], true)) {
+                $selectedIds = $request->query('hoarding_ids');
+                if ($selectedIds !== null && $selectedIds !== []) {
+                    $validated = $request->validate([
+                        'hoarding_ids' => ['required', 'array', 'min:1'],
+                        'hoarding_ids.*' => ['required', 'integer', 'distinct', 'min:1'],
+                    ]);
+                    $hoardingIds = array_map('intval', $validated['hoarding_ids']);
+                } else {
+                    $hoardingIds = Hoarding::where('vendor_id', $vendor->id)
+                        ->orderByDesc('created_at')
+                        ->pluck('id')
+                        ->all();
+                }
+                if (!$hoardingIds) {
+                    return redirect()->route('vendor.hoardings.myHoardings')
+                        ->withErrors(['export' => 'There are no hoardings to export for your vendor account.']);
+                }
+
+                try {
+                    $transferService = app(HoardingTransferService::class);
+                    $package = $request->input('format') === 'excel'
+                        ? $transferService->export($vendor, $hoardingIds)
+                        : $transferService->exportCsvTransfer($vendor, $hoardingIds);
+                } catch (\InvalidArgumentException $exception) {
+                    return redirect()->route('vendor.hoardings.myHoardings')
+                        ->withErrors(['export' => $exception->getMessage()]);
+                }
+                return response()->download($package['path'], $package['filename'], [
+                    'Content-Type' => $request->input('format') === 'excel'
+                        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        : 'application/zip',
+                ])->deleteFileAfterSend(true);
+            }
+
             $columns = ['ID', 'Title', 'Type', 'Location', 'Bookings', 'Status'];
             $rows = $hoardings->map(function ($h) {
                 $parts = [];
@@ -426,20 +463,7 @@ class HoardingController extends Controller
             $filename = 'my_hoardings_' . now()->format('Ymd_His');
             $format = $request->input('format');
 
-            if ($format === 'excel') {
-                $html = '<table>';
-                $html .= '<tr>' . implode('', array_map(fn($col) => "<th>{$col}</th>", $columns)) . '</tr>';
-                foreach ($rows as $row) {
-                    $html .= '<tr>' . implode('', array_map(fn($cell) => "<td>{$cell}</td>", $row)) . '</tr>';
-                }
-                $html .= '</table>';
-                return response($html, 200, [
-                    'Content-Type'        => 'application/vnd.ms-excel',
-                    'Content-Disposition' => "attachment; filename={$filename}.xls",
-                    'Pragma'              => 'no-cache',
-                    'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
-                ]);
-            } elseif ($format === 'pdf') {
+            if ($format === 'pdf') {
                 $html = '<!DOCTYPE html><html><head><style>';
                 $html .= 'body { font-family: Arial, sans-serif; font-size: 12px; }';
                 $html .= 'h2 { margin-bottom: 10px; }';
@@ -487,7 +511,7 @@ class HoardingController extends Controller
         // --- Normal page logic ---
         if ($activeTab === 'draft') {
             $query = Hoarding::where('vendor_id', $vendor->id)
-                ->where('status', 'Draft');
+                ->where('status', Hoarding::STATUS_DRAFT);
             if ($search) {
                 $query->search($search);
             }
@@ -554,6 +578,141 @@ class HoardingController extends Controller
             'activeTab' => $activeTab,
             'perPage' => $perPage
         ]);
+    }
+
+    public function previewTransferImport(Request $request, HoardingTransferService $transferService)
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'extensions:xlsx,csv,zip', 'max:262144'],
+            'media_file' => ['nullable', 'file', 'extensions:zip', 'max:262144'],
+        ], [
+            'file.required' => 'Choose an OOHAPP Excel or CSV transfer file.',
+            'file.extensions' => 'Choose an OOHAPP .xlsx workbook, a complete OOHAPP transfer .csv, or its .zip transfer bundle. Report-only CSV/PDF exports cannot be imported.',
+            'file.max' => 'The selected transfer file must be 256 MB or smaller.',
+            'media_file.extensions' => 'CSV transfer media must be provided as a .zip file.',
+            'media_file.max' => 'The media ZIP must be 256 MB or smaller.',
+        ]);
+
+        $extension = strtolower($validated['file']->getClientOriginalExtension());
+        if ($extension === 'xlsx' && $request->hasFile('media_file')) {
+            return redirect()->route('vendor.hoardings.myHoardings')
+                ->withErrors(['media_file' => 'Excel transfer workbooks already contain their media. Do not upload a separate media ZIP.']);
+        }
+        if ($extension === 'zip' && $request->hasFile('media_file')) {
+            return redirect()->route('vendor.hoardings.myHoardings')
+                ->withErrors(['media_file' => 'The CSV transfer ZIP already contains its media. Do not upload another media ZIP.']);
+        }
+        if ($extension !== 'csv' && $request->hasFile('media_file')) {
+            return redirect()->route('vendor.hoardings.myHoardings')
+                ->withErrors(['media_file' => 'A separate media ZIP is only used with a transfer CSV file.']);
+        }
+
+        try {
+            $preview = match ($extension) {
+                'xlsx' => $transferService->inspect($validated['file']->getRealPath(), Auth::user()),
+                'csv' => $transferService->inspectCsv(
+                    $validated['file']->getRealPath(),
+                    Auth::user(),
+                    $request->file('media_file')?->getRealPath()
+                ),
+                'zip' => $transferService->inspectCsvBundle($validated['file']->getRealPath(), Auth::user()),
+            };
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()->route('vendor.hoardings.myHoardings')
+                ->withErrors(['file' => $exception->getMessage()]);
+        }
+
+        $this->discardTransferPreview();
+        $token = Str::random(48);
+        $path = $validated['file']->storeAs('hoarding-transfers', $token . '.' . $extension, 'local');
+        if (!$path) {
+            throw new \RuntimeException('The transfer package could not be stored for preview.');
+        }
+        $mediaPath = null;
+        if ($request->hasFile('media_file')) {
+            $mediaPath = $request->file('media_file')->storeAs('hoarding-transfers', $token . '-media.zip', 'local');
+            if (!$mediaPath) {
+                Storage::disk('local')->delete($path);
+                throw new \RuntimeException('The transfer media package could not be stored for preview.');
+            }
+        }
+        session()->put('vendor_hoarding_transfer_preview', [
+            'token' => $token,
+            'path' => $path,
+            'media_path' => $mediaPath,
+            'format' => $extension,
+            'vendor_id' => Auth::id(),
+            'expires_at' => now()->addMinutes(30)->timestamp,
+        ]);
+
+        return view('hoardings.vendor.transfer-preview', compact('preview', 'token'));
+    }
+
+    public function confirmTransferImport(Request $request, HoardingTransferService $transferService)
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'size:48'],
+        ]);
+        $pending = session('vendor_hoarding_transfer_preview');
+        if (
+            !is_array($pending)
+            || !hash_equals((string) ($pending['token'] ?? ''), $validated['token'])
+            || (int) ($pending['vendor_id'] ?? 0) !== (int) Auth::id()
+            || (int) ($pending['expires_at'] ?? 0) < now()->timestamp
+        ) {
+            $this->discardTransferPreview();
+            return redirect()->route('vendor.hoardings.myHoardings')
+                ->withErrors(['file' => 'The import preview expired. Upload the transfer file again.']);
+        }
+
+        try {
+            $transferPath = Storage::disk('local')->path($pending['path']);
+            $result = match ($pending['format'] ?? 'xlsx') {
+                'xlsx' => $transferService->import($transferPath, Auth::user()),
+                'csv' => $transferService->importCsv(
+                    $transferPath,
+                    Auth::user(),
+                    !empty($pending['media_path']) ? Storage::disk('local')->path($pending['media_path']) : null
+                ),
+                'zip' => $transferService->importCsvBundle($transferPath, Auth::user()),
+                default => throw new \InvalidArgumentException('This transfer file type is not supported. Upload the workbook or CSV bundle again.'),
+            };
+        } catch (\InvalidArgumentException $exception) {
+            $this->discardTransferPreview();
+            return redirect()->route('vendor.hoardings.myHoardings')
+                ->withErrors(['file' => $exception->getMessage()]);
+        } finally {
+            $this->discardTransferPreview();
+        }
+
+        return redirect()->route('vendor.hoardings.myHoardings')
+            ->with('hoarding_import_result', $result);
+    }
+
+    public function cancelTransferImport(Request $request)
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'size:48'],
+        ]);
+        $pending = session('vendor_hoarding_transfer_preview');
+        if (is_array($pending) && hash_equals((string) ($pending['token'] ?? ''), $validated['token'])) {
+            $this->discardTransferPreview();
+        }
+
+        return redirect()->route('vendor.hoardings.myHoardings');
+    }
+
+    private function discardTransferPreview(): void
+    {
+        $pending = session('vendor_hoarding_transfer_preview');
+        if (is_array($pending)) {
+            foreach (['path', 'media_path'] as $key) {
+                if (!empty($pending[$key])) {
+                    Storage::disk('local')->delete($pending[$key]);
+                }
+            }
+        }
+        session()->forget('vendor_hoarding_transfer_preview');
     }
 
     private function normalizeFilterValues(array $values): array

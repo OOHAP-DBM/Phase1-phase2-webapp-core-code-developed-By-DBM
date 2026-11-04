@@ -379,6 +379,7 @@
     // MODAL MANAGEMENT
     // =====================================================
     function openDirectEnquiryModal() {
+        window.dispatchEvent(new Event('direct-enquiry-modal:opening'));
         document.getElementById('directEnquiryModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         regenerateCaptcha();
@@ -819,44 +820,27 @@
     document.head.appendChild(style);
 
     // =====================================================
-    // AUTO-SHOW DIRECT ENQUIRY MODAL AT INTERVALS
+    // Show the lead form when a desktop visitor appears to be leaving the page.
     // =====================================================
     (function () {
-        // Only show if not already submitted or closed recently
-
         function shouldShowModal() {
-            // Check if modal was closed in the last 6 hours
             const closedAt = localStorage.getItem('direct_enquiry_closed_at');
             if (closedAt && (Date.now() - parseInt(closedAt, 10)) < 6 * 60 * 60 * 1000) {
-                console.log('[DirectEnquiryModal] Not showing: closedAt in last 6 hours', closedAt);
                 return false;
             }
-            // You can add more checks here (e.g., if enquiry was submitted)
-            // console.log('[DirectEnquiryModal] shouldShowModal: true');
-            return true;
+            return !sessionStorage.getItem('direct_enquiry_exit_shown');
         }
 
-        // Show modal at intervals: 30s, 1m, 2m, 5m
-        const intervals = [30, 80, 160, 310]; // seconds
-        let shown = false;
+        document.addEventListener('mouseout', (event) => {
+            if (window.innerWidth <= 640 || event.clientY > 0 || event.relatedTarget) return;
+            if (document.activeElement?.matches('[data-destination-search]')) return;
+            if (Array.from(document.querySelectorAll('.destination-suggestions'))
+                .some((dropdown) => !dropdown.hidden)) return;
+            if (!shouldShowModal()) return;
 
-
-        function scheduleModals() {
-            intervals.forEach((sec, idx) => {
-                setTimeout(() => {
-                    console.log(`[DirectEnquiryModal] Timer fired for interval: ${sec}s, shown: ${shown}`);
-                    if (!shown && shouldShowModal()) {
-                        console.log('[DirectEnquiryModal] Opening modal at', sec, 'seconds');
-                        openDirectEnquiryModal();
-                        shown = true;
-                    }
-                    // After last interval, allow future triggers if user closes without submitting
-                    if (idx === intervals.length - 1) shown = false;
-                }, sec * 1000);
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', scheduleModals);
+            sessionStorage.setItem('direct_enquiry_exit_shown', '1');
+            openDirectEnquiryModal();
+        });
     })();
 </script>
 <style>
